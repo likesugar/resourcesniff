@@ -121,6 +121,7 @@ public class SniffActivity extends Activity {
 
             @Override
             public void onPageFinished(WebView view, String url) {
+                BiliParser.tryParse(SniffActivity.this, url);
                 etUrl.setText(url);
             }
         });
@@ -228,6 +229,117 @@ public class SniffActivity extends Activity {
         }
         if (text.matches("[\\w\\-./?:#=&%+~@!$'*;,\\[\\]]+")) return text;
         return null;
+    }
+
+    /** B站视频解析（downkyi 思路提取）：view API 拿 cid → playurl API(fnval=16 DASH, qn=127) 取最高码率，入记录 */
+    static class BiliParser {
+        static final java.util.Map<Integer, String> QN = new java.util.HashMap<Integer, String>();
+        static {
+            QN.put(127, "8K超高清"); QN.put(126, "杜比视界"); QN.put(125, "HDR真彩");
+            QN.put(120, "4K超清"); QN.put(116, "1080P60"); QN.put(112, "1080P高码率");
+            QN.put(80, "1080P高清"); QN.put(74, "720P60"); QN.put(64, "720P高清");
+            QN.put(32, "480P清晰"); QN.put(16, "360P流畅");
+        }
+        static final java.util.Set<String> parsed = new java.util.HashSet<String>();
+
+        static void tryParse(final SniffActivity act, String pageUrl) {
+            try {
+                if (pageUrl == null) return;
+                Uri u = Uri.parse(pageUrl);
+                String host = u.getHost() == null ? "" : u.getHost();
+                if (!host.contains("bilibili.com")) return;
+                if (!u.getPath().contains("/video/")) return;
+                Matcher m = Pattern.compile("(BV[0-9A-Za-z]{10})").matcher(pageUrl);
+                if (!m.find()) return;
+                final String bvid = m.group(1);
+                int p = 1;
+                try { p = Integer.parseInt(u.getQueryParameter("p")); } catch (Exception e) { }
+                final int pIdx = p;
+                if (!parsed.add(bvid + "#p" + pIdx)) return;
+
+                new Thread(new Runnable() {
+                    @Override
+                    public void run() {
+                        try {
+                            // 1. view API → cid
+                            String vjson = httpGet("https://api.bilibili.com/x/web-interface/view?bvid=" + bvid,
+                                    "https://www.bilibili.com/");
+                            org.json.JSONObject vroot = new org.json.JSONObject(vjson);
+                            if (vroot.optInt("code", -1) != 0) return;
+                            org.json.JSONArray pages = vroot.getJSONObject("data").getJSONArray("pages");
+                            long cid = pages.getJSONObject(Math.min(pIdx - 1, pages.length() - 1)).getLong("cid");
+                            final String title = vroot.getJSONObject("data").optString("title", "B站视频");
+
+                            // 2. playurl API（带 WebView Cookie，登录则可拿到高画质）
+                            String apiUrl = "https://api.bilibili.com/x/player/playurl?bvid=" + bvid
+                                    + "&cid=" + cid + "&qn=127&fnval=16&fourk=1";
+                            String pjson = httpGet(apiUrl, "https://www.bilibili.com/video/");
+                            org.json.JSONObject proot = new org.json.JSONObject(pjson);
+                            if (proot.optInt("code", -1) != 0) return;
+                            org.json.JSONObject pd = proot.getJSONObject("data");
+                            int qn = pd.optInt("quality", 0);
+                            String qname = QN.containsKey(qn) ? QN.get(qn) : ("qn" + qn);
+
+                            String best = null; long bestBw = -1;
+                            if (pd.has("dash")) {
+                                org.json.JSONArray vids = pd.getJSONObject("dash").getJSONArray("video");
+                                for (int i = 0; i < vids.length(); i++) {
+                                    org.json.JSONObject v = vids.getJSONObject(i);
+                                    long bw = v.optLong("bandwidth", 0);
+                                    int id = v.optInt("id", 0);
+                                    // 优先画质 id 大的，同画质选码率高的
+                                    String q1 = QN.containsKey(id) ? QN.get(id) : ("qn" + id);
+                                    String q2 = QN.containsKey(qn) ? QN.get(qn) : ("qn" + qn);
+                                    boolean better = best == null || compareQ(id, qn) || (id == qn && bw > bestBw);
+                                    if (better) {
+                                        best = v.getString("baseUrl");
+                                        bestBw = bw;
+                                        qname = q1;
+                                    }
+                                }
+                            } else {
+                                org.json.JSONArray durls = pd.optJSONArray("durl");
+                                if (durls != null && durls.length() > 0) {
+                                    best = durls.getJSONObject(0).getString("url");
+                                }
+                            }
+                            if (best == null) return;
+                            final String fbest = best;
+                            final String fqn = qname;
+                            act.runOnUiThread(new Runnable() {
+                                @Override
+                                public void run() {
+                                    String key = "bili#" + bvid + "#" + fqn;
+                                    if (!act.recordKeys.add(key)) return;
+                                    act.addRecord(fbest, "▶" + fqn + "·" + title);
+                                    if (!act.isRecordsVisible) act.toggleRecords();
+                                }
+                            });
+                        } catch (Exception e) { }
+                    }
+
+                    static boolean compareQ(int a, int b) {
+                        // 画质 id 数值大小基本对应等级（127>126>125>120>116>112>80>74>64>32>16）
+                        return a > b;
+                    }
+
+                    static String httpGet(String url, String referer) throws Exception {
+                        java.net.HttpURLConnection c = (java.net.HttpURLConnection) new java.net.URL(url).openConnection();
+                        c.setConnectTimeout(8000); c.setReadTimeout(8000);
+                        c.setRequestProperty("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36");
+                        c.setRequestProperty("Referer", referer);
+                        String cookie = android.webkit.CookieManager.getInstance().getCookie("https://api.bilibili.com/");
+                        if (cookie != null && cookie.length() > 0) c.setRequestProperty("Cookie", cookie);
+                        java.io.BufferedReader r = new java.io.BufferedReader(new java.io.InputStreamReader(c.getInputStream(), "UTF-8"));
+                        StringBuilder sb = new StringBuilder();
+                        String line;
+                        while ((line = r.readLine()) != null) sb.append(line);
+                        r.close();
+                        return sb.toString();
+                    }
+                }).start();
+            } catch (Exception e) { }
+        }
     }
 
     static boolean isMediaUrl(String url) {
