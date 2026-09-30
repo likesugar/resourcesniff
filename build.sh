@@ -46,7 +46,7 @@ done
 "$BT/zipalign" -f 4 build_out/app-unsigned.apk build_out/app-aligned.apk
 
 echo "[6/6] sign + verify..."
-"$BT/apksigner" sign --ks debug.keystore --ks-pass pass:android --key-pass pass:android \
+"$BT/apksigner" sign --ks "$PROJ/debug.keystore" --ks-pass pass:android --key-pass pass:android \
     --out "资源嗅探_v$VN.apk" build_out/app-aligned.apk
 "$BT/apksigner" verify "资源嗅探_v$VN.apk"
 
