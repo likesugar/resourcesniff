@@ -162,7 +162,14 @@ public class SniffActivity extends Activity {
             }
         });
 
-        webView.loadUrl("https://live.douyin.com/");
+        // 弹窗带入的输入
+        String pre = getIntent().getStringExtra("input");
+        if (pre != null && pre.length() > 0) {
+            etUrl.setText(pre);
+            openInputUrl();
+        } else {
+            webView.loadUrl("https://live.douyin.com/");
+        }
     }
 
     void openInputUrl() {

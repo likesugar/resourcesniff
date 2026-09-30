@@ -1,7 +1,9 @@
 package com.wink.xgjhome;
 
 import android.app.Activity;
+import android.content.ClipboardManager;
 import android.content.Intent;
+import android.widget.EditText;
 import android.os.Build;
 import android.os.Bundle;
 import android.view.View;
@@ -80,18 +82,7 @@ public class HomeActivity extends Activity {
 
         // 复刻壳：卡片 → 嗅探弹窗
         findViewById(R.id.cardPlayer).setOnClickListener(new View.OnClickListener() {
-            public void onClick(View v) {
-                new android.app.AlertDialog.Builder(HomeActivity.this)
-                        .setTitle("资源嗅探")
-                        .setMessage("打开嗅探页面，自动截获网页中的视频/直播流地址")
-                        .setNegativeButton("取消", null)
-                        .setPositiveButton("开始嗅探", new android.content.DialogInterface.OnClickListener() {
-                            public void onClick(android.content.DialogInterface d, int w) {
-                                startActivity(new Intent(HomeActivity.this, SniffActivity.class));
-                            }
-                        })
-                        .show();
-            }
+            public void onClick(View v) { showSniffDialog(); }
         });
 
     }
@@ -99,5 +90,41 @@ public class HomeActivity extends Activity {
     @Override
     protected void onResume() {
         super.onResume();
+    }
+
+    private void showSniffDialog() {
+        android.app.Dialog d = new android.app.Dialog(this);
+        d.setContentView(R.layout.dialog_sniff);
+        android.view.Window w = d.getWindow();
+        if (w != null) {
+            w.setBackgroundDrawableResource(android.R.color.transparent);
+            w.setLayout(android.view.ViewGroup.LayoutParams.MATCH_PARENT,
+                    android.view.ViewGroup.LayoutParams.WRAP_CONTENT);
+        }
+        final EditText et = d.findViewById(R.id.et_dialog_url);
+        d.findViewById(R.id.btn_paste).setOnClickListener(new View.OnClickListener() {
+            public void onClick(View v) {
+                try {
+                    ClipboardManager cm = (ClipboardManager) getSystemService(CLIPBOARD_SERVICE);
+                    if (cm != null && cm.getPrimaryClip() != null
+                            && cm.getPrimaryClip().getItemAt(0) != null
+                            && cm.getPrimaryClip().getItemAt(0).getText() != null) {
+                        et.setText(cm.getPrimaryClip().getItemAt(0).getText().toString().trim());
+                    }
+                } catch (Exception e) { }
+            }
+        });
+        d.findViewById(R.id.btn_cancel).setOnClickListener(new View.OnClickListener() {
+            public void onClick(View v) { d.dismiss(); }
+        });
+        d.findViewById(R.id.btn_go).setOnClickListener(new View.OnClickListener() {
+            public void onClick(View v) {
+                Intent i = new Intent(HomeActivity.this, SniffActivity.class);
+                i.putExtra("input", et.getText().toString().trim());
+                startActivity(i);
+                d.dismiss();
+            }
+        });
+        d.show();
     }
 }
