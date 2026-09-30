@@ -3,6 +3,7 @@ package com.wink.xgjhome;
 import android.annotation.SuppressLint;
 import android.app.Activity;
 import android.content.ClipData;
+import android.content.Intent;
 import android.content.ClipboardManager;
 import android.net.Uri;
 import android.os.Bundle;
@@ -81,7 +82,18 @@ public class SniffActivity extends Activity {
         webView.setWebViewClient(new WebViewClient() {
             @Override
             public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest request) {
-                return false;
+                Uri u = request.getUrl();
+                String scheme = u.getScheme() == null ? "" : u.getScheme().toLowerCase();
+                if ("http".equals(scheme) || "https".equals(scheme)) return false;
+                // 非 http(s) 协议（intent:// bilibili:// 等）：先拉外部App，失败退回 https
+                try {
+                    startActivity(new Intent(Intent.ACTION_VIEW, u));
+                } catch (Exception e) {
+                    String s2 = u.toString();
+                    String https = "https://" + s2.replaceAll("^[a-zA-Z][a-zA-Z0-9+.-]*://", "");
+                    view.loadUrl(https);
+                }
+                return true;
             }
 
             @Override
