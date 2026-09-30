@@ -80,6 +80,10 @@ public class SniffActivity extends Activity {
         ws.setDatabaseEnabled(true);
         CookieManager.getInstance().setAcceptCookie(true);
         CookieManager.getInstance().setAcceptThirdPartyCookies(webView, true);
+        webView.addJavascriptInterface(new Object() {
+            @android.webkit.JavascriptInterface
+            public String get(String name) { return readAsset(name); }
+        }, "AndroidAssets");
 
         webView.setWebChromeClient(new WebChromeClient());
         webView.setWebViewClient(new WebViewClient() {
@@ -88,14 +92,10 @@ public class SniffActivity extends Activity {
                 Uri u = request.getUrl();
                 String scheme = u.getScheme() == null ? "" : u.getScheme().toLowerCase();
                 if ("http".equals(scheme) || "https".equals(scheme)) return false;
-                // 非 http(s) 协议（intent:// bilibili:// 等）：先拉外部App，失败退回 https
-                try {
-                    startActivity(new Intent(Intent.ACTION_VIEW, u));
-                } catch (Exception e) {
-                    String s2 = u.toString();
-                    String https = "https://" + s2.replaceAll("^[a-zA-Z][a-zA-Z0-9+.-]*://", "");
-                    view.loadUrl(https);
-                }
+                // 非 http(s) 协议：一律页内转 https，不拉起外部App
+                String s2 = u.toString();
+                String https = "https://" + s2.replaceAll("^[a-zA-Z][a-zA-Z0-9+.-]*://", "");
+                view.loadUrl(https);
                 return true;
             }
 
@@ -369,39 +369,32 @@ public class SniffActivity extends Activity {
         }
     }
 
-    /** B站脚本链：GM垫片 → 11个依赖库 → 主脚本，逐个顺序eval */
+    /** B站脚本注入：JS桥直读assets（绕开evaluateJavascript体积限制），window.eval 全局作用域 */
     void runBiliChain() {
-        java.util.List<String> seq = new java.util.ArrayList<>();
-        seq.add(GM_SHIM);
+        StringBuilder names = new StringBuilder("[");
         String[] libs = {"bili_lib_1.js","bili_lib_2.js","bili_lib_3.js","bili_lib_4.js","bili_lib_5.js",
                 "bili_lib_6.js","bili_lib_7.js","bili_lib_8.js","bili_lib_9.js","bili_lib_10.js","bili_lib_11.js"};
-        for (String n : libs) {
-            String c = readAsset(n);
-            if (c == null) return;
-            seq.add(c);
-        }
-        String main = readAsset("bili.user.js");
-        if (main == null) return;
-        seq.add(main);
-        evalChain(seq.iterator());
+        for (String n : libs) names.append('"').append(n).append('"').append(',');
+        names.append('"bili.user.js"');
+        String bs = getBootstrap("window.AndroidAssets ? null : 'no-bridge'", names.toString());
+        webView.evaluateJavascript(bs, null);
     }
 
-    void evalChain(final java.util.Iterator<String> it) {
-        if (!it.hasNext()) return;
-        String js = it.next();
-        String wrapped;
-        if (js == GM_SHIM) {
-            wrapped = js;
-        } else {
-            final String escaped = js.replace("\\", "\\\\").replace("'", "\'").replace("\n", "\\n").replace("\r", "");
-            wrapped = "(function(){try{eval('" + escaped + "');}catch(e){var d=document.createElement('div');d.style.cssText='position:fixed;top:0;left:0;right:0;z-index:999999;background:#c0392b;color:#fff;font-size:12px;padding:2px';d.textContent='脚本错误:'+e.message;document.body?document.body.appendChild(d):document.documentElement.appendChild(d);}})();";
-        }
-        webView.evaluateJavascript(wrapped, new android.webkit.ValueCallback<String>() {
-            @Override
-            public void onReceiveValue(String v) { evalChain(it); }
-        });
+    String getBootstrap(String check, String namesJson) {
+        return "(function(){"
+            + "function bad(m){var d=document.createElement('div');d.style.cssText='position:fixed;top:0;left:0;right:0;z-index:999999;background:#c0392b;color:#fff;font-size:12px;padding:2px';d.textContent='脚本错误:'+m;(document.body||document.documentElement).appendChild(d);}"
+            + "var AB=window.AndroidAssets;"
+            + "function get(n){return new Promise(function(res,rej){var v=AB?AB.get(n):null;if(v===null||v===undefined)rej('asset missing: '+n);else res(v);});}"
+            + "var names=" + namesJson + ";"
+            + "(async function(){"
+            + "  var e0=" + check + "; if(e0){bad(e0);return;}"
+            + GM_SHIM + ";"
+            + "  for(var i=0;i<names.length;i++){"
+            + "    try{var c=await get(names[i]); (0,window.eval)(c);}catch(err){bad(err&&err.message?err.message:String(err)+' @'+names[i]);return;}"
+            + "  }"
+            + "})();"
+            + "})();";
     }
-
     private boolean biliInjected = false;
     private static final String GM_SHIM =
         "if(typeof window.GM_addStyle=='undefined'){window.GM_addStyle=function(c){var s=document.createElement('style');s.textContent=c;document.head.appendChild(s);};}"
