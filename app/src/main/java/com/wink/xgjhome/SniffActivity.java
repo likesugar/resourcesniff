@@ -374,8 +374,8 @@ public class SniffActivity extends Activity {
         StringBuilder names = new StringBuilder("[");
         String[] libs = {"bili_lib_1.js","bili_lib_2.js","bili_lib_3.js","bili_lib_4.js","bili_lib_5.js",
                 "bili_lib_6.js","bili_lib_7.js","bili_lib_8.js","bili_lib_9.js","bili_lib_10.js","bili_lib_11.js"};
-        for (String n : libs) names.append('"').append(n).append('"').append(',');
-        names.append('"bili.user.js"');
+        for (String n : libs) names.append("\"").append(n).append("\"").append(",");
+        names.append("\"bili.user.js\"");
         String bs = getBootstrap("window.AndroidAssets ? null : 'no-bridge'", names.toString());
         webView.evaluateJavascript(bs, null);
     }
