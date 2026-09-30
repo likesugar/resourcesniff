@@ -70,9 +70,6 @@ public class SniffActivity extends Activity {
 
         WebSettings ws = webView.getSettings();
         ws.setJavaScriptEnabled(true);
-        // 默认手机UA：B站优化脚本匹配 m.bilibili.com，需移动端页面
-        ws.setUserAgentString("Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36");
-        isMobileUa = true;
         ws.setDomStorageEnabled(true);
         ws.setMediaPlaybackRequiresUserGesture(false);
         ws.setMixedContentMode(WebSettings.MIXED_CONTENT_ALWAYS_ALLOW);
@@ -80,10 +77,6 @@ public class SniffActivity extends Activity {
         ws.setDatabaseEnabled(true);
         CookieManager.getInstance().setAcceptCookie(true);
         CookieManager.getInstance().setAcceptThirdPartyCookies(webView, true);
-        webView.addJavascriptInterface(new Object() {
-            @android.webkit.JavascriptInterface
-            public String get(String name) { return readAsset(name); }
-        }, "AndroidAssets");
 
         webView.setWebChromeClient(new WebChromeClient());
         webView.setWebViewClient(new WebViewClient() {
@@ -92,10 +85,14 @@ public class SniffActivity extends Activity {
                 Uri u = request.getUrl();
                 String scheme = u.getScheme() == null ? "" : u.getScheme().toLowerCase();
                 if ("http".equals(scheme) || "https".equals(scheme)) return false;
-                // 非 http(s) 协议：一律页内转 https，不拉起外部App
-                String s2 = u.toString();
-                String https = "https://" + s2.replaceAll("^[a-zA-Z][a-zA-Z0-9+.-]*://", "");
-                view.loadUrl(https);
+                // 非 http(s) 协议（intent:// bilibili:// 等）：先拉外部App，失败退回 https
+                try {
+                    startActivity(new Intent(Intent.ACTION_VIEW, u));
+                } catch (Exception e) {
+                    String s2 = u.toString();
+                    String https = "https://" + s2.replaceAll("^[a-zA-Z][a-zA-Z0-9+.-]*://", "");
+                    view.loadUrl(https);
+                }
                 return true;
             }
 
@@ -124,7 +121,7 @@ public class SniffActivity extends Activity {
 
             @Override
             public void onPageStarted(WebView view, String url, android.graphics.Bitmap favicon) {
-                injectUserscriptFor(url);
+                if (url != null && url.contains("douyin.com")) injectDouyinScript();
             }
 
             public void onPageFinished(WebView view, String url) {
@@ -353,55 +350,21 @@ public class SniffActivity extends Activity {
         return MEDIA.matcher(url.toLowerCase()).find();
     }
 
-    // ---- 油猴脚本离线内置（参照 DKVideoPlayer 已验证实现）----
-    private String jsDouyin = null, jsBili = null;
+    /** 油猴脚本离线内置：抖音网页版全能优化（assets/douyin.user.js） */
+    private String jsDouyin = null;
 
-    void injectUserscriptFor(String url) {
-        String h = url == null ? "" : url;
-        if (h.contains("douyin.com")) {
-            if (jsDouyin == null) jsDouyin = readAsset("douyin.user.js");
-            if (jsDouyin != null) runUserscript(jsDouyin);
-        } else if (h.contains("bilibili.com")) {
-            if (!biliInjected) {
-                biliInjected = true;
-                runBiliChain();
-            }
-        }
+    void injectDouyinScript() {
+        if (jsDouyin == null) jsDouyin = readAsset("douyin.user.js");
+        if (jsDouyin == null) return;
+        String shim = "if(typeof window.GM_addStyle=='undefined'){window.GM_addStyle=function(c){var s=document.createElement('style');s.textContent=c;document.head.appendChild(s);};}"
+            + "if(typeof window.GM_getValue=='undefined'){window.GM_getValue=function(k,d){var v=localStorage.getItem('gm_'+k);return v===null?d:v;};window.GM_setValue=function(k,v){localStorage.setItem('gm_'+k,v);};window.GM_deleteValue=function(k){localStorage.removeItem('gm_'+k);};}"
+            + "if(typeof window.GM_xmlhttpRequest=='undefined'){window.GM_xmlhttpRequest=function(d){fetch(d.url).then(function(r){return r.text();}).then(function(t){if(d.onload)d.onload({responseText:t,status:200});});};}"
+            + "if(typeof window.GM_info=='undefined'){window.GM_info={script:{version:'offline'}};}"
+            + "if(typeof window.unsafeWindow=='undefined'){window.unsafeWindow=window;}";
+        webView.evaluateJavascript(shim, null);
+        final String escaped = jsDouyin.replace("\\", "\\\\").replace("'", "\'").replace("\n", "\\n").replace("\r", "");
+        webView.evaluateJavascript("(function(){try{eval('" + escaped + "');}catch(e){console.log('userscript error',e);}})();", null);
     }
-
-    /** B站脚本注入：JS桥直读assets（绕开evaluateJavascript体积限制），window.eval 全局作用域 */
-    void runBiliChain() {
-        StringBuilder names = new StringBuilder("[");
-        String[] libs = {"bili_lib_1.js","bili_lib_2.js","bili_lib_3.js","bili_lib_4.js","bili_lib_5.js",
-                "bili_lib_6.js","bili_lib_7.js","bili_lib_8.js","bili_lib_9.js","bili_lib_10.js","bili_lib_11.js"};
-        for (String n : libs) names.append("\"").append(n).append("\"").append(",");
-        names.append("\"bili.user.js\"");
-        String bs = getBootstrap("window.AndroidAssets ? null : 'no-bridge'", names.toString());
-        webView.evaluateJavascript(bs, null);
-    }
-
-    String getBootstrap(String check, String namesJson) {
-        return "(function(){"
-            + "function bad(m){var d=document.createElement('div');d.style.cssText='position:fixed;top:0;left:0;right:0;z-index:999999;background:#c0392b;color:#fff;font-size:12px;padding:2px';d.textContent='脚本错误:'+m;(document.body||document.documentElement).appendChild(d);}"
-            + "var AB=window.AndroidAssets;"
-            + "function get(n){return new Promise(function(res,rej){var v=AB?AB.get(n):null;if(v===null||v===undefined)rej('asset missing: '+n);else res(v);});}"
-            + "var names=" + namesJson + ";"
-            + "(async function(){"
-            + "  var e0=" + check + "; if(e0){bad(e0);return;}"
-            + GM_SHIM + ";"
-            + "  for(var i=0;i<names.length;i++){"
-            + "    try{var c=await get(names[i]); (0,window.eval)(c);}catch(err){bad(err&&err.message?err.message:String(err)+' @'+names[i]);return;}"
-            + "  }"
-            + "})();"
-            + "})();";
-    }
-    private boolean biliInjected = false;
-    private static final String GM_SHIM =
-        "if(typeof window.GM_addStyle=='undefined'){window.GM_addStyle=function(c){var s=document.createElement('style');s.textContent=c;document.head.appendChild(s);};}"
-        + "if(typeof window.GM_getValue=='undefined'){window.GM_getValue=function(k,d){var v=localStorage.getItem('gm_'+k);return v===null?d:v;};window.GM_setValue=function(k,v){localStorage.setItem('gm_'+k,v);};window.GM_deleteValue=function(k){localStorage.removeItem('gm_'+k);};}"
-        + "if(typeof window.GM_xmlhttpRequest=='undefined'){window.GM_xmlhttpRequest=function(d){fetch(d.url).then(function(r){return r.text();}).then(function(t){if(d.onload)d.onload({responseText:t,status:200});});};}"
-        + "if(typeof window.GM_info=='undefined'){window.GM_info={script:{version:'offline'}};}"
-        + "if(typeof window.unsafeWindow=='undefined'){window.unsafeWindow=window;}";
 
     String readAsset(String name) {
         try {
@@ -412,18 +375,6 @@ public class SniffActivity extends Activity {
             is.close();
             return bo.toString("UTF-8");
         } catch (Throwable e) { return null; }
-    }
-
-    void runUserscript(String js) {
-        if (js == null || js.length() < 50) return;
-        String shim = "if(typeof window.GM_addStyle=='undefined'){window.GM_addStyle=function(c){var s=document.createElement('style');s.textContent=c;document.head.appendChild(s);};}"
-            + "if(typeof window.GM_getValue=='undefined'){window.GM_getValue=function(k,d){var v=localStorage.getItem('gm_'+k);return v===null?d:v;};window.GM_setValue=function(k,v){localStorage.setItem('gm_'+k,v);};window.GM_deleteValue=function(k){localStorage.removeItem('gm_'+k);};}"
-            + "if(typeof window.GM_xmlhttpRequest=='undefined'){window.GM_xmlhttpRequest=function(d){fetch(d.url).then(function(r){return r.text();}).then(function(t){if(d.onload)d.onload({responseText:t,status:200});});};}"
-            + "if(typeof window.GM_info=='undefined'){window.GM_info={script:{version:'offline'}};}"
-            + "if(typeof window.unsafeWindow=='undefined'){window.unsafeWindow=window;}";
-        webView.evaluateJavascript(shim, null);
-        final String escaped = js.replace("\\", "\\\\").replace("'", "\\'").replace("\n", "\\n").replace("\r", "");
-        webView.evaluateJavascript("(function(){try{eval('" + escaped + "');}catch(e){console.log('userscript error',e);}})();", null);
     }
 
     void switchUa() {
