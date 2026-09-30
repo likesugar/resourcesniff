@@ -47,7 +47,7 @@ done
 
 echo "[6/6] sign + verify..."
 "$BT/apksigner" sign --ks "$PROJ/debug.keystore" --ks-pass pass:android --key-pass pass:android \
-    --out "资源嗅探_v$VN.apk" build_out/app-aligned.apk
-"$BT/apksigner" verify "资源嗅探_v$VN.apk"
+    --out "$PROJ/资源嗅探_v$VN.apk" build_out/app-aligned.apk
+"$BT/apksigner" verify "$PROJ/资源嗅探_v$VN.apk"
 
 echo "=== DONE: 资源嗅探_v$VN.apk ==="
