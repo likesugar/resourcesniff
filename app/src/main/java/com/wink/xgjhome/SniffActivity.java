@@ -70,6 +70,9 @@ public class SniffActivity extends Activity {
 
         WebSettings ws = webView.getSettings();
         ws.setJavaScriptEnabled(true);
+        // 默认手机UA：B站优化脚本匹配 m.bilibili.com，需移动端页面
+        ws.setUserAgentString("Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36");
+        isMobileUa = true;
         ws.setDomStorageEnabled(true);
         ws.setMediaPlaybackRequiresUserGesture(false);
         ws.setMixedContentMode(WebSettings.MIXED_CONTENT_ALWAYS_ALLOW);
@@ -391,7 +394,7 @@ public class SniffActivity extends Activity {
             wrapped = js;
         } else {
             final String escaped = js.replace("\\", "\\\\").replace("'", "\'").replace("\n", "\\n").replace("\r", "");
-            wrapped = "(function(){try{eval('" + escaped + "');}catch(e){console.log('us-lib error',e);}})();";
+            wrapped = "(function(){try{eval('" + escaped + "');}catch(e){var d=document.createElement('div');d.style.cssText='position:fixed;top:0;left:0;right:0;z-index:999999;background:#c0392b;color:#fff;font-size:12px;padding:2px';d.textContent='脚本错误:'+e.message;document.body?document.body.appendChild(d):document.documentElement.appendChild(d);}})();";
         }
         webView.evaluateJavascript(wrapped, new android.webkit.ValueCallback<String>() {
             @Override

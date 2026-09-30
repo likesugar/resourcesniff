@@ -86,7 +86,7 @@
                 android:id="@+id/btn_switch_ua"
                 android:layout_width="wrap_content"
                 android:layout_height="36dp"
-                android:text="切电脑UA"
+                android:text="切手机UA"
                 android:textColor="#ffffff"
                 android:textSize="13sp"
                 android:background="#4D2ed573"
