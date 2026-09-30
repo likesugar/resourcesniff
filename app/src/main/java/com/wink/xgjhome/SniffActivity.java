@@ -359,10 +359,53 @@ public class SniffActivity extends Activity {
             if (jsDouyin == null) jsDouyin = readAsset("douyin.user.js");
             if (jsDouyin != null) runUserscript(jsDouyin);
         } else if (h.contains("bilibili.com")) {
-            if (jsBili == null) jsBili = readAsset("bili.user.js");
-            if (jsBili != null) runUserscript(jsBili);
+            if (!biliInjected) {
+                biliInjected = true;
+                runBiliChain();
+            }
         }
     }
+
+    /** B站脚本链：GM垫片 → 11个依赖库 → 主脚本，逐个顺序eval */
+    void runBiliChain() {
+        java.util.List<String> seq = new java.util.ArrayList<>();
+        seq.add(GM_SHIM);
+        String[] libs = {"bili_lib_1.js","bili_lib_2.js","bili_lib_3.js","bili_lib_4.js","bili_lib_5.js",
+                "bili_lib_6.js","bili_lib_7.js","bili_lib_8.js","bili_lib_9.js","bili_lib_10.js","bili_lib_11.js"};
+        for (String n : libs) {
+            String c = readAsset(n);
+            if (c == null) return;
+            seq.add(c);
+        }
+        String main = readAsset("bili.user.js");
+        if (main == null) return;
+        seq.add(main);
+        evalChain(seq.iterator());
+    }
+
+    void evalChain(final java.util.Iterator<String> it) {
+        if (!it.hasNext()) return;
+        String js = it.next();
+        String wrapped;
+        if (js == GM_SHIM) {
+            wrapped = js;
+        } else {
+            final String escaped = js.replace("\\", "\\\\").replace("'", "\'").replace("\n", "\\n").replace("\r", "");
+            wrapped = "(function(){try{eval('" + escaped + "');}catch(e){console.log('us-lib error',e);}})();";
+        }
+        webView.evaluateJavascript(wrapped, new android.webkit.ValueCallback<String>() {
+            @Override
+            public void onReceiveValue(String v) { evalChain(it); }
+        });
+    }
+
+    private boolean biliInjected = false;
+    private static final String GM_SHIM =
+        "if(typeof window.GM_addStyle=='undefined'){window.GM_addStyle=function(c){var s=document.createElement('style');s.textContent=c;document.head.appendChild(s);};}"
+        + "if(typeof window.GM_getValue=='undefined'){window.GM_getValue=function(k,d){var v=localStorage.getItem('gm_'+k);return v===null?d:v;};window.GM_setValue=function(k,v){localStorage.setItem('gm_'+k,v);};window.GM_deleteValue=function(k){localStorage.removeItem('gm_'+k);};}"
+        + "if(typeof window.GM_xmlhttpRequest=='undefined'){window.GM_xmlhttpRequest=function(d){fetch(d.url).then(function(r){return r.text();}).then(function(t){if(d.onload)d.onload({responseText:t,status:200});});};}"
+        + "if(typeof window.GM_info=='undefined'){window.GM_info={script:{version:'offline'}};}"
+        + "if(typeof window.unsafeWindow=='undefined'){window.unsafeWindow=window;}";
 
     String readAsset(String name) {
         try {
