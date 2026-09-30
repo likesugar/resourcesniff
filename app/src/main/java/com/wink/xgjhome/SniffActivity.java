@@ -242,6 +242,25 @@ public class SniffActivity extends Activity {
         }
         static final java.util.Set<String> parsed = new java.util.HashSet<String>();
 
+        static boolean compareQ(int a, int b) {
+            return a > b;
+        }
+
+        static String httpGet(String url, String referer) throws Exception {
+            java.net.HttpURLConnection c = (java.net.HttpURLConnection) new java.net.URL(url).openConnection();
+            c.setConnectTimeout(8000); c.setReadTimeout(8000);
+            c.setRequestProperty("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36");
+            c.setRequestProperty("Referer", referer);
+            String cookie = android.webkit.CookieManager.getInstance().getCookie("https://api.bilibili.com/");
+            if (cookie != null && cookie.length() > 0) c.setRequestProperty("Cookie", cookie);
+            java.io.BufferedReader r = new java.io.BufferedReader(new java.io.InputStreamReader(c.getInputStream(), "UTF-8"));
+            StringBuilder sb = new StringBuilder();
+            String line;
+            while ((line = r.readLine()) != null) sb.append(line);
+            r.close();
+            return sb.toString();
+        }
+
         static void tryParse(final SniffActivity act, String pageUrl) {
             try {
                 if (pageUrl == null) return;
@@ -318,25 +337,6 @@ public class SniffActivity extends Activity {
                         } catch (Exception e) { }
                     }
 
-                    static boolean compareQ(int a, int b) {
-                        // 画质 id 数值大小基本对应等级（127>126>125>120>116>112>80>74>64>32>16）
-                        return a > b;
-                    }
-
-                    static String httpGet(String url, String referer) throws Exception {
-                        java.net.HttpURLConnection c = (java.net.HttpURLConnection) new java.net.URL(url).openConnection();
-                        c.setConnectTimeout(8000); c.setReadTimeout(8000);
-                        c.setRequestProperty("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36");
-                        c.setRequestProperty("Referer", referer);
-                        String cookie = android.webkit.CookieManager.getInstance().getCookie("https://api.bilibili.com/");
-                        if (cookie != null && cookie.length() > 0) c.setRequestProperty("Cookie", cookie);
-                        java.io.BufferedReader r = new java.io.BufferedReader(new java.io.InputStreamReader(c.getInputStream(), "UTF-8"));
-                        StringBuilder sb = new StringBuilder();
-                        String line;
-                        while ((line = r.readLine()) != null) sb.append(line);
-                        r.close();
-                        return sb.toString();
-                    }
                 }).start();
             } catch (Exception e) { }
         }
