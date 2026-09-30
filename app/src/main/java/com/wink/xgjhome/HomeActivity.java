@@ -1,6 +1,7 @@
 package com.wink.xgjhome;
 
 import android.app.Activity;
+import android.content.Intent;
 import android.os.Build;
 import android.os.Bundle;
 import android.view.View;
@@ -77,7 +78,21 @@ public class HomeActivity extends Activity {
             }
         });
 
-        // 复刻壳只保留首页 UI，卡片不跳转
+        // 复刻壳：卡片 → 嗅探弹窗
+        findViewById(R.id.cardPlayer).setOnClickListener(new View.OnClickListener() {
+            public void onClick(View v) {
+                new android.app.AlertDialog.Builder(HomeActivity.this)
+                        .setTitle("资源嗅探")
+                        .setMessage("打开嗅探页面，自动截获网页中的视频/直播流地址")
+                        .setNegativeButton("取消", null)
+                        .setPositiveButton("开始嗅探", new android.content.DialogInterface.OnClickListener() {
+                            public void onClick(android.content.DialogInterface d, int w) {
+                                startActivity(new Intent(HomeActivity.this, SniffActivity.class));
+                            }
+                        })
+                        .show();
+            }
+        });
 
     }
 

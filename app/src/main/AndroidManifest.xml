@@ -8,6 +8,10 @@
         android:theme="@style/AppTheme"
         android:allowBackup="true">
 
+        <activity android:name=".SniffActivity"
+            android:exported="false"
+            android:configChanges="orientation|screenSize|screenLayout|keyboardHidden"/>
+
         <activity android:name=".HomeActivity"
             android:exported="true"
             android:windowSoftInputMode="adjustResize">
