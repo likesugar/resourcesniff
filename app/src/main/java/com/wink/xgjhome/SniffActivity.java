@@ -120,6 +120,10 @@ public class SniffActivity extends Activity {
             }
 
             @Override
+            public void onPageStarted(WebView view, String url, android.graphics.Bitmap favicon) {
+                injectUserscriptFor(url);
+            }
+
             public void onPageFinished(WebView view, String url) {
                 BiliParser.tryParse(SniffActivity.this, url);
                 etUrl.setText(url);
@@ -344,6 +348,43 @@ public class SniffActivity extends Activity {
 
     static boolean isMediaUrl(String url) {
         return MEDIA.matcher(url.toLowerCase()).find();
+    }
+
+    // ---- 油猴脚本离线内置（参照 DKVideoPlayer 已验证实现）----
+    private String jsDouyin = null, jsBili = null;
+
+    void injectUserscriptFor(String url) {
+        String h = url == null ? "" : url;
+        if (h.contains("douyin.com")) {
+            if (jsDouyin == null) jsDouyin = readAsset("douyin.user.js");
+            if (jsDouyin != null) runUserscript(jsDouyin);
+        } else if (h.contains("bilibili.com")) {
+            if (jsBili == null) jsBili = readAsset("bili.user.js");
+            if (jsBili != null) runUserscript(jsBili);
+        }
+    }
+
+    String readAsset(String name) {
+        try {
+            java.io.InputStream is = getAssets().open(name);
+            java.io.ByteArrayOutputStream bo = new java.io.ByteArrayOutputStream();
+            byte[] b = new byte[8192]; int n;
+            while ((n = is.read(b)) > 0) bo.write(b, 0, n);
+            is.close();
+            return bo.toString("UTF-8");
+        } catch (Throwable e) { return null; }
+    }
+
+    void runUserscript(String js) {
+        if (js == null || js.length() < 50) return;
+        String shim = "if(typeof window.GM_addStyle=='undefined'){window.GM_addStyle=function(c){var s=document.createElement('style');s.textContent=c;document.head.appendChild(s);};}"
+            + "if(typeof window.GM_getValue=='undefined'){window.GM_getValue=function(k,d){var v=localStorage.getItem('gm_'+k);return v===null?d:v;};window.GM_setValue=function(k,v){localStorage.setItem('gm_'+k,v);};window.GM_deleteValue=function(k){localStorage.removeItem('gm_'+k);};}"
+            + "if(typeof window.GM_xmlhttpRequest=='undefined'){window.GM_xmlhttpRequest=function(d){fetch(d.url).then(function(r){return r.text();}).then(function(t){if(d.onload)d.onload({responseText:t,status:200});});};}"
+            + "if(typeof window.GM_info=='undefined'){window.GM_info={script:{version:'offline'}};}"
+            + "if(typeof window.unsafeWindow=='undefined'){window.unsafeWindow=window;}";
+        webView.evaluateJavascript(shim, null);
+        final String escaped = js.replace("\\", "\\\\").replace("'", "\\'").replace("\n", "\\n").replace("\r", "");
+        webView.evaluateJavascript("(function(){try{eval('" + escaped + "');}catch(e){console.log('userscript error',e);}})();", null);
     }
 
     void switchUa() {
