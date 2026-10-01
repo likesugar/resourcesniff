@@ -56,6 +56,32 @@ public class SniffActivity extends Activity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        try {
+            doCreate(savedInstanceState);
+        } catch (Throwable e) {
+            showCrash(e);
+        }
+    }
+
+    void showCrash(final Throwable e) {
+        new android.app.AlertDialog.Builder(this)
+                .setTitle("闪退原因")
+                .setCancelable(false)
+                .setMessage(android.util.Log.getStackTraceString(e))
+                .setPositiveButton("复制并退出", new android.content.DialogInterface.OnClickListener() {
+                    public void onClick(android.content.DialogInterface d, int w) {
+                        try {
+            [SYSTEM_NOTE: Content compressed. Read the full version if needed.]Catch (Throwable e2) { }
+                        finish();
+                        android.os.Process.killProcess(android.os.Process.myPid());
+                    }
+                })
+                .show();
+    }
+
+    @SuppressLint({"SetJavaScriptEnabled", "ClickableViewAccessibility"})
+    void doCreate(Bundle savedInstanceState) {
+        setContentView(R.layout.activity_sniff);
         setContentView(R.layout.activity_sniff);
 
         webView = findViewById(R.id.webview);
