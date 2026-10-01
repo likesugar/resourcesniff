@@ -142,9 +142,13 @@ public class SniffActivity extends Activity {
                 Uri u = request.getUrl();
                 String sc = u.getScheme() == null ? "" : u.getScheme().toLowerCase();
                 if ("http".equals(sc) || "https".equals(sc)) return false;
-                // bilibili:// 等协议：不询问拉起外部，直接页内转 https
-                String https = "https://" + u.toString().replaceAll("^[a-zA-Z][a-zA-Z0-9+.-]*://", "");
-                view.loadUrl(https);
+                // bilibili:// 等协议：不拉起外部；剩余部分带域名才转 https，否则忽略留在当前页
+                String rest = u.toString().replaceAll("^[a-zA-Z][a-zA-Z0-9+.-]*://", "");
+                int slash = rest.indexOf('/');
+                String host = slash >= 0 ? rest.substring(0, slash) : rest;
+                if (host.indexOf('.') >= 0) {
+                    view.loadUrl("https://" + rest);
+                }
                 return true;
             }
 
@@ -467,14 +471,28 @@ public class SniffActivity extends Activity {
         }
     }
 
+    /** 内置 jessibuca 播放器：assets/player.html?url=...（m3u8/flv/ts 等流） */
     void playUrl(String url) {
         try {
-            android.content.Intent i = new android.content.Intent(android.content.Intent.ACTION_VIEW);
-            i.setDataAndType(android.net.Uri.parse(url), "video/*");
-            startActivity(i);
+            boolean live = isMediaUrl(url) && (url.contains(".ts") || url.contains(".flv"));
+            String enc = java.net.URLEncoder.encode(url, "UTF-8");
+            String t = java.net.URLEncoder.encode(clipTitle(url), "UTF-8");
+            webView.loadUrl("file:///android_asset/player.html?url=" + enc + "&live=" + (live ? 1 : 0) + "&title=" + t);
+            Toast.makeText(this, "内置播放器打开", Toast.LENGTH_SHORT).show();
         } catch (Exception e) {
-            Toast.makeText(this, "没有可用播放器", Toast.LENGTH_SHORT).show();
+            try {
+                android.content.Intent i = new android.content.Intent(android.content.Intent.ACTION_VIEW);
+                i.setDataAndType(android.net.Uri.parse(url), "video/*");
+                startActivity(i);
+            } catch (Exception e2) {
+                Toast.makeText(this, "没有可用播放器", Toast.LENGTH_SHORT).show();
+            }
         }
+    }
+
+    String clipTitle(String url) {
+        for (String key : recordKeys) { }
+        return "资源嗅探";
     }
 
     void startRecord(final String url) {
