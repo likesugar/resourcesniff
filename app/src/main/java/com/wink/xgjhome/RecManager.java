@@ -55,28 +55,11 @@ public class RecManager {
         String u = url == null ? "" : url.trim();
         while (u.endsWith("\\") || u.endsWith("\"") || u.endsWith("'") || u.endsWith(",")) u = u.substring(0, u.length() - 1).trim();
         if (u.isEmpty() || !u.startsWith("http")) return;
-        final String url2 = u;
-        if (u.toLowerCase().contains(".m3u8")) { startHlsRec(u); return; }
-        RecJob job = new RecJob();
-        job.id = ++recSeq;
-        job.notifId = 9000 + job.id;
-        job.url = url;
-        String name;
-        try {
-            String lu = url.toLowerCase();
-            String ext = lu.contains(".flv") ? "flv" : "mp4";
-            name = "录制_" + new java.text.SimpleDateFormat("MMdd_HHmmss", java.util.Locale.US).format(new java.util.Date()) + "_" + job.id + "." + ext;
-            android.content.ContentValues cv = new android.content.ContentValues();
-            cv.put(android.provider.MediaStore.Video.Media.DISPLAY_NAME, name);
-            cv.put(android.provider.MediaStore.Video.Media.MIME_TYPE, "mp4".equals(ext) ? "video/mp4" : "video/x-flv");
-            cv.put(android.provider.MediaStore.Video.Media.RELATIVE_PATH, "Movies/录制");
-            job.storeUri = sCtx.getContentResolver().insert(
-                android.provider.MediaStore.Video.Media.getContentUri("external_primary"), cv);
-            if (job.storeUri == null) return;
-        } catch (Throwable t) { return; }
-        job.name = name;
-        startPull(job, false);
+        startBgRec(u); return;
+        /*
+*/
     }
+
 
     private static void startPull(final RecJob job, final boolean append) {
         job.active = true;
@@ -308,6 +291,8 @@ public class RecManager {
     }
 
     public static void recStop(int jid) {
+        RecJob bg = recJobs.get(jid);
+        if (bg != null && bg.file != null && bg.file.isDirectory()) { pauseBg(bg, "暂停录制"); return; }
         if (ffkSession != null) {
             com.arthenica.ffmpegkit.FFmpegKit.cancel(ffkSession.getSessionId());
             return;
@@ -324,12 +309,32 @@ public class RecManager {
     public static void recContinue(int jid) {
         RecJob job = stoppedJobs.get(jid);
         if (job == null) return;
+        if (job.file != null && job.file.isDirectory()) {
+            stoppedJobs.remove(job.id);
+            job.active = true;
+            job.paused = false;
+            job.state = null;
+            recJobs.put(job.id, job);
+            acquireWake();
+            startBgPlayer(job);
+            startBgSession(job);
+            return;
+        }
         startPull(job, true);
     }
 
     /** 结束录制：合并转封装成 mp4（后台执行），完成后从列表移除 */
     public static void recFinish(int jid) {
         RecJob live = recJobs.get(jid);
+        if (live != null && live.file != null && live.file.isDirectory()) {
+            stopBgSession();
+            stopBgPlayer();
+            live.active = false;
+            recJobs.remove(live.id);
+            releaseWakeIfIdle();
+            mergeSegs(live);
+            return;
+        }
         if (live != null && ffkSession != null) {
             com.arthenica.ffmpegkit.FFmpegKit.cancel(ffkSession.getSessionId());
             return;
@@ -342,6 +347,7 @@ public class RecManager {
         final RecJob job = stoppedJobs.get(jid);
         if (job == null) return;
         stoppedJobs.remove(job.id);
+        if (job.file != null && job.file.isDirectory()) { mergeSegs(job); return; }
         new Thread(new Runnable() { public void run() { convertToMp4(job); } }).start();
     }
 
@@ -374,6 +380,157 @@ public class RecManager {
                 job.state = "转换失败: " + e.getClass().getSimpleName();
             }
             stoppedJobs.put(job.id, job);
+        } }).start();
+    }
+
+
+    // ---------- 后台静音播放器拉流录制：分段落盘 + 无流量自动暂停 ----------
+    private static tv.danmaku.ijk.media.player.IjkMediaPlayer bgPlayer;
+    private static com.arthenica.ffmpegkit.FFmpegSession bgSession;
+    private static volatile boolean bgCancel = false;
+    private static final String BG_UA = "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36";
+
+    static void startBgRec(final String url) {
+        try {
+            final RecJob job = new RecJob();
+            job.id = ++recSeq;
+            job.notifId = 9000 + job.id;
+            job.url = url;
+            job.name = "直播·原画_" + System.currentTimeMillis() / 1000 + ".ts";
+            final java.io.File dir = new java.io.File(sCtx.getExternalFilesDir(null), "录制/rec" + job.id);
+            dir.mkdirs();
+            job.file = dir;
+            recJobs.put(job.id, job);
+            acquireWake();
+            startBgPlayer(job);
+            startBgSession(job);
+            new Thread(new Runnable() { public void run() {  // 流量看门狗
+                long last = -1;
+                while (job.active) {
+                    try { Thread.sleep(5000); } catch (Throwable e) { break; }
+                    if (!job.active) break;
+                    long total = dirTotal(job);
+                    if (total == last) { pauseBg(job, "无流量暂停"); break; }
+                    last = total;
+                }
+            } }).start();
+        } catch (Throwable e) {
+            try {
+                RecJob jb = new RecJob();
+                jb.id = ++recSeq;
+                jb.name = "直播·原画（失败）";
+                jb.state = "启动失败: " + e.getClass().getSimpleName();
+                stoppedJobs.put(jb.id, jb);
+            } catch (Throwable ignored) {}
+        }
+    }
+
+    static long dirTotal(RecJob job) {
+        try {
+            long t = 0;
+            java.io.File[] fs = job.file.listFiles();
+            if (fs == null) return -1;
+            for (java.io.File f : fs) t += f.length();
+            return t;
+        } catch (Throwable e) { return -1; }
+    }
+
+    static void startBgSession(final RecJob job) {
+        bgCancel = false;
+        String[] args = { "-y", "-user_agent", BG_UA,
+            "-headers", "Referer: https://live.douyin.com/\r\n",
+            "-i", job.url, "-c", "copy",
+            "-f", "segment", "-segment_time", "30", "-reset_timestamps", "1",
+            new java.io.File(job.file, "seg%03d.ts").getAbsolutePath() };
+        bgSession = com.arthenica.ffmpegkit.FFmpegKit.executeWithArgumentsAsync(args,
+            new com.arthenica.ffmpegkit.FFmpegSessionCompleteCallback() {
+                public void apply(com.arthenica.ffmpegkit.FFmpegSession st) {
+                    if (bgCancel) return;
+                    if (job.active) {
+                        try { Thread.sleep(1000); } catch (Throwable e) { }
+                        if (job.active) startBgSession(job);  // 断流自动重连续录
+                    }
+                }
+            });
+    }
+
+    static void startBgPlayer(final RecJob job) {
+        stopBgPlayer();
+        try {
+            tv.danmaku.ijk.media.player.IjkMediaPlayer m = new tv.danmaku.ijk.media.player.IjkMediaPlayer();
+            java.util.Map<String, String> h = new java.util.HashMap<String, String>();
+            h.put("Referer", "https://live.douyin.com/");
+            h.put("User-Agent", BG_UA);
+            m.setDataSource(job.url, h);
+            m.setVolume(0f, 0f);
+            m.prepareAsync();
+            m.start();
+            bgPlayer = m;
+        } catch (Throwable e) { stopBgPlayer(); }
+    }
+
+    static void stopBgPlayer() {
+        try { if (bgPlayer != null) bgPlayer.stop(); } catch (Throwable ignored) {}
+        try { if (bgPlayer != null) bgPlayer.release(); } catch (Throwable ignored) {}
+        bgPlayer = null;
+    }
+
+    static void stopBgSession() {
+        bgCancel = true;
+        try { if (bgSession != null) com.arthenica.ffmpegkit.FFmpegKit.cancel(bgSession.getSessionId()); } catch (Throwable ignored) {}
+        bgSession = null;
+    }
+
+    static void pauseBg(RecJob job, String why) {
+        stopBgSession();
+        stopBgPlayer();
+        job.active = false;
+        job.paused = true;
+        job.state = why;
+        recJobs.remove(job.id);
+        stoppedJobs.put(job.id, job);
+        releaseWakeIfIdle();
+    }
+
+    static void mergeSegs(final RecJob job) {
+        job.state = "转换MP4中…";
+        new Thread(new Runnable() { public void run() {
+            try {
+                java.io.File[] segs = job.file.listFiles();
+                java.util.Arrays.sort(segs);
+                java.util.List<java.io.File> list = new java.util.ArrayList<java.io.File>();
+                for (java.io.File f : segs) if (f.getName().startsWith("seg") && f.length() > 0) list.add(f);
+                if (list.isEmpty()) { job.state = "无数据"; stoppedJobs.put(job.id, job); return; }
+                java.io.File listFile = new java.io.File(job.file, "list.txt");
+                java.io.FileWriter fw = new java.io.FileWriter(listFile);
+                for (java.io.File f : list) fw.write("file '" + f.getAbsolutePath() + "'\n");
+                fw.close();
+                java.io.File mp4 = new java.io.File(job.file, "out.mp4");
+                com.arthenica.ffmpegkit.FFmpegSession st = com.arthenica.ffmpegkit.FFmpegKit.executeWithArguments(
+                    new String[]{"-y", "-f", "concat", "-safe", "0", "-i", listFile.getAbsolutePath(),
+                        "-c", "copy", "-fflags", "+genpts", "-movflags", "+faststart", mp4.getAbsolutePath()});
+                if (st.getState().equals(com.arthenica.ffmpegkit.SessionState.COMPLETED) && mp4.length() > 0) {
+                    String mp4Name = job.name.endsWith(".ts") ? job.name.substring(0, job.name.length() - 3) + ".mp4" : job.name + ".mp4";
+                    android.content.ContentValues cv = new android.content.ContentValues();
+                    cv.put(android.provider.MediaStore.Video.Media.DISPLAY_NAME, mp4Name);
+                    cv.put(android.provider.MediaStore.Video.Media.MIME_TYPE, "video/mp4");
+                    cv.put(android.provider.MediaStore.Video.Media.RELATIVE_PATH, "Movies/录制");
+                    android.net.Uri out = sCtx.getContentResolver().insert(
+                        android.provider.MediaStore.Video.Media.getContentUri("external_primary"), cv);
+                    java.io.InputStream in = new java.io.FileInputStream(mp4);
+                    java.io.OutputStream os = sCtx.getContentResolver().openOutputStream(out);
+                    byte[] b = new byte[32768]; int n;
+                    while ((n = in.read(b)) > 0) os.write(b, 0, n);
+                    in.close(); os.close();
+                    for (java.io.File f : job.file.listFiles()) f.delete();
+                    job.file.delete();
+                    job.state = null;
+                } else job.state = "合并失败";
+                stoppedJobs.put(job.id, job);
+            } catch (Throwable e) {
+                job.state = "转换失败: " + e.getClass().getSimpleName();
+                stoppedJobs.put(job.id, job);
+            }
         } }).start();
     }
 

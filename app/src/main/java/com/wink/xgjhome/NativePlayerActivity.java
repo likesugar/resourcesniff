@@ -22,9 +22,6 @@ public class NativePlayerActivity extends Activity {
 
     private VideoView videoView;
     private StandardVideoController controller;
-    private android.widget.TextView tvSize;
-    private android.os.Handler sizeHandler = new android.os.Handler();
-    private Runnable sizeTick;
     private String url;
     private String title;
     private int kernel = KERNEL_MEDIA;
@@ -77,20 +74,11 @@ public class NativePlayerActivity extends Activity {
             @Override
             public void onKernelSwitch() { toggleKernel(); }
         });
+        // 控制层左上角：width: height:（随控制条显隐）
+        controller.addControlComponent(new SizeComponent(videoView));
 
         root.addView(videoView, new FrameLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
-
-        // 控制层左上角：width: height:
-        tvSize = new android.widget.TextView(this);
-        tvSize.setText("width: 0 height: 0");
-        tvSize.setTextColor(0xFFFFFFFF);
-        tvSize.setTextSize(11);
-        tvSize.setPadding(16, 8, 16, 8);
-        tvSize.setShadowLayer(2, 1, 1, 0x88000000);
-        root.addView(tvSize, new FrameLayout.LayoutParams(
-                ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT,
-                android.view.Gravity.TOP | android.view.Gravity.START));
 
         setContentView(root);
         if (url == null || url.length() == 0) {
@@ -102,16 +90,6 @@ public class NativePlayerActivity extends Activity {
         videoView.setUrl(url, douyinHeaders());
         videoView.start();
 
-        sizeTick = new Runnable() {
-            public void run() {
-                try {
-                    int[] sz = videoView.getVideoSize();
-                    if (sz != null && sz[0] > 0 && sz[1] > 0) tvSize.setText("width: " + sz[0] + " height: " + sz[1]);
-                } catch (Throwable ignored) {}
-                sizeHandler.postDelayed(this, 500);
-            }
-        };
-        sizeHandler.postDelayed(sizeTick, 500);
     }
 
     void applyKernel() {
@@ -155,7 +133,6 @@ public class NativePlayerActivity extends Activity {
 
     @Override
     protected void onDestroy() {
-        if (sizeHandler != null && sizeTick != null) sizeHandler.removeCallbacks(sizeTick);
         try { videoView.release(); } catch (Throwable e) { }
         super.onDestroy();
     }
