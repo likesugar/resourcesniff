@@ -77,6 +77,25 @@ public class SniffActivity extends Activity {
         ws.setDatabaseEnabled(true);
         CookieManager.getInstance().setAcceptCookie(true);
         CookieManager.getInstance().setAcceptThirdPartyCookies(webView, true);
+        final android.content.Context ctx = this;
+        Thread.setDefaultUncaughtExceptionHandler(new Thread.UncaughtExceptionHandler() {
+            @Override
+            public void uncaughtException(Thread t, final Throwable e) {
+                new Thread(new Runnable() {
+                    @Override
+                    public void run() {
+                        android.app.AlertDialog.Builder b = new android.app.AlertDialog.Builder(ctx);
+                        b.setTitle("闪退原因");
+                        b.setMessage(android.util.Log.getStackTraceString(e));
+                        try {
+                            b.show();
+                        } catch (Throwable e2) { }
+                        try { Thread.sleep(5000); } catch (InterruptedException e2) { }
+                        android.os.Process.killProcess(android.os.Process.myPid());
+                    }
+                }).start();
+            }
+        });
 
         webView.setWebChromeClient(new WebChromeClient());
         webView.setWebViewClient(new WebViewClient() {
@@ -220,14 +239,22 @@ public class SniffActivity extends Activity {
     }
 
     static String extractUrl(String text) {
+        if (text == null) return null;
         Matcher m = URL_IN_TEXT.matcher(text);
-        if (m.find()) {
+        String fallback = null;
+        while (m.find()) {
             String u = m.group();
+            // 校验 host：必须带点，避免抓到 aweme/detail 这类相对路径
+            int sp = u.indexOf("//");
+            String rest = sp >= 0 ? u.substring(sp + 2) : u;
+            int slash = rest.indexOf('/');
+            String host = slash >= 0 ? rest.substring(0, slash) : rest;
+            if (host.indexOf('.') < 0) continue;
             if (u.startsWith("www.")) u = "https://" + u;
-            return u;
+            if (u.contains("v.douyin.com")) return u; // 抖音短链优先
+            if (fallback == null) fallback = u;
         }
-        if (text.matches("[\\w\\-./?:#=&%+~@!$'*;,\\[\\]]+")) return text;
-        return null;
+        return fallback;
     }
 
     /** B站视频解析（downkyi 思路提取）：view API 拿 cid → playurl API(fnval=16 DASH, qn=127) 取最高码率，入记录 */
