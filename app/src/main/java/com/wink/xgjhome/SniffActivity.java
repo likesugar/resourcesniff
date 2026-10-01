@@ -71,7 +71,9 @@ public class SniffActivity extends Activity {
                 .setPositiveButton("复制并退出", new android.content.DialogInterface.OnClickListener() {
                     public void onClick(android.content.DialogInterface d, int w) {
                         try {
-            [SYSTEM_NOTE: Content compressed. Read the full version if needed.]Catch (Throwable e2) { }
+                            ClipboardManager cm=(ClipboardManager)getSystemService(CLIPBOARD_SERVICE);
+                            cm.setPrimaryClip(android.content.ClipData.newPlainText("crash", android.util.Log.getStackTraceString(e)));
+                            Toast.makeText(getApplicationContext(), "已复制", Toast.LENGTH_LONG).show();
                         finish();
                         android.os.Process.killProcess(android.os.Process.myPid());
                     }
@@ -81,7 +83,6 @@ public class SniffActivity extends Activity {
 
     @SuppressLint({"SetJavaScriptEnabled", "ClickableViewAccessibility"})
     void doCreate(Bundle savedInstanceState) {
-        setContentView(R.layout.activity_sniff);
         setContentView(R.layout.activity_sniff);
 
         webView = findViewById(R.id.webview);
