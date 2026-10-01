@@ -800,6 +800,8 @@ public class SniffActivity extends Activity {
     }
 
     void addRecord(final String url, String title) {
+        // 流畅/极速不显示
+        if (title != null && title.contains("抖音") && (url.contains("_ld.") || url.contains("_md."))) return;
         LinearLayout row = new LinearLayout(this);
         row.setOrientation(LinearLayout.VERTICAL);
         row.setPadding(16, 12, 16, 12);

@@ -92,11 +92,24 @@ public class NativePlayerActivity extends Activity {
         ws.setDomStorageEnabled(true);
         ws.setMediaPlaybackRequiresUserGesture(false);
         ws.setMixedContentMode(WebSettings.MIXED_CONTENT_ALWAYS_ALLOW);
+        wv.setWebViewClient(new android.webkit.WebViewClient() {
+            @Override
+            public android.webkit.WebResourceResponse shouldInterceptRequest(WebView view, android.webkit.WebResourceRequest request) {
+                return serveAppAsset(request);
+            }
+        });
         wv.addJavascriptInterface(new Object() {
             @android.webkit.JavascriptInterface
             public String getUrl() { return url; }
             @android.webkit.JavascriptInterface
             public void onNative() { }
+            @android.webkit.JavascriptInterface
+            public void openNative(final String u, final String t) {
+                runOnUiThread(new Runnable() { public void run() {
+                    if (usingWeb) { switchToNativeKernel(); }
+                    else { videoView.setUrl(u); videoView.start(); }
+                }});
+            }
         }, "AndroidPlayer");
         root.addView(wv, new FrameLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
@@ -112,9 +125,26 @@ public class NativePlayerActivity extends Activity {
             // 抖音：网页内核先行，失败 player.html 自动调 openNative 切原生
             videoView.setVisibility(View.GONE);
             wv.setVisibility(View.VISIBLE);
-            wv.loadUrl("file:///android_asset/player.html");
+            wv.loadUrl("https://appassets.local/player.html");
         } else {
             videoView.start();
+        }
+    }
+
+    /** 虚拟域名：https://appassets.local/xxx → assets/xxx（file:// 下 Worker 被禁，需 https 同源） */
+    android.webkit.WebResourceResponse serveAppAsset(android.webkit.WebResourceRequest request) {
+        Uri u = request.getUrl();
+        if (!"appassets.local".equals(u.getHost())) return null;
+        String path = u.getPath();
+        if (path == null || path.startsWith("/player.html")) path = "/player.html";
+        try {
+            java.io.InputStream is = getAssets().open(path.substring(1));
+            String mime = path.endsWith(".wasm") ? "application/wasm"
+                    : path.endsWith(".js") ? "text/javascript"
+                    : path.endsWith(".html") ? "text/html" : "application/octet-stream";
+            return new android.webkit.WebResourceResponse(mime, path.endsWith(".html") ? "utf-8" : null, is);
+        } catch (Throwable e) {
+            return null;
         }
     }
 
@@ -124,16 +154,21 @@ public class NativePlayerActivity extends Activity {
         if (usingWeb) {
             try { videoView.pause(); } catch (Throwable e) { }
             videoView.setVisibility(View.GONE);
-            wv.loadUrl("file:///android_asset/player.html");
+            wv.loadUrl("https://appassets.local/player.html");
             wv.setVisibility(View.VISIBLE);
             Toast.makeText(this, "已切换：jessibuca 网页内核", Toast.LENGTH_SHORT).show();
         } else {
-            try { wv.loadUrl("about:blank"); } catch (Throwable e) { }
-            wv.setVisibility(View.GONE);
-            videoView.setVisibility(View.VISIBLE);
-            videoView.start();
-            Toast.makeText(this, "已切换：MediaPlayer 内核", Toast.LENGTH_SHORT).show();
+            switchToNativeKernel();
         }
+    }
+
+    void switchToNativeKernel() {
+        try { wv.loadUrl("about:blank"); } catch (Throwable e) { }
+        wv.setVisibility(View.GONE);
+        videoView.setVisibility(View.VISIBLE);
+        usingWeb = false;
+        videoView.setUrl(url);
+        videoView.start();
     }
 
     @Override
