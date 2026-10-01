@@ -64,7 +64,14 @@ public class NativePlayerActivity extends Activity {
 
         // DKVideoPlayer：MediaPlayer 内核 + 标准控制层
         videoView = new VideoView(this);
-        videoView.setUrl(url);
+        if (url != null && (url.contains("douyincdn") || url.contains("douyin"))) {
+            java.util.Map<String, String> hdrs = new java.util.HashMap<String, String>();
+            hdrs.put("Referer", "https://live.douyin.com/");
+            hdrs.put("User-Agent", "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36");
+            videoView.setUrl(url, hdrs);
+        } else {
+            videoView.setUrl(url);
+        }
         controller = new StandardVideoController(this);
         controller.addDefaultControlComponent(title != null ? title : "资源嗅探", url != null && url.contains(".m3u8"));
         videoView.setVideoController(controller);

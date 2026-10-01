@@ -497,7 +497,7 @@ public class SniffActivity extends Activity {
                 final String f = best;
                 main.post(new Runnable() { public void run() {
                     if (recordKeys.add("dy#" + f)) {
-                        addRecord(f, "抖音直播");
+                        addRecord(f, "抖音·" + douyinQuality(f));
                         if (!isRecordsVisible) toggleRecords();
                     }
                     douyinParsing = false;
@@ -593,7 +593,7 @@ public class SniffActivity extends Activity {
                         final String fu = u;
                         main.post(new Runnable() { public void run() {
                             if (recordKeys.add("dy#" + fu)) {
-                                addRecord(fu, "抖音直播");
+                                addRecord(fu, "抖音·" + douyinQuality(fu));
                                 if (!isRecordsVisible) toggleRecords();
                             }
                             douyinParsing = false;
@@ -616,7 +616,7 @@ public class SniffActivity extends Activity {
                         final String fu = u;
                         main.post(new Runnable() { public void run() {
                             if (recordKeys.add("dy#" + fu)) {
-                                addRecord(fu, "抖音直播(兜底)");
+                                addRecord(fu, "抖音·" + douyinQuality(fu) + "(兜底)");
                                 if (!isRecordsVisible) toggleRecords();
                             }
                             douyinParsing = false;
@@ -637,6 +637,18 @@ public class SniffActivity extends Activity {
                 addRecord(msg, "抖音直播");
             }
         }});
+    }
+
+    /** 抖音清晰度后缀识别：_or4原画 _uhd蓝光 _hd高清 _sd标清 _ld流畅 _md极速 */
+    static String douyinQuality(String url) {
+        String l = url.toLowerCase();
+        if (l.contains("_or4.") || l.contains("/origin")) return "原画";
+        if (l.contains("_uhd.")) return "蓝光";
+        if (l.contains("_hd.")) return "高清";
+        if (l.contains("_sd.")) return "标清";
+        if (l.contains("_ld.")) return "流畅";
+        if (l.contains("_md.")) return "极速";
+        return "直播";
     }
 
     static boolean isMediaUrl(String url) {
