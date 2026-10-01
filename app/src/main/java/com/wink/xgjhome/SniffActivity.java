@@ -88,7 +88,11 @@ public class SniffActivity extends Activity {
             public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest request) {
                 Uri u = request.getUrl();
                 String scheme = u.getScheme() == null ? "" : u.getScheme().toLowerCase();
-                if ("http".equals(scheme) || "https".equals(scheme)) return false;
+                if ("http".equals(scheme) || "https".equals(scheme)) {
+                    // host 无点号说明是相对路径被浏览器补全的假链接（如 webcast_room/），忽略
+                    String h = u.getHost() == null ? "" : u.getHost();
+                    return !h.contains(".");
+                }
                 // 非 http(s) 协议：不拉起外部、不询问；剩余部分带域名才转 https，否则忽略
                 String s2 = u.toString();
                 String rest = s2.replaceAll("^[a-zA-Z][a-zA-Z0-9+.-]*://", "");
