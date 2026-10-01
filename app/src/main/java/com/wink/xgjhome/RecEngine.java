@@ -159,8 +159,8 @@ public class RecEngine {
                     android.database.Cursor cur = dm.query(new android.app.DownloadManager.Query().setFilterById(id));
                     boolean done = false, failed = false;
                     if (cur != null && cur.moveToFirst()) {
-                        int st = cur.getInt(cur.getColumnIndex(DownloadManager.COLUMN_STATUS));
-                        long bytes = cur.getLong(cur.getColumnIndex(DownloadManager.COLUMN_TOTAL_SIZE_BYTES));
+                        int st = cur.getInt(cur.getColumnIndex(android.app.DownloadManager.COLUMN_STATUS));
+                        long bytes = cur.getLong(cur.getColumnIndex(android.app.DownloadManager.COLUMN_TOTAL_SIZE_BYTES));
                         done = st == DownloadManager.STATUS_SUCCESSFUL;
                         failed = st == DownloadManager.STATUS_FAILED;
                         if (bytes > 0) update(ctx, url, "size", bytes);
