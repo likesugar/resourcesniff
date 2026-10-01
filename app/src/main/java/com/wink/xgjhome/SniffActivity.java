@@ -56,44 +56,6 @@ public class SniffActivity extends Activity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        try {
-            doCreate(savedInstanceState);
-        } catch (Throwable e) {
-            showCrash(e);
-        }
-    }
-
-    void showCrash(final Throwable e) {
-        // 崩溃堆栈落盘：内部数据目录 files/crash.txt
-        try {
-            java.io.File dir = getExternalFilesDir(null);
-            if (dir == null) dir = getFilesDir();
-            java.io.File f = new java.io.File(dir, "crash.txt");
-            java.io.FileWriter fw = new java.io.FileWriter(f, true);
-            fw.append("\n==== " + new java.util.Date().toString() + " ====\n");
-            fw.append(android.util.Log.getStackTraceString(e));
-            fw.close();
-        } catch (Throwable e2) { }
-        new android.app.AlertDialog.Builder(this)
-                .setTitle("闪退原因")
-                .setCancelable(false)
-                .setMessage(android.util.Log.getStackTraceString(e))
-                .setPositiveButton("复制并退出", new android.content.DialogInterface.OnClickListener() {
-                    public void onClick(android.content.DialogInterface d, int w) {
-                        try {
-                            ClipboardManager cm=(ClipboardManager)getSystemService(CLIPBOARD_SERVICE);
-                            cm.setPrimaryClip(android.content.ClipData.newPlainText("crash", android.util.Log.getStackTraceString(e)));
-                            Toast.makeText(getApplicationContext(), "已复制", Toast.LENGTH_LONG).show();
-                        } catch (Throwable e2) { }
-                        finish();
-                        android.os.Process.killProcess(android.os.Process.myPid());
-                    }
-                })
-                .show();
-    }
-
-    @SuppressLint({"SetJavaScriptEnabled", "ClickableViewAccessibility"})
-    void doCreate(Bundle savedInstanceState) {
         setContentView(R.layout.activity_sniff);
 
         webView = findViewById(R.id.webview);
@@ -115,35 +77,17 @@ public class SniffActivity extends Activity {
         ws.setDatabaseEnabled(true);
         CookieManager.getInstance().setAcceptCookie(true);
         CookieManager.getInstance().setAcceptThirdPartyCookies(webView, true);
-        final android.content.Context ctx = this;
-        Thread.setDefaultUncaughtExceptionHandler(new Thread.UncaughtExceptionHandler() {
-            @Override
-            public void uncaughtException(Thread t, final Throwable e) {
-                new Thread(new Runnable() {
-                    @Override
-                    public void run() {
-                        android.app.AlertDialog.Builder b = new android.app.AlertDialog.Builder(ctx);
-                        b.setTitle("闪退原因");
-                        b.setMessage(android.util.Log.getStackTraceString(e));
-                        try {
-                            b.show();
-                        } catch (Throwable e2) { }
-                        try { Thread.sleep(5000); } catch (InterruptedException e2) { }
-                        android.os.Process.killProcess(android.os.Process.myPid());
-                    }
-                }).start();
-            }
-        });
 
         webView.setWebChromeClient(new WebChromeClient());
         webView.setWebViewClient(new WebViewClient() {
             @Override
             public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest request) {
                 Uri u = request.getUrl();
-                String sc = u.getScheme() == null ? "" : u.getScheme().toLowerCase();
-                if ("http".equals(sc) || "https".equals(sc)) return false;
-                // bilibili:// 等协议：不拉起外部；剩余部分带域名才转 https，否则忽略留在当前页
-                String rest = u.toString().replaceAll("^[a-zA-Z][a-zA-Z0-9+.-]*://", "");
+                String scheme = u.getScheme() == null ? "" : u.getScheme().toLowerCase();
+                if ("http".equals(scheme) || "https".equals(scheme)) return false;
+                // 非 http(s) 协议：不拉起外部、不询问；剩余部分带域名才转 https，否则忽略
+                String s2 = u.toString();
+                String rest = s2.replaceAll("^[a-zA-Z][a-zA-Z0-9+.-]*://", "");
                 int slash = rest.indexOf('/');
                 String host = slash >= 0 ? rest.substring(0, slash) : rest;
                 if (host.indexOf('.') >= 0) {
@@ -281,22 +225,14 @@ public class SniffActivity extends Activity {
     }
 
     static String extractUrl(String text) {
-        if (text == null) return null;
         Matcher m = URL_IN_TEXT.matcher(text);
-        String fallback = null;
-        while (m.find()) {
+        if (m.find()) {
             String u = m.group();
-            // 校验 host：必须带点，避免抓到 aweme/detail 这类相对路径
-            int sp = u.indexOf("//");
-            String rest = sp >= 0 ? u.substring(sp + 2) : u;
-            int slash = rest.indexOf('/');
-            String host = slash >= 0 ? rest.substring(0, slash) : rest;
-            if (host.indexOf('.') < 0) continue;
             if (u.startsWith("www.")) u = "https://" + u;
-            if (u.contains("v.douyin.com")) return u; // 抖音短链优先
-            if (fallback == null) fallback = u;
+            return u;
         }
-        return fallback;
+        if (text.matches("[\\w\\-./?:#=&%+~@!$'*;,\\[\\]]+")) return text;
+        return null;
     }
 
     /** B站视频解析（downkyi 思路提取）：view API 拿 cid → playurl API(fnval=16 DASH, qn=127) 取最高码率，入记录 */
@@ -430,122 +366,6 @@ public class SniffActivity extends Activity {
         webView.evaluateJavascript("(function(){try{eval('" + escaped + "');}catch(e){console.log('userscript error',e);}})();", null);
     }
 
-    final java.util.Map<String, Thread> recThreads = new java.util.HashMap<>();
-
-    void showRecordMenu(View anchor, final String url) {
-        android.widget.PopupMenu pm = new android.widget.PopupMenu(this, anchor);
-        pm.getMenu().add("下载");
-        pm.getMenu().add("播放");
-        final String label = recThreads.containsKey(url) ? "停止录制" : "直播录制";
-        pm.getMenu().add(label);
-        pm.setOnMenuItemClickListener(new android.widget.PopupMenu.OnMenuItemClickListener() {
-            @Override
-            public boolean onMenuItemClick(android.view.MenuItem item) {
-                String t = item.getTitle().toString();
-                if (t.equals("下载")) downloadUrl(url);
-                else if (t.equals("播放")) playUrl(url);
-                else if (t.equals("直播录制")) startRecord(url);
-                else if (t.equals("停止录制")) stopRecord(url);
-                return true;
-            }
-        });
-        pm.show();
-    }
-
-    String refererFor(String url) {
-        return url.contains("bilibili.com") || url.contains("bilivideo") ? "https://www.bilibili.com/" : null;
-    }
-
-    void downloadUrl(String url) {
-        try {
-            android.app.DownloadManager.Request req = new android.app.DownloadManager.Request(android.net.Uri.parse(url));
-            String rf = refererFor(url);
-            if (rf != null) req.addRequestHeader("Referer", rf);
-            req.setNotificationVisibility(android.app.DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED);
-            req.setDestinationInExternalPublicDir(android.os.Environment.DIRECTORY_MOVIES,
-                    "资源嗅探_" + System.currentTimeMillis() + ".ts");
-            ((android.app.DownloadManager) getSystemService(DOWNLOAD_SERVICE)).enqueue(req);
-            Toast.makeText(this, "已加入下载（Movies）", Toast.LENGTH_SHORT).show();
-        } catch (Exception e) {
-            Toast.makeText(this, "下载失败: " + e.getMessage(), Toast.LENGTH_LONG).show();
-        }
-    }
-
-    /** 内置 jessibuca 播放器：assets/player.html?url=...（m3u8/flv/ts 等流） */
-    void playUrl(String url) {
-        try {
-            boolean live = isMediaUrl(url) && (url.contains(".ts") || url.contains(".flv"));
-            String enc = java.net.URLEncoder.encode(url, "UTF-8");
-            String t = java.net.URLEncoder.encode(clipTitle(url), "UTF-8");
-            webView.loadUrl("file:///android_asset/player.html?url=" + enc + "&live=" + (live ? 1 : 0) + "&title=" + t);
-            Toast.makeText(this, "内置播放器打开", Toast.LENGTH_SHORT).show();
-        } catch (Exception e) {
-            try {
-                android.content.Intent i = new android.content.Intent(android.content.Intent.ACTION_VIEW);
-                i.setDataAndType(android.net.Uri.parse(url), "video/*");
-                startActivity(i);
-            } catch (Exception e2) {
-                Toast.makeText(this, "没有可用播放器", Toast.LENGTH_SHORT).show();
-            }
-        }
-    }
-
-    String clipTitle(String url) {
-        for (String key : recordKeys) { }
-        return "资源嗅探";
-    }
-
-    void startRecord(final String url) {
-        if (recThreads.containsKey(url)) return;
-        Toast.makeText(this, "开始录制", Toast.LENGTH_SHORT).show();
-        Thread t = new Thread(new Runnable() {
-            @Override
-            public void run() {
-                java.io.File out = new java.io.File(
-                        android.os.Environment.getExternalStoragePublicDirectory(android.os.Environment.DIRECTORY_MOVIES),
-                        "资源嗅探_直播_" + System.currentTimeMillis() + ".ts");
-                java.io.InputStream in = null;
-                java.io.FileOutputStream fos = null;
-                try {
-                    java.net.HttpURLConnection c = (java.net.HttpURLConnection) new java.net.URL(url).openConnection();
-                    c.setConnectTimeout(8000); c.setReadTimeout(8000);
-                    c.setRequestProperty("User-Agent", "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36");
-                    String rf = refererFor(url);
-                    if (rf != null) c.setRequestProperty("Referer", rf);
-                    in = c.getInputStream();
-                    fos = new java.io.FileOutputStream(out);
-                    byte[] buf = new byte[65536]; int n; long total = 0;
-                    while ((n = in.read(buf)) > 0) {
-                        fos.write(buf, 0, n);
-                        total += n;
-                    }
-                    final String msg = "录制完成: " + (total / 1048576) + "MB " + out.getName();
-                    runOnUiThread(new Runnable() {
-                        @Override
-                        public void run() { Toast.makeText(SniffActivity.this, msg, Toast.LENGTH_LONG).show(); }
-                    });
-                } catch (final Exception e) {
-                    runOnUiThread(new Runnable() {
-                        @Override
-                        public void run() { Toast.makeText(SniffActivity.this, "录制中断: " + e.getMessage(), Toast.LENGTH_LONG).show(); }
-                    });
-                } finally {
-                    try { if (in != null) in.close(); } catch (Exception e) { }
-                    try { if (fos != null) fos.close(); } catch (Exception e) { }
-                    recThreads.remove(url);
-                }
-            }
-        });
-        recThreads.put(url, t);
-        t.start();
-    }
-
-    void stopRecord(String url) {
-        Thread t = recThreads.remove(url);
-        if (t != null) t.interrupt();
-        Toast.makeText(this, "已停止", Toast.LENGTH_SHORT).show();
-    }
-
     String readAsset(String name) {
         try {
             java.io.InputStream is = getAssets().open(name);
@@ -589,6 +409,17 @@ public class SniffActivity extends Activity {
         topBar.setVisibility(isTopBarVisible ? View.VISIBLE : View.GONE);
     }
 
+    /** 内置 jessibuca 播放器：assets/player.html?url=... */
+    void playUrl(String url) {
+        try {
+            String enc = java.net.URLEncoder.encode(url, "UTF-8");
+            String t = java.net.URLEncoder.encode("资源嗅探", "UTF-8");
+            webView.loadUrl("file:///android_asset/player.html?url=" + enc + "&live=1&title=" + t);
+        } catch (Exception e) {
+            Toast.makeText(this, "打不开: " + e.getMessage(), Toast.LENGTH_SHORT).show();
+        }
+    }
+
     void addRecord(final String url, String title) {
         LinearLayout row = new LinearLayout(this);
         row.setOrientation(LinearLayout.VERTICAL);
@@ -603,6 +434,21 @@ public class SniffActivity extends Activity {
         tv.setSingleLine(true);
         row.addView(tv);
 
+        TextView btnPlay = new TextView(this);
+        btnPlay.setText("▶");
+        btnPlay.setTextColor(0xFF8AB4F8);
+        btnPlay.setTextSize(13);
+        btnPlay.setPadding(0, 4, 8, 4);
+        btnPlay.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) { playUrl(url); }
+        });
+        LinearLayout btnRow = new LinearLayout(this);
+        btnRow.setOrientation(LinearLayout.HORIZONTAL);
+        btnRow.setGravity(android.view.Gravity.RIGHT);
+        btnRow.addView(btnPlay);
+        row.addView(btnRow);
+
         TextView tvUrl = new TextView(this);
         tvUrl.setTextColor(0xFF8AB4F8);
         tvUrl.setTextSize(11);
@@ -610,7 +456,7 @@ public class SniffActivity extends Activity {
         tvUrl.setSingleLine(true);
         row.addView(tvUrl);
 
-        // 点行复制
+        // 点行复制，长按删除
         row.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
@@ -619,28 +465,17 @@ public class SniffActivity extends Activity {
                 Toast.makeText(SniffActivity.this, "已复制", Toast.LENGTH_SHORT).show();
             }
         });
-
-        // ⁝ 菜单：下载 / 播放 / 直播录制
-        LinearLayout headRow = new LinearLayout(this);
-        headRow.setOrientation(LinearLayout.HORIZONTAL);
-        headRow.setGravity(android.view.Gravity.CENTER_VERTICAL);
-        TextView menuBtn = new TextView(this);
-        menuBtn.setText("\u2064\u2064\u2064");
-        menuBtn.setTextColor(0xFFFFFFFF);
-        menuBtn.setTextSize(16);
-        menuBtn.setPadding(12, 4, 12, 4);
-        menuBtn.setOnClickListener(new View.OnClickListener() {
+        row.setOnLongClickListener(new View.OnLongClickListener() {
             @Override
-            public void onClick(View v) {
-                showRecordMenu(v, url);
+            public boolean onLongClick(View v) {
+                ViewGroup p = (ViewGroup) v.getParent();
+                if (p != null) p.removeView(v);
+                recordKeys.remove(url);
+                foundUrls.remove(url);
+                Toast.makeText(SniffActivity.this, "已删除", Toast.LENGTH_SHORT).show();
+                return true;
             }
         });
-        headRow.addView(tv);
-        headRow.addView(menuBtn, new LinearLayout.LayoutParams(
-                android.view.ViewGroup.LayoutParams.WRAP_CONTENT,
-                android.view.ViewGroup.LayoutParams.WRAP_CONTENT));
-        row.addView(headRow);
-        row.addView(tvUrl);
 
         layoutRecords.addView(row, 0);
     }
