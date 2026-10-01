@@ -929,12 +929,16 @@ public class SniffActivity extends Activity {
                 if (t.equals("下载")) downloadUrl(url);
                 else if (t.equals("播放")) playUrl(url);
                 else if (t.equals("直播录制")) {
-                    kbArmed = true;
-                    Toast.makeText(SniffActivity.this, "已武装录制，出现分片即自动开始", Toast.LENGTH_SHORT).show();
+                    try {
+                        android.content.ClipboardManager cm = (android.content.ClipboardManager) getSystemService(Context.CLIPBOARD_SERVICE);
+                        cm.setPrimaryClip(android.content.ClipData.newPlainText("stream", url));
+                    } catch (Throwable e) { }
+                    startActivity(new Intent(SniffActivity.this, RecordActivity.class));
+                    Toast.makeText(SniffActivity.this, "已复制流地址，到下载页点「读取剪贴板录制」", Toast.LENGTH_LONG).show();
                 }
                 else if (t.equals("停止录制")) {
-                    stopKb();
-                    Toast.makeText(SniffActivity.this, "录制已结束（ffmpeg 重建中）", Toast.LENGTH_SHORT).show();
+                    RecManager.recStopAll();
+                    Toast.makeText(SniffActivity.this, "录制已结束", Toast.LENGTH_SHORT).show();
                 }
                 else if (t.equals("删除")) {
                     ViewGroup p = (ViewGroup) row.getParent();
@@ -1026,5 +1030,16 @@ public class SniffActivity extends Activity {
         } else {
             super.onBackPressed();
         }
+    }
+
+    @Override
+    protected void onDestroy() {
+        try { webView.stopLoading(); } catch (Throwable e) { }
+        try {
+            ViewGroup p = (ViewGroup) webView.getParent();
+            if (p != null) p.removeView(webView);
+            webView.destroy();
+        } catch (Throwable e) { }
+        super.onDestroy();
     }
 }

@@ -200,4 +200,8 @@ public class RecManager {
         stoppedJobs.remove(job.id);
         try { if (job.storeUri != null) sCtx.getContentResolver().delete(job.storeUri, null, null); } catch (Throwable ignored) {}
     }
+
+    public static void recStopAll() {
+        for (Integer id : recJobs.keySet().toArray(new Integer[0])) recStop(id);
+    }
 }

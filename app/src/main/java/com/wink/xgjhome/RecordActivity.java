@@ -2,6 +2,7 @@ package com.wink.xgjhome;
 
 import android.app.Activity;
 import android.content.Intent;
+import android.content.Context;
 import android.graphics.Color;
 import android.graphics.Typeface;
 import android.os.Bundle;
@@ -50,16 +51,23 @@ public class RecordActivity extends Activity {
         title.setLayoutParams(hlp);
         head.addView(title);
         TextView recNow = new TextView(this);
-        recNow.setText("⏺ 录制当前流");
+        recNow.setText("📋 读取剪贴板录制");
         recNow.setTextColor(Color.WHITE);
         recNow.setTextSize(14);
         recNow.setPadding(20, 12, 20, 12);
         recNow.setBackgroundColor(0xFF24485E);
         recNow.setOnClickListener(new View.OnClickListener() {
             public void onClick(View v) {
-                String u = RecManager.lastStreamUrl;
-                if (u == null || u.isEmpty() || !u.startsWith("http")) {
-                    Toast.makeText(RecordActivity.this, "先在播放器里开播一条直播流", Toast.LENGTH_SHORT).show();
+                String u = null;
+                try {
+                    android.content.ClipboardManager cm = (android.content.ClipboardManager) getSystemService(Context.CLIPBOARD_SERVICE);
+                    if (cm != null && cm.getPrimaryClip() != null && cm.getPrimaryClip().getItemAt(0) != null
+                            && cm.getPrimaryClip().getItemAt(0).getText() != null) {
+                        u = cm.getPrimaryClip().getItemAt(0).getText().toString().trim();
+                    }
+                } catch (Throwable e) { }
+                if (u == null || !u.startsWith("http")) {
+                    Toast.makeText(RecordActivity.this, "剪贴板里没有有效链接", Toast.LENGTH_SHORT).show();
                     return;
                 }
                 RecManager.startRecJob(u);
