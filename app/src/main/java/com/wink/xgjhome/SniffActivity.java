@@ -382,60 +382,88 @@ public class SniffActivity extends Activity {
         }
     }
 
-    // ==== DK 抖音解析规则 ====
+    // ==== DK 抖音解析（照 DKVideoPlayer MainActivity 逐段移植）====
     private final java.util.List<String> douyinCands = new java.util.ArrayList<>();
     private boolean douyinPickScheduled = false;
     private final java.util.Set<String> seenMedia = new java.util.HashSet<>();
     static final String UA_MOBILE = "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36";
+    private boolean douyinParsing = false;      // 对应 DK 的 parsing（抖音解析进行中）
+    private String douyinLiveUrl = null;        // 当前解析的直播间地址
+    private final android.os.Handler main = new android.os.Handler(android.os.Looper.getMainLooper());
+    private static final String DY_LIVE_COOKIE = "enter_pc_once=1; hevc_supported=true; ttwid=1%7COnZEYGAxHABx6WRfArV8V0vfh1qUfP8AU2WYpG2ybdU%7C1754493043%7C867b28541b24aca9aec6379357aa2bff731e159fa7a804a767f575c8ff886639; __ac_nonce=06893707d00e64c4488d5; __ac_signature=_02B4Z6wo00f01m0zFcQAAIDDRDeLuhFSmo5tExFAAPPu88; odin_tt=e0bcb4ad345d3ed6915b71cab9469cb459681b743f65d870cb52329adfa8792b80633cf01c31edd9cf4874b743daacc7b789efd1727202b7ed3f6e7059ce43a72f3358995fc8367000f0b42103a78d1b; passport_csrf_token=4d713363889176dba46a4d28394acf2f";
 
+    /** 对应 DK shouldInterceptRequest 的抖音判定段 */
     void maybeRecordDouyin(final String url) {
         String l = url.toLowerCase();
-        // 裸直播地址：去参数后含 douyincdn + /stage/ 且末段不带扩展名（签名地址每次都变会死循环）
+        if (url.contains("/log/")) return;
+        if (l.contains("bilivideo") || l.contains("upos-")) return;
+        // 抖音直播：无参数裸地址 .../stage/xxxxx（不带 .flv?e= 签名参数，签名地址每次都变会死循环）
         String base = url;
         int qi = base.indexOf('?');
         if (qi > 0) base = base.substring(0, qi);
         String lb = base.toLowerCase();
         boolean bareLive = lb.contains("douyincdn") && lb.contains("/stage/")
             && !lb.substring(lb.lastIndexOf('/') + 1).contains(".");
+        if (bareLive) {
+            final String f = base;
+            boolean added = false;
+            synchronized (douyinCands) {
+                if (!douyinCands.contains(f)) { douyinCands.add(f); added = true; }
+            }
+            if (added && !douyinPickScheduled) {
+                douyinPickScheduled = true;
+                main.postDelayed(new Runnable() { public void run() { finishDouyinPick(); } }, 3000);
+            }
+            return;
+        }
         boolean hit = (l.contains(".flv") || l.contains(".m3u8") || l.contains(".mp4") || l.contains(".m4s"))
-            && (l.contains("douyinvod") || l.contains("/aweme/v1/play") || l.contains("playwm"))
-            && !l.contains("bilivideo") && !l.contains("upos-");
-        if (!bareLive && !hit) return;
-
-        final String f;
+            && (l.contains("douyinvod") || l.contains("/aweme/v1/play") || l.contains("playwm"));
         if (hit) {
             // 抖音强制最高画质：ratio→1080p；biz_resolution→1088x1920（兼容 %3D 编码）
             String hi = url
                 .replaceAll("ratio=[a-zA-Z0-9_]+", "ratio=1080p")
                 .replaceAll("biz_resolution(=|%3D|%3d)[a-zA-Z0-9_x]+", "biz_resolution$11088x1920")
                 .replaceAll("resolution(=|%3D|%3d)[a-zA-Z0-9_x]+", "resolution$11088x1920");
-            f = hi;
-        } else {
-            f = base;
-        }
-        synchronized (douyinCands) {
-            if (!douyinCands.contains(f)) douyinCands.add(f);
-        }
-        if (l.contains(".m3u8")) {
-            final String murl = url;
-            new Thread(new Runnable() { public void run() { pickBestVariant(murl); } }).start();
-        }
-        if (!douyinPickScheduled) {
-            douyinPickScheduled = true;
-            long delay = bareLive ? 3000 : 6000;
-            runOnUiThread(new Runnable() { public void run() {
-                new android.os.Handler(android.os.Looper.getMainLooper())
-                    .postDelayed(new Runnable() { public void run() { finishDouyinPick(); } }, 3000);
-            }});
+            synchronized (douyinCands) {
+                if (!douyinCands.contains(hi)) douyinCands.add(hi);
+            }
+            if (!douyinPickScheduled) {
+                douyinPickScheduled = true;
+                main.postDelayed(new Runnable() { public void run() { finishDouyinPick(); } }, 6000);
+            }
+            if (l.contains(".m3u8")) {
+                new Thread(new Runnable() { public void run() { pickBestVariant(url); } }).start();
+            }
         }
     }
 
-    /** 3~6 秒窗口后收口：候选里挑远端体积最大的进记录（照DK finishDouyinPick） */
+    /** 看门狗：8秒还没抓到候选就重新走提取，直到抓到为止（照DK douyinWatchdog，reload换成重提取） */
+    private final Runnable douyinWatchdog = new Runnable() {
+        public void run() {
+            if (!douyinParsing) return;
+            boolean hasCands;
+            synchronized (douyinCands) { hasCands = !douyinCands.isEmpty(); }
+            if (!hasCands && douyinLiveUrl != null) {
+                douyinLiveExtract(douyinLiveUrl, CookieManager.getInstance().getCookie("https://live.douyin.com"));
+            }
+            if (hasCands && douyinPickScheduled) return;  // 已进入择优流程，停止看门狗
+            main.postDelayed(this, 8000);
+        }
+    };
+
+    void startDouyinWatchdog() {
+        main.removeCallbacks(douyinWatchdog);
+        main.postDelayed(douyinWatchdog, 8000);
+    }
+
+    /** 抖音候选收集后按体积择优（照DK finishDouyinPick） */
     void finishDouyinPick() {
         java.util.List<String> snapshot;
         synchronized (douyinCands) { snapshot = new java.util.ArrayList<String>(douyinCands); }
-        if (snapshot.isEmpty()) return;
-        douyinPickScheduled = false;
+        if (snapshot.isEmpty()) {
+            if (douyinParsing) main.postDelayed(new Runnable() { public void run() { finishDouyinPick(); } }, 2000);
+            return;
+        }
         new Thread(new Runnable() {
             public void run() {
                 String best = snapshot.get(0);
@@ -445,11 +473,12 @@ public class SniffActivity extends Activity {
                     if (len > bestLen) { bestLen = len; best = u; }
                 }
                 final String f = best;
-                runOnUiThread(new Runnable() { public void run() {
+                main.post(new Runnable() { public void run() {
                     if (recordKeys.add("dy#" + f)) {
-                        addRecord(f, "抖音");
+                        addRecord(f, "抖音直播");
                         if (!isRecordsVisible) toggleRecords();
                     }
+                    douyinParsing = false;
                 }});
             }
         }).start();
@@ -473,7 +502,7 @@ public class SniffActivity extends Activity {
         }
     }
 
-    /** m3u8 主清单 → 挑最大 BANDWIDTH 子清单 */
+    /** m3u8 主清单 → 挑最大 BANDWIDTH 子清单（照DK pickBestVariant） */
     void pickBestVariant(String masterUrl) {
         try {
             java.net.HttpURLConnection c = (java.net.HttpURLConnection) new java.net.URL(masterUrl).openConnection();
@@ -508,8 +537,66 @@ public class SniffActivity extends Activity {
         } catch (Throwable ignored) {}
     }
 
+    /** DK douyinLiveExtract：直接拉直播间页面按清晰度正则提取流地址（兜底提取方案） */
+    private void douyinLiveExtract(final String liveUrl, final String cookie) {
+        new Thread(new Runnable() { public void run() {
+            try {
+                java.net.HttpURLConnection c = (java.net.HttpURLConnection) new java.net.URL(liveUrl).openConnection();
+                c.setConnectTimeout(10000); c.setReadTimeout(10000);
+                c.setInstanceFollowRedirects(true);
+                c.setRequestProperty("User-Agent", "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/138.0.0.0 Safari/537.36");
+                c.setRequestProperty("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8");
+                c.setRequestProperty("Accept-Language", "zh-CN,zh;q=0.9");
+                c.setRequestProperty("Cookie", cookie != null && cookie.length() > 10 ? cookie : DY_LIVE_COOKIE);
+                if (c.getResponseCode() != 200) { c.disconnect(); failDouyin("页面请求失败:" + c.getResponseCode()); return; }
+                java.io.BufferedReader r = new java.io.BufferedReader(new java.io.InputStreamReader(c.getInputStream(), "UTF-8"));
+                StringBuilder sb = new StringBuilder();
+                String line;
+                while ((line = r.readLine()) != null) sb.append(line);
+                r.close(); c.disconnect();
+                String html = sb.toString();
+
+                // 各清晰度流地址正则提取（照DK）
+                String[][] qualities = {
+                    {"原画", "flv\",?\\s*\"?streamUrl\"?:?\\s*\"?(https?:[^\"']+flv[^\"']*)"},
+                    {"蓝光", "\"(?:flv|full)\"\\s*:\\s*\"(https?:[^\"]+)\""},
+                    {"超清", "\"uhd\"\\s*:\\s*\\{[^}]*?\"url\"\\s*:\\s*\"(https?:[^\"]+)\""},
+                    {"高清", "\"hd\"\\s*:\\s*\\{[^}]*?\"url\"\\s*:\\s*\"(https?:[^\"]+)\""},
+                    {"标清", "\"sd\"\\s*:\\s*\\{[^}]*?\"url\"\\s*:\\s*\"(https?:[^\"]+)\""}
+                };
+                for (String[] q : qualities) {
+                    java.util.regex.Matcher pm = java.util.regex.Pattern.compile(q[1]).matcher(html);
+                    if (pm.find()) {
+                        String u = pm.group(1).replace("\\u002F", "/").replace("\\/", "/");
+                        final String fu = u;
+                        main.post(new Runnable() { public void run() {
+                            if (recordKeys.add("dy#" + fu)) {
+                                addRecord(fu, "抖音直播");
+                                if (!isRecordsVisible) toggleRecords();
+                            }
+                            douyinParsing = false;
+                        }});
+                        return;
+                    }
+                }
+                failDouyin("各清晰度都没取到流地址");
+            } catch (Throwable e) {
+                failDouyin("解析异常:" + e.getMessage());
+            }
+        }}).start();
+    }
+
+    private void failDouyin(final String msg) {
+        main.post(new Runnable() { public void run() {
+            if (recordKeys.add("dyfail#" + msg)) {
+                addRecord(msg, "抖音直播");
+            }
+        }});
+    }
+
     static boolean isMediaUrl(String url) {
         return MEDIA.matcher(url.toLowerCase()).find();
+    }
     }
 
     /** 油猴脚本离线内置：抖音网页版全能优化（assets/douyin.user.js） */
