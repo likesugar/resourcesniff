@@ -200,6 +200,7 @@ public class DownloadManagerActivity extends Activity {
         pm.getMenu().add("取消");
         pm.getMenu().add("开始");
         pm.getMenu().add("播放");
+        pm.getMenu().add(RecEngine.ST_PAUSE.equals(status) ? "继续" : "暂停");
         pm.getMenu().add("结束录制");
         pm.setOnMenuItemClickListener(new android.widget.PopupMenu.OnMenuItemClickListener() {
             @Override
@@ -215,6 +216,15 @@ public class DownloadManagerActivity extends Activity {
                     Toast.makeText(DownloadManagerActivity.this, "已取消", Toast.LENGTH_SHORT).show();
                 } else if (t.equals("开始")) {
                     RecEngine.startRecording(DownloadManagerActivity.this, url, o.optString("title", "资源嗅探"));
+                    refresh();
+                } else if (t.equals("暂停")) {
+                    RecEngine.pause(DownloadManagerActivity.this, url);
+                    refresh();
+                } else if (t.equals("继续")) {
+                    if (RecEngine.running(url)) RecEngine.resume(DownloadManagerActivity.this, url);
+                    else if (RecEngine.TYPE_REC.equals(o.optString("type")))
+                        RecEngine.startRecording(DownloadManagerActivity.this, url, o.optString("title", "资源嗅探"));
+                    else RecEngine.startDownload(DownloadManagerActivity.this, url, o.optString("title", "资源嗅探"));
                     refresh();
                 } else if (t.equals("播放")) {
                     String path = o.optString("path", "");
