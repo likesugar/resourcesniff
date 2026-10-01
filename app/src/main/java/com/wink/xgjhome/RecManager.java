@@ -160,21 +160,32 @@ public class RecManager {
                         fo = (java.io.FileOutputStream) sCtx.getContentResolver().openOutputStream(job.storeUri, "w");
                         java.util.LinkedHashSet<String> seen = new java.util.LinkedHashSet<>();
                         byte[] buf = new byte[65536];
+                        String curUrl = job.url;
                         while (job.active) {
-                            java.net.HttpURLConnection pc = (java.net.HttpURLConnection) new java.net.URL(job.url).openConnection();
+                            java.net.HttpURLConnection pc = (java.net.HttpURLConnection) new java.net.URL(curUrl).openConnection();
                             pc.setConnectTimeout(8000); pc.setReadTimeout(8000);
                             pc.setRequestProperty("User-Agent", "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36");
                             pc.setRequestProperty("Referer", "https://live.douyin.com/");
                             java.util.List<String> segs = new java.util.ArrayList<String>();
+                            String variant = null;
                             if (pc.getResponseCode() == 200) {
                                 java.io.BufferedReader br = new java.io.BufferedReader(new java.io.InputStreamReader(pc.getInputStream()));
                                 String ln, lastInf = null;
+                                boolean inVariant = false;
                                 while ((ln = br.readLine()) != null) {
                                     ln = ln.trim();
+                                    if (ln.startsWith("#EXT-X-STREAM-INF")) { inVariant = true; continue; }
+                                    if (inVariant && !ln.isEmpty() && !ln.startsWith("#")) {
+                                        String v = ln;
+                                        if (!v.startsWith("http")) v = new java.net.URL(new java.net.URL(curUrl), v).toString();
+                                        variant = v;
+                                        inVariant = false;
+                                        continue;
+                                    }
                                     if (ln.startsWith("#EXTINF")) lastInf = ln;
                                     else if (!ln.isEmpty() && !ln.startsWith("#") && lastInf != null) {
                                         String seg = ln;
-                                        if (!seg.startsWith("http")) seg = new java.net.URL(new java.net.URL(job.url), seg).toString();
+                                        if (!seg.startsWith("http")) seg = new java.net.URL(new java.net.URL(curUrl), seg).toString();
                                         segs.add(seg);
                                         lastInf = null;
                                     }
@@ -182,6 +193,7 @@ public class RecManager {
                                 br.close();
                             }
                             pc.disconnect();
+                            if (variant != null && segs.isEmpty()) { curUrl = variant; continue; }
                             for (String seg : segs) {
                                 if (!job.active) break;
                                 if (!seen.add(seg)) continue;
