@@ -50,7 +50,7 @@ public class BiliLoginActivity extends Activity {
                 ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f));
         setContentView(root);
 
-        webView.loadUrl("https://passport.bilibili.com/h5-app/login");
+        webView.loadUrl("https://m.bilibili.com/login-entry?gourl=https%3A%2F%2Fm.bilibili.com%2F");
 
         handler.postDelayed(new Runnable() {
             @Override
