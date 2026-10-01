@@ -64,14 +64,15 @@ public class NativePlayerActivity extends Activity {
 
         // DKVideoPlayer：MediaPlayer 内核 + 标准控制层
         videoView = new VideoView(this);
-                controller.setOnKernelSwitchListener(new StandardVideoController.OnKernelSwitchListener() {
-            @Override
-            public void onKernelSwitch() { toggleKernel(); }
-        });
-videoView.setUrl(url);
+        videoView.setUrl(url);
         controller = new StandardVideoController(this);
         controller.addDefaultControlComponent(title != null ? title : "资源嗅探", url != null && url.contains(".m3u8"));
         videoView.setVideoController(controller);
+        controller.setOnKernelSwitchListener(new StandardVideoController.OnKernelSwitchListener() {
+            @Override
+            public void onKernelSwitch() { toggleKernel(); }
+        });
+
         root.addView(videoView, new FrameLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
 
