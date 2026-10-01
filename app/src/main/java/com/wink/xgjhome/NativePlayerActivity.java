@@ -2,25 +2,29 @@ package com.wink.xgjhome;
 
 import android.annotation.SuppressLint;
 import android.app.Activity;
-import android.net.Uri;
 import android.os.Bundle;
 import android.view.Gravity;
 import android.view.View;
+import android.view.ViewGroup;
 import android.widget.Button;
 import android.widget.FrameLayout;
 import android.widget.Toast;
-import android.widget.VideoView;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
 
-/** 双内核播放器：默认系统 MediaPlayer（VideoView），可切 jessibuca 网页内核 */
+import xyz.doikki.videoplayer.player.VideoView;
+import xyz.doikki.videocontroller.StandardVideoController;
+
+/** 双内核播放器：DKVideoPlayer 控制层（默认 MediaPlayer 内核）+ jessibuca 网页内核切换（控制层按钮） */
 public class NativePlayerActivity extends Activity {
 
-    private VideoView vv;
+    private VideoView videoView;
+    private StandardVideoController controller;
     private WebView wv;
     private String url;
     private String title;
     private boolean usingWeb = false;
+    private Button kernelBtn;
 
     @SuppressLint("SetJavaScriptEnabled")
     @Override
@@ -32,103 +36,95 @@ public class NativePlayerActivity extends Activity {
         FrameLayout root = new FrameLayout(this);
         root.setBackgroundColor(0xFF000000);
 
-        // 内核A：系统 MediaPlayer
-        vv = new VideoView(this);
-        root.addView(vv, new FrameLayout.LayoutParams(
-                FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT));
+        // DKVideoPlayer：MediaPlayer 内核 + 标准控制层
+        videoView = new VideoView(this);
+        videoView.setUrl(url);
+        controller = new StandardVideoController(this);
+        controller.addDefaultControlComponent(title != null ? title : "资源嗅探", url != null && url.contains(".m3u8"));
+        videoView.setVideoController(controller);
+        root.addView(videoView, new FrameLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
 
-        // 内核B：jessibuca 网页内核
+        // jessibuca 网页内核（隐藏，控制层"内核"按钮切换）
         wv = new WebView(this);
+        wv.setVisibility(View.GONE);
         WebSettings ws = wv.getSettings();
         ws.setJavaScriptEnabled(true);
         ws.setDomStorageEnabled(true);
         ws.setMediaPlaybackRequiresUserGesture(false);
-        ws.setAllowFileAccess(true);
-        wv.setBackgroundColor(0xFF000000);
+        ws.setMixedContentMode(WebSettings.MIXED_CONTENT_ALWAYS_ALLOW);
         wv.addJavascriptInterface(new Object() {
             @android.webkit.JavascriptInterface
             public String getUrl() { return url; }
             @android.webkit.JavascriptInterface
-            public void openNative(String u, String t) {
-                runOnUiThread(new Runnable() {
-                    @Override
-                    public void run() { switchToNative(); }
-                });
-            }
+            public void onNative() { }
         }, "AndroidPlayer");
-        wv.loadUrl("file:///android_asset/player.html");
-        wv.setVisibility(View.GONE);
         root.addView(wv, new FrameLayout.LayoutParams(
-                FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT));
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
 
-        // 顶栏按钮
-        Button btn = new Button(this);
-        btn.setText("🌐 切网页内核");
-        btn.setTextSize(12);
-        FrameLayout.LayoutParams bp = new FrameLayout.LayoutParams(
-                FrameLayout.LayoutParams.WRAP_CONTENT, FrameLayout.LayoutParams.WRAP_CONTENT,
+        // 控制层右上角悬浮的内核切换按钮（覆盖层，跟随控制层显隐简化为常驻小按钮）
+        kernelBtn = new Button(this);
+        kernelBtn.setText("🌐内核");
+        kernelBtn.setTextSize(11);
+        kernelBtn.setBackgroundResource(R.drawable.bg_btn_deep);
+        FrameLayout.LayoutParams kp = new FrameLayout.LayoutParams(
+                ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT,
                 Gravity.TOP | Gravity.END);
-        bp.setMargins(16, 32, 16, 0);
-        btn.setOnClickListener(new View.OnClickListener() {
+        kp.setMargins(0, 12, 12, 0);
+        kernelBtn.setOnClickListener(new View.OnClickListener() {
             @Override
-            public void onClick(View v) { toggle(); }
+            public void onClick(View v) { toggleKernel(); }
         });
-        root.addView(btn, bp);
+        root.addView(kernelBtn, kp);
 
         setContentView(root);
-
         if (url == null || url.length() == 0) {
             Toast.makeText(this, "无播放地址", Toast.LENGTH_SHORT).show();
             finish();
             return;
         }
-        vv.setVideoURI(Uri.parse(url));
-        vv.start();
+        videoView.start();
     }
 
-    void toggle() {
-        if (!usingWeb) {
-            try { vv.pause(); } catch (Throwable e) { }
-            vv.setVisibility(View.GONE);
+    /** 内核切换：MediaPlayer(VideoView) ↔ jessibuca(WebView) */
+    void toggleKernel() {
+        usingWeb = !usingWeb;
+        if (usingWeb) {
+            try { videoView.pause(); } catch (Throwable e) { }
+            videoView.setVisibility(View.GONE);
+            wv.loadUrl("file:///android_asset/player.html");
             wv.setVisibility(View.VISIBLE);
-            usingWeb = true;
-            btnState("▶ 系统内核");
+            Toast.makeText(this, "已切换：jessibuca 网页内核", Toast.LENGTH_SHORT).show();
         } else {
+            try { wv.loadUrl("about:blank"); } catch (Throwable e) { }
             wv.setVisibility(View.GONE);
-            vv.setVisibility(View.VISIBLE);
-            usingWeb = false;
-            btnState("🌐 切网页内核");
-            try { vv.start(); } catch (Throwable e) { }
+            videoView.setVisibility(View.VISIBLE);
+            videoView.start();
+            Toast.makeText(this, "已切换：MediaPlayer 内核", Toast.LENGTH_SHORT).show();
         }
-    }
-
-    void switchToNative() {
-        if (!usingWeb) return;
-        wv.setVisibility(View.GONE);
-        vv.setVisibility(View.VISIBLE);
-        usingWeb = false;
-        btnState("🌐 切网页内核");
-        try { vv.start(); } catch (Throwable e) { }
-    }
-
-    void btnState(String t) {
-        View b = findViewById(0);
-        // 简化：直接遍历顶层找 Button
-        android.view.ViewGroup root = (android.view.ViewGroup) findViewById(android.R.id.content);
-        for (int i = 0; i < root.getChildCount(); i++) {
-            View c = root.getChildAt(i);
-            if (c instanceof android.view.ViewGroup) {
-                android.view.ViewGroup g = (android.view.ViewGroup) c;
-                for (int j = 0; j < g.getChildCount(); j++) {
-                    View cc = g.getChildAt(j);
-                    if (cc instanceof Button) ((Button) cc).setText(t);
-                }
-            }
-        }
+        kernelBtn.setText(usingWeb ? "🌐原生" : "🌐网页");
     }
 
     @Override
-    public void onBackPressed() {
-        super.onBackPressed();
+    protected void onPause() {
+        super.onPause();
+        videoView.pause();
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        if (!usingWeb) videoView.resume();
+    }
+
+    @Override
+    protected void onDestroy() {
+        try { videoView.release(); } catch (Throwable e) { }
+        try {
+            ViewGroup p = (ViewGroup) wv.getParent();
+            if (p != null) p.removeView(wv);
+            wv.destroy();
+        } catch (Throwable e) { }
+        super.onDestroy();
     }
 }
