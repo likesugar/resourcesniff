@@ -52,7 +52,11 @@ public class RecManager {
     }
 
     static void startRecJob(final String url) {
-        if (url.toLowerCase().contains(".m3u8")) { startHlsRec(url); return; }
+        String u = url == null ? "" : url.trim();
+        while (u.endsWith("\\") || u.endsWith("\"") || u.endsWith("'") || u.endsWith(",")) u = u.substring(0, u.length() - 1).trim();
+        if (u.isEmpty() || !u.startsWith("http")) return;
+        final String url2 = u;
+        if (u.toLowerCase().contains(".m3u8")) { startHlsRec(u); return; }
         RecJob job = new RecJob();
         job.id = ++recSeq;
         job.notifId = 9000 + job.id;
@@ -142,7 +146,7 @@ public class RecManager {
             job.id = ++recSeq;
             job.notifId = 9000 + job.id;
             job.url = url;
-            job.name = "直播_hls_" + System.currentTimeMillis() + ".ts";
+            job.name = "直播·原画_" + System.currentTimeMillis() / 1000 + ".ts";
             job.startTs = System.currentTimeMillis();
             android.content.ContentValues cv = new android.content.ContentValues();
             cv.put(android.provider.MediaStore.Video.Media.DISPLAY_NAME, job.name);
@@ -214,6 +218,7 @@ public class RecManager {
                             Thread.sleep(2000);
                         }
                     } catch (Throwable t) {
+                        job.state = "中断: " + t.getClass().getSimpleName();
                     } finally {
                         try { if (fo != null) fo.close(); } catch (Exception ignored) {}
                         if (job.startTs > 0) job.secs += (System.currentTimeMillis() - job.startTs) / 1000;
@@ -232,7 +237,16 @@ public class RecManager {
                 }
             });
             job.thread.start();
-        } catch (Throwable e) { }
+        } catch (Throwable e) {
+            // 失败可见化：放进已停止列表，state 显示原因
+            try {
+                RecJob jb = new RecJob();
+                jb.id = ++recSeq;
+                jb.name = "直播·原画（失败）";
+                jb.state = "启动失败: " + e.getClass().getSimpleName();
+                stoppedJobs.put(jb.id, jb);
+            } catch (Throwable ignored) {}
+        }
     }
 
     static void startFfmpegRec(final String url) {
