@@ -399,7 +399,7 @@ public class RecManager {
             job.name = "直播·原画_" + System.currentTimeMillis() / 1000 + ".ts";
             job.startTs = System.currentTimeMillis();
             String title = job.name.endsWith(".ts") ? job.name.substring(0, job.name.length() - 3) : job.name;
-            final java.io.File dir = new java.io.File(sCtx.getExternalFilesDir(null), "录制/" + title);
+            final java.io.File dir = new java.io.File(sCtx.getExternalFilesDir(null), "录制合并/" + title);
             dir.mkdirs();
             job.file = dir;
             recJobs.put(job.id, job);
@@ -570,7 +570,7 @@ public class RecManager {
                     }
                     listFile.delete();
                     mp4.renameTo(new java.io.File(job.file, mp4Name));
-                    job.state = "已保存: files/录制/" + mp4Name.replace(".mp4", "") + "/" + mp4Name;
+                    job.state = "已保存: files/录制合并/" + mp4Name.replace(".mp4", "") + "/" + mp4Name;
                 } else job.state = "合并失败";
                 stoppedJobs.put(job.id, job);
             } catch (Throwable e) {

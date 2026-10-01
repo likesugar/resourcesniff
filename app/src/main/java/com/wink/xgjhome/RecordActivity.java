@@ -117,15 +117,45 @@ public class RecordActivity extends Activity {
         return String.format(java.util.Locale.US, "%.0fKB", b / 1024.0);
     }
 
+    private final java.util.ArrayList<String> rowOrder = new java.util.ArrayList<String>();
+    private final java.util.HashMap<String, TextView> rowInfo = new java.util.HashMap<String, TextView>();
+
     private void rebuild() {
-        list.removeAllViews();
         int n = RecManager.recJobs.size() + RecManager.stoppedJobs.size();
         tvEmpty.setVisibility(n == 0 ? View.VISIBLE : View.GONE);
-        for (RecManager.RecJob j : RecManager.recJobs.values()) addRow(list, j, true);
-        for (RecManager.RecJob j : RecManager.stoppedJobs.values()) addRow(list, j, false);
+        java.util.ArrayList<String> order = new java.util.ArrayList<String>();
+        final java.util.LinkedHashMap<String, RecManager.RecJob> jobs = new java.util.LinkedHashMap<String, RecManager.RecJob>();
+        final java.util.HashMap<String, Boolean> liveMap = new java.util.HashMap<String, Boolean>();
+        for (RecManager.RecJob j : RecManager.recJobs.values()) { order.add("L" + j.id); jobs.put("L" + j.id, j); liveMap.put("L" + j.id, true); }
+        for (RecManager.RecJob j : RecManager.stoppedJobs.values()) { order.add("S" + j.id); jobs.put("S" + j.id, j); liveMap.put("S" + j.id, false); }
+        if (order.equals(rowOrder)) {  // 结构没变只更新文字，避免闪
+            for (String key : order) {
+                TextView tv = rowInfo.get(key);
+                if (tv != null) tv.setText(buildInfo(jobs.get(key), liveMap.get(key)));
+            }
+            return;
+        }
+        list.removeAllViews();
+        rowInfo.clear();
+        rowOrder.clear();
+        rowOrder.addAll(order);
+        for (String key : order) {
+            RecManager.RecJob j = jobs.get(key);
+            boolean live = liveMap.get(key);
+            java.util.concurrent.atomic.AtomicReference<TextView> infoRef = new java.util.concurrent.atomic.AtomicReference<TextView>();
+            addRow(list, j, live, infoRef);
+            rowInfo.put(key, infoRef.get());
+        }
     }
 
-    private void addRow(LinearLayout parent, final RecManager.RecJob j, final boolean live) {
+    private String buildInfo(RecManager.RecJob j, boolean live) {
+        long secs = j.secs + (live && j.startTs > 0 ? (System.currentTimeMillis() - j.startTs) / 1000 : 0);
+        return "录制时长: " + fmtDur(secs)
+            + "\n录制大小: " + fmtSize(j.bytes)
+            + "\n录制状态: " + (live ? "录制中" : (j.state != null ? j.state : "暂停录制"));
+    }
+
+    private void addRow(LinearLayout parent, final RecManager.RecJob j, final boolean live, final java.util.concurrent.atomic.AtomicReference<TextView> infoRef) {
         LinearLayout row = new LinearLayout(this);
         row.setOrientation(LinearLayout.HORIZONTAL);
         row.setGravity(Gravity.CENTER_VERTICAL);
@@ -159,13 +189,9 @@ public class RecordActivity extends Activity {
         tvName.setSingleLine(true);
         mid.addView(tvName);
 
-        long secs = j.secs + (live && j.startTs > 0 ? (System.currentTimeMillis() - j.startTs) / 1000 : 0);
-        long size = j.bytes;
-        String info = "录制时长: " + fmtDur(secs)
-            + "\n录制大小: " + fmtSize(size)
-            + "\n录制状态: " + (live ? "录制中" : (j.state != null ? j.state : "暂停录制"));
         TextView tvInfo = new TextView(this);
-        tvInfo.setText(info);
+        tvInfo.setText(buildInfo(j, live));
+        if (infoRef != null) infoRef.set(tvInfo);
         tvInfo.setTextColor(0xFF8A919E);
         tvInfo.setTextSize(13);
         tvInfo.setLineSpacing(4, 1);
