@@ -59,6 +59,9 @@ public class NativePlayerActivity extends Activity {
     void initPlayerPage(Bundle savedInstanceState) {
         url = getIntent().getStringExtra("url");
         title = getIntent().getStringExtra("title");
+        // DK 对抖音直播用 Ijk（firefly）内核：MediaPlayer 播 m3u8/flv 会报"出了点小问题"
+        kernel = (url != null && (url.contains("douyin") || url.contains(".m3u8") || url.contains(".flv")))
+                ? KERNEL_IJK : KERNEL_MEDIA;
 
         FrameLayout root = new FrameLayout(this);
         root.setBackgroundColor(0xFF000000);
