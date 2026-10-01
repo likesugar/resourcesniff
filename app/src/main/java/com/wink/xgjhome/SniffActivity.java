@@ -426,7 +426,7 @@ public class SniffActivity extends Activity {
             java.io.FileInputStream is = new java.io.FileInputStream(f);
             java.io.ByteArrayOutputStream bo = new java.io.ByteArrayOutputStream();
             byte[] b = new byte[8192]; int n;
-            while ((n = in.read(b)) > 0) bo.write(b, 0, n);
+            while ((n = is.read(b)) > 0) bo.write(b, 0, n);
             is.close();
             return bo.toString("UTF-8");
         } catch (Throwable e) { return null; }
