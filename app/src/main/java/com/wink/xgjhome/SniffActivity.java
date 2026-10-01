@@ -74,6 +74,7 @@ public class SniffActivity extends Activity {
                             ClipboardManager cm=(ClipboardManager)getSystemService(CLIPBOARD_SERVICE);
                             cm.setPrimaryClip(android.content.ClipData.newPlainText("crash", android.util.Log.getStackTraceString(e)));
                             Toast.makeText(getApplicationContext(), "已复制", Toast.LENGTH_LONG).show();
+                        } catch (Throwable e2) { }
                         finish();
                         android.os.Process.killProcess(android.os.Process.myPid());
                     }
