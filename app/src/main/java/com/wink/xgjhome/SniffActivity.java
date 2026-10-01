@@ -603,13 +603,14 @@ public class SniffActivity extends Activity {
                 }
                 // 兜底：页面里任意 m3u8/flv 直链（转义兼容 \/ \u002F）
                 String[] gens = {
-                    "https?:[^\\"'\\s]*?\\.m3u8[^\\"'\\s]*",
-                    "https?:[^\\"'\\s]*?\\.flv[^\\"'\\s]*"
+                    "https?:\\S*?\\.m3u8\\S*",
+                    "https?:\\S*?\\.flv\\S*"
                 };
                 for (String gp : gens) {
                     java.util.regex.Matcher gm = java.util.regex.Pattern.compile(gp).matcher(html);
                     if (gm.find()) {
                         String u = gm.group(0).replace("\\u002F", "/").replace("\\/", "/");
+                        u = u.replaceAll("^[\"'\\[<]+", "").replaceAll("[\"'\\]>.,;)]+$", "");
                         final String fu = u;
                         main.post(new Runnable() { public void run() {
                             if (recordKeys.add("dy#" + fu)) {
