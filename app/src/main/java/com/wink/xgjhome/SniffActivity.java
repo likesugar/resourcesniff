@@ -615,7 +615,7 @@ public class SniffActivity extends Activity {
                         final String fu = u;
                         main.post(new Runnable() { public void run() {
                             if (recordKeys.add("dy#" + fu)) {
-                                addRecord(fu, "抖音·" + douyinQuality(fu) + "(兜底)");
+                                addRecord(fu, "抖音·直播(1088×1920)");
                                 if (!isRecordsVisible) toggleRecords();
                             }
                             douyinParsing = false;

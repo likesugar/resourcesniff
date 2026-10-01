@@ -7,6 +7,7 @@ VN=${VN:-"3.0"}
 WORK=$HOME/work
 mkdir -p $WORK && cd $WORK
 
+
 BT=$ANDROID_HOME/build-tools/34.0.0
 SDK=$ANDROID_HOME/platforms/android-34/android.jar
 PROJ=$GITHUB_WORKSPACE
@@ -23,6 +24,7 @@ echo "[2/6] aapt2 link..."
     -R build_out/res.zip \
     --java build_out/gen --auto-add-overlay \
     --min-sdk-version 29 --target-sdk-version 36 \
+    -A "$PROJ/app/src/main/assets" \
     --version-code "$VC" --version-name "$VN"
 
 echo "[3/6] ecj compile..."
@@ -34,7 +36,9 @@ java -jar ecj.jar -source 1.8 -target 1.8 -encoding UTF-8 -proc:none -nowarn \
     "$PROJ"/app/src/main/java/com/wink/xgjhome/*.java \
     $PROJ/app/src/main/java/xyz/doikki/videoplayer/*/*.java \
     $PROJ/app/src/main/java/xyz/doikki/videocontroller/*.java \
-    $PROJ/app/src/main/java/xyz/doikki/videocontroller/component/*.java
+    $PROJ/app/src/main/java/xyz/doikki/videocontroller/component/*.java \
+    $PROJ/app/src/main/java/tv/danmaku/ijk/media/player/*.java \
+    $PROJ/app/src/main/java/tv/danmaku/ijk/media/player/*/*.java
 
 echo "[4/6] d8 dex..."
 find build_out/classes -name "*.class" > build_out/classlist.txt
@@ -46,6 +50,8 @@ echo "[5/6] dex + zipalign..."
 for d in build_out/dex/*.dex; do
     (cd build_out/dex && zip -q ../app-unsigned.apk "$(basename $d)")
 done
+mkdir -p build_out_xgj/lib/arm64-v8a
+if [ -d "$PROJ/lib/arm64-v8a" ]; then cp "$PROJ"/lib/arm64-v8a/*.so build_out_xgj/lib/arm64-v8a/; (cd build_out_xgj && zip -q -r app-unsigned.apk lib); fi
 "$BT/zipalign" -f 4 build_out/app-unsigned.apk build_out/app-aligned.apk
 
 echo "[6/6] sign + verify..."
