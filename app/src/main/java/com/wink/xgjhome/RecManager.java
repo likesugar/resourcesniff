@@ -177,7 +177,8 @@ public class RecManager {
                                 pc.setConnectTimeout(8000); pc.setReadTimeout(8000);
                                 pc.setRequestProperty("User-Agent", "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36");
                                 pc.setRequestProperty("Referer", "https://live.douyin.com/");
-                                if (pc.getResponseCode() == 200) {
+                                int rc = pc.getResponseCode();
+                                if (rc == 200) {
                                     ok = true;
                                     java.io.BufferedReader br = new java.io.BufferedReader(new java.io.InputStreamReader(pc.getInputStream()));
                                     String ln, lastInf = null;
@@ -209,7 +210,7 @@ public class RecManager {
                                 for (String v : variants) if (v.contains("_or4")) { pick = v; break; }
                                 curUrl = pick; failStreak = 0; continue;
                             }
-                            if (!ok) { failStreak++; job.state = "清单失败x" + failStreak; Thread.sleep(2000); continue; }
+                            if (!ok) { failStreak++; job.state = "清单失败x" + failStreak + " (HTTP" + pc.getResponseCode() + ")"; Thread.sleep(2000); continue; }
                             // ---- 逐分片下载（独立容错）----
                             for (String seg : segs) {
                                 if (!job.active) break;
@@ -230,7 +231,7 @@ public class RecManager {
                                     } else failStreak++;
                                 } catch (Throwable se) {
                                     failStreak++;
-                                    job.state = "分片失败x" + failStreak;
+                                    job.state = "分片失败x" + failStreak + " (" + se.getClass().getSimpleName() + ")";
                                 } finally {
                                     if (sc != null) { try { sc.disconnect(); } catch (Throwable ignored) {} }
                                 }

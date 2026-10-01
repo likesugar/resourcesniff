@@ -464,6 +464,7 @@ public class SniffActivity extends Activity {
         boolean bareLive = lb.contains("douyincdn") && lb.contains("/stage/")
             && !lb.substring(lb.lastIndexOf('/') + 1).contains(".");
         if (bareLive || (anyM3u8 && !l.contains("bilivideo") && !l.contains("upos-"))) {
+            if (anyM3u8 && l.contains("_sd.")) return; // 标清不进记录
             final String f = base;
             boolean added = false;
             synchronized (douyinCands) {
@@ -533,12 +534,15 @@ public class SniffActivity extends Activity {
             }
         });
         boolean added = false;
+        String pgTitle = "";
+        try { pgTitle = webView.getTitle(); } catch (Throwable e) { }
         for (final String u : snapshot) {
             if (recordKeys.add("dy#" + u)) {
                 added = true;
                 final String q = douyinQuality(u);
+                final String t = pgTitle == null ? "" : pgTitle;
                 main.post(new Runnable() { public void run() {
-                    addRecord(u, "抖音·" + q);
+                    addRecord(u, "抖音[" + t + "]·" + q);
                 }});
             }
         }
