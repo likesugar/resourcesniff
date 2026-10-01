@@ -439,7 +439,8 @@ public class SniffActivity extends Activity {
         tv.setSingleLine(true);
 
         TextView menuBtn = new TextView(this);
-        menuBtn.setText("\u2064\u2064\u2064");
+        menuBtn.setText("\u22EE");
+        menuBtn.setBackgroundColor(0x338899AA);
         menuBtn.setTextColor(0xFFFFFFFF);
         menuBtn.setTextSize(16);
         menuBtn.setPadding(12, 4, 12, 4);
