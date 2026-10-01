@@ -849,6 +849,7 @@ public class SniffActivity extends Activity {
     /** 内置 jessibuca 播放器：player.html 通过 AndroidPlayer 桥取地址 */
     void playUrl(String url) {
         try {
+            finish(); // 播放前先退出资源嗅探
             playerUrl = url;
             android.content.Intent i = new android.content.Intent(this, NativePlayerActivity.class);
             i.putExtra("url", url);
@@ -929,6 +930,7 @@ public class SniffActivity extends Activity {
                 if (t.equals("下载")) downloadUrl(url);
                 else if (t.equals("播放")) playUrl(url);
                 else if (t.equals("直播录制")) {
+                    finish(); // 先退出资源嗅探
                     try {
                         android.content.ClipboardManager cm = (android.content.ClipboardManager) getSystemService(Context.CLIPBOARD_SERVICE);
                         cm.setPrimaryClip(android.content.ClipData.newPlainText("stream", url));
