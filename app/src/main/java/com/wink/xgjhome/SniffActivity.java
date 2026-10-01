@@ -375,7 +375,15 @@ public class SniffActivity extends Activity {
     private String jsDouyin = null;
 
     void injectDouyinScript() {
-        if (jsDouyin == null) jsDouyin = readAsset("douyin.user.js");
+        if (jsDouyin == null) {
+            // 优先网络缓存版（greasyfork 584735 最新），失败回退内置 assets
+            try {
+                java.io.File f = new java.io.File(getFilesDir(), "douyin.user.js");
+                if (f.exists() && f.length() > 1000) jsDouyin = readTextFile(f);
+            } catch (Throwable e) { }
+            if (jsDouyin == null) jsDouyin = readAsset("douyin.user.js");
+        }
+        fetchLatestDouyinScript();
         if (jsDouyin == null) return;
         String shim = "if(typeof window.GM_addStyle=='undefined'){window.GM_addStyle=function(c){var s=document.createElement('style');s.textContent=c;document.head.appendChild(s);};}"
             + "if(typeof window.GM_getValue=='undefined'){window.GM_getValue=function(k,d){var v=localStorage.getItem('gm_'+k);return v===null?d:v;};window.GM_setValue=function(k,v){localStorage.setItem('gm_'+k,v);};window.GM_deleteValue=function(k){localStorage.removeItem('gm_'+k);};}"
@@ -385,6 +393,43 @@ public class SniffActivity extends Activity {
         webView.evaluateJavascript(shim, null);
         final String escaped = jsDouyin.replace("\\", "\\\\").replace("'", "\'").replace("\n", "\\n").replace("\r", "");
         webView.evaluateJavascript("(function(){try{eval('" + escaped + "');}catch(e){console.log('userscript error',e);}})();", null);
+    }
+
+    static final String DOUYIN_SCRIPT_URL = "https://update.greasyfork.org/scripts/584735/%E6%8A%96%E9%9F%B3%E7%BD%91%E9%A1%B5%E7%89%88%E5%85%A8%E8%83%BD%E4%BC%98%E5%8C%96.user.js";
+
+    /** 后台拉最新脚本缓存到 files/douyin.user.js，下次注入生效 */
+    void fetchLatestDouyinScript() {
+        new Thread(new Runnable() {
+            @Override
+            public void run() {
+                try {
+                    java.net.HttpURLConnection c = (java.net.HttpURLConnection) new java.net.URL(DOUYIN_SCRIPT_URL).openConnection();
+                    c.setConnectTimeout(8000); c.setReadTimeout(8000);
+                    if (c.getResponseCode() != 200) return;
+                    java.io.InputStream in = c.getInputStream();
+                    java.io.ByteArrayOutputStream bo = new java.io.ByteArrayOutputStream();
+                    byte[] b = new byte[8192]; int n;
+                    while ((n = in.read(b)) > 0) bo.write(b, 0, n);
+                    in.close();
+                    if (bo.size() > 1000) {
+                        java.io.File f = new java.io.File(getFilesDir(), "douyin.user.js");
+                        java.io.FileOutputStream fo = new java.io.FileOutputStream(f);
+                        fo.write(bo.toByteArray()); fo.close();
+                    }
+                } catch (Throwable e) { }
+            }
+        }).start();
+    }
+
+    String readTextFile(java.io.File f) {
+        try {
+            java.io.FileInputStream is = new java.io.FileInputStream(f);
+            java.io.ByteArrayOutputStream bo = new java.io.ByteArrayOutputStream();
+            byte[] b = new byte[8192]; int n;
+            while ((n = in.read(b)) > 0) bo.write(b, 0, n);
+            is.close();
+            return bo.toString("UTF-8");
+        } catch (Throwable e) { return null; }
     }
 
     String readAsset(String name) {
