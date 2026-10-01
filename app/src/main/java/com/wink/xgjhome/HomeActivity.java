@@ -100,7 +100,6 @@ public class HomeActivity extends Activity {
         findViewById(R.id.cardPlayer).setOnClickListener(new View.OnClickListener() {
             public void onClick(View v) { showSniffDialog(); }
         });
-        // 第二张卡片：下载管理页
         findViewById(R.id.cardDownload).setOnClickListener(new View.OnClickListener() {
             public void onClick(View v) {
                 startActivity(new Intent(HomeActivity.this, DownloadManagerActivity.class));
