@@ -68,6 +68,22 @@ public class HomeActivity extends Activity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        Thread.setDefaultUncaughtExceptionHandler(new Thread.UncaughtExceptionHandler() {
+            @Override
+            public void uncaughtException(Thread t, Throwable e) {
+                try {
+                    java.io.File dir = getExternalFilesDir(null);
+                    if (dir == null) dir = getFilesDir();
+                    java.io.File f = new java.io.File(dir, "crash.txt");
+                    java.io.FileWriter fw = new java.io.FileWriter(f, true);
+                    fw.append("\n==== " + new java.util.Date().toString() + " thread=" + t.getName() + " ====\n");
+                    fw.append(android.util.Log.getStackTraceString(e));
+                    fw.close();
+                } catch (Throwable e2) { }
+                Thread.setDefaultUncaughtExceptionHandler(null);
+                throw new RuntimeException(e);
+            }
+        });
         setContentView(R.layout.activity_toolbox);
         applyTheme();
         applyImmersive();

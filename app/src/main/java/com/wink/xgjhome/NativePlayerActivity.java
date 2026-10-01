@@ -30,6 +30,33 @@ public class NativePlayerActivity extends Activity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        try {
+            initPlayerPage(savedInstanceState);
+        } catch (Throwable e) {
+            showCrash(e);
+        }
+    }
+
+    void showCrash(final Throwable e) {
+        try {
+            java.io.File dir = getExternalFilesDir(null);
+            if (dir == null) dir = getFilesDir();
+            java.io.File f = new java.io.File(dir, "crash.txt");
+            java.io.FileWriter fw = new java.io.FileWriter(f, true);
+            fw.append("\n==== " + new java.util.Date().toString() + " (player) ====\n");
+            fw.append(android.util.Log.getStackTraceString(e));
+            fw.close();
+        } catch (Throwable e2) { }
+        new android.app.AlertDialog.Builder(this)
+                .setTitle("播放页闪退原因")
+                .setCancelable(false)
+                .setMessage(android.util.Log.getStackTraceString(e))
+                .setPositiveButton("好", null)
+                .show();
+    }
+
+    @SuppressLint("SetJavaScriptEnabled")
+    void initPlayerPage(Bundle savedInstanceState) {
         url = getIntent().getStringExtra("url");
         title = getIntent().getStringExtra("title");
 
@@ -127,4 +154,5 @@ public class NativePlayerActivity extends Activity {
         } catch (Throwable e) { }
         super.onDestroy();
     }
+
 }
