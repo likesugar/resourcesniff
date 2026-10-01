@@ -31,7 +31,10 @@ curl -sL -o ecj.jar "https://repo1.maven.org/maven2/org/eclipse/jdt/ecj/3.33.0/e
 java -jar ecj.jar -source 1.8 -target 1.8 -encoding UTF-8 -proc:none -nowarn \
     -cp "$SDK" -d build_out/classes \
     "$RJ" \
-    "$PROJ"/app/src/main/java/com/wink/xgjhome/*.java
+    "$PROJ"/app/src/main/java/com/wink/xgjhome/*.java \
+    $PROJ/app/src/main/java/xyz/doikki/videoplayer/*/*.java \
+    $PROJ/app/src/main/java/xyz/doikki/videocontroller/*.java \
+    $PROJ/app/src/main/java/xyz/doikki/videocontroller/component/*.java
 
 echo "[4/6] d8 dex..."
 find build_out/classes -name "*.class" > build_out/classlist.txt
