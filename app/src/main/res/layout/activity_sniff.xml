@@ -83,6 +83,20 @@
                 android:minHeight="0dp"/>
 
             <Button
+                android:id="@+id/btn_refresh"
+                android:layout_width="wrap_content"
+                android:layout_height="36dp"
+                android:text="↻"
+                android:textColor="#ffffff"
+                android:textSize="16sp"
+                android:background="#4D1677FF"
+                android:layout_marginLeft="8dp"
+                android:paddingLeft="12dp"
+                android:paddingRight="12dp"
+                android:minWidth="0dp"
+                android:minHeight="0dp"/>
+
+            <Button
                 android:id="@+id/btn_switch_ua"
                 android:layout_width="wrap_content"
                 android:layout_height="36dp"

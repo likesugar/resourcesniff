@@ -67,6 +67,13 @@ public class SniffActivity extends Activity {
         btnSwitchUa = findViewById(R.id.btn_switch_ua);
         Button btnGo = findViewById(R.id.btn_go);
         Button btnRecords = findViewById(R.id.btn_records);
+        Button btnRefresh = findViewById(R.id.btn_refresh);
+        btnRefresh.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                try { webView.reload(); } catch (Throwable e) { }
+            }
+        });
 
         WebSettings ws = webView.getSettings();
         ws.setJavaScriptEnabled(true);
@@ -785,6 +792,7 @@ public class SniffActivity extends Activity {
             android.content.Intent i = new android.content.Intent(this, NativePlayerActivity.class);
             i.putExtra("url", url);
             i.putExtra("title", "资源嗅探");
+            i.putExtra("kernel", url.contains("douyin") ? "web" : "native");
             startActivity(i);
         } catch (Exception e) {
             Toast.makeText(this, "打不开: " + e.getMessage(), Toast.LENGTH_SHORT).show();

@@ -58,6 +58,7 @@ public class NativePlayerActivity extends Activity {
     void initPlayerPage(Bundle savedInstanceState) {
         url = getIntent().getStringExtra("url");
         title = getIntent().getStringExtra("title");
+        usingWeb = "web".equals(getIntent().getStringExtra("kernel"));
 
         FrameLayout root = new FrameLayout(this);
         root.setBackgroundColor(0xFF000000);
@@ -107,7 +108,14 @@ public class NativePlayerActivity extends Activity {
             finish();
             return;
         }
-        videoView.start();
+        if (usingWeb) {
+            // 抖音：网页内核先行，失败 player.html 自动调 openNative 切原生
+            videoView.setVisibility(View.GONE);
+            wv.setVisibility(View.VISIBLE);
+            wv.loadUrl("file:///android_asset/player.html");
+        } else {
+            videoView.start();
+        }
     }
 
     /** 内核切换：MediaPlayer(VideoView) ↔ jessibuca(WebView) */
