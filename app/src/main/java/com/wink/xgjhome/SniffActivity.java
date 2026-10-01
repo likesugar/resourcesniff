@@ -66,7 +66,9 @@ public class SniffActivity extends Activity {
     void showCrash(final Throwable e) {
         // 崩溃堆栈落盘：内部数据目录 files/crash.txt
         try {
-            java.io.File f = new java.io.File(getFilesDir(), "crash.txt");
+            java.io.File dir = getExternalFilesDir(null);
+            if (dir == null) dir = getFilesDir();
+            java.io.File f = new java.io.File(dir, "crash.txt");
             java.io.FileWriter fw = new java.io.FileWriter(f, true);
             fw.append("\n==== " + new java.util.Date().toString() + " ====\n");
             fw.append(android.util.Log.getStackTraceString(e));
