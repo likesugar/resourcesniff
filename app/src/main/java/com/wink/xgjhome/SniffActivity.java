@@ -601,10 +601,12 @@ public class SniffActivity extends Activity {
                         return;
                     }
                 }
-                // 兜底：页面里任意 m3u8/flv 直链（转义兼容 \/ \u002F）
+                // 统一解码转义后再匹配
+                html = html.replace("\\u0026", "&").replace("\\u002F", "/").replace("\\/", "/").replace("\\u003D", "=");
+                // 兜底：页面里任意 m3u8/flv 直链
                 String[] gens = {
-                    "https?:\\S*?\\.m3u8\\S*",
-                    "https?:\\S*?\\.flv\\S*"
+                    "https?:[^\\s\"'<>]*?\\.m3u8[^\\s\"'<>]*",
+                    "https?:[^\\s\"'<>]*?\\.flv[^\\s\"'<>]*"
                 };
                 for (String gp : gens) {
                     java.util.regex.Matcher gm = java.util.regex.Pattern.compile(gp).matcher(html);
