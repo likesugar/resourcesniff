@@ -597,7 +597,6 @@ public class SniffActivity extends Activity {
     static boolean isMediaUrl(String url) {
         return MEDIA.matcher(url.toLowerCase()).find();
     }
-    }
 
     /** 油猴脚本离线内置：抖音网页版全能优化（assets/douyin.user.js） */
     private String jsDouyin = null;
