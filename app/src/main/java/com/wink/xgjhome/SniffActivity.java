@@ -859,8 +859,15 @@ public class SniffActivity extends Activity {
                 String t = item.getTitle().toString();
                 if (t.equals("下载")) downloadUrl(url);
                 else if (t.equals("播放")) playUrl(url);
-                else if (t.equals("直播录制")) startRecord(url);
-                else if (t.equals("停止录制")) stopRecord(url);
+                else if (t.equals("直播录制")) {
+                    RecManager.lastStreamUrl = url;
+                    RecManager.init(getApplicationContext());
+                    RecManager.startRecJob(url);
+                    Toast.makeText(SniffActivity.this, "已开始录制", Toast.LENGTH_SHORT).show();
+                }
+                else if (t.equals("停止录制")) {
+                    Toast.makeText(SniffActivity.this, "长按记录可停止", Toast.LENGTH_SHORT).show();
+                }
                 else if (t.equals("删除")) {
                     ViewGroup p = (ViewGroup) row.getParent();
                     if (p != null) p.removeView(row);

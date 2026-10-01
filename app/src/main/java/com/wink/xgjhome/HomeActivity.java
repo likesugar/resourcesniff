@@ -68,6 +68,7 @@ public class HomeActivity extends Activity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        RecManager.init(getApplicationContext());
         Thread.setDefaultUncaughtExceptionHandler(new Thread.UncaughtExceptionHandler() {
             @Override
             public void uncaughtException(Thread t, Throwable e) {
@@ -102,7 +103,7 @@ public class HomeActivity extends Activity {
         });
         findViewById(R.id.cardDownload).setOnClickListener(new View.OnClickListener() {
             public void onClick(View v) {
-                startActivity(new Intent(HomeActivity.this, DownloadManagerActivity.class));
+                startActivity(new Intent(HomeActivity.this, RecordActivity.class));
             }
         });
 
