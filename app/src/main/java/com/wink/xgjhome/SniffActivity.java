@@ -485,32 +485,24 @@ public class SniffActivity extends Activity {
         main.postDelayed(douyinWatchdog, 8000);
     }
 
-    /** 抖音候选收集后按体积择优（照DK finishDouyinPick） */
+    /** 候选全部入记录（带画质标签），不再只挑一条 */
     void finishDouyinPick() {
         java.util.List<String> snapshot;
         synchronized (douyinCands) { snapshot = new java.util.ArrayList<String>(douyinCands); }
-        if (snapshot.isEmpty()) {
-            if (douyinParsing) main.postDelayed(new Runnable() { public void run() { finishDouyinPick(); } }, 2000);
-            return;
-        }
-        new Thread(new Runnable() {
-            public void run() {
-                String best = snapshot.get(0);
-                long bestLen = -1;
-                for (String u : snapshot) {
-                    long len = remoteSizeDouyin(u);
-                    if (len > bestLen) { bestLen = len; best = u; }
-                }
-                final String f = best;
+        douyinPickScheduled = false;
+        douyinParsing = false;
+        if (snapshot.isEmpty()) return;
+        boolean added = false;
+        for (final String u : snapshot) {
+            if (recordKeys.add("dy#" + u)) {
+                added = true;
+                final String q = douyinQuality(u);
                 main.post(new Runnable() { public void run() {
-                    if (recordKeys.add("dy#" + f)) {
-                        addRecord(f, "抖音·" + douyinQuality(f));
-                        if (!isRecordsVisible) toggleRecords();
-                    }
-                    douyinParsing = false;
+                    addRecord(u, "抖音·" + q);
                 }});
             }
-        }).start();
+        }
+        if (added && !isRecordsVisible) toggleRecords();
     }
 
     long remoteSizeDouyin(String url) {
