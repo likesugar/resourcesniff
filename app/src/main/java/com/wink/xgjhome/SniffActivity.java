@@ -82,11 +82,17 @@ public class SniffActivity extends Activity {
             public String getUrl() { return playerUrl; }
             @android.webkit.JavascriptInterface
             public String getScript() {
+                StringBuilder sb = new StringBuilder();
+                String vue = readAsset("vue.global.min.js");
+                if (vue != null) sb.append(vue).append("\n;\n");
+                String js = null;
                 try {
                     java.io.File f = new java.io.File(getFilesDir(), "douyin.user.js");
-                    if (f.exists() && f.length() > 1000) return readTextFile(f);
+                    if (f.exists() && f.length() > 1000) js = readTextFile(f);
                 } catch (Throwable e) { }
-                return readAsset("douyin.user.js");
+                if (js == null) js = readAsset("douyin.user.js");
+                if (js != null) sb.append(js);
+                return sb.toString();
             }
         }, "AndroidPlayer");
 
@@ -510,7 +516,7 @@ public class SniffActivity extends Activity {
     private String jsDouyin = null;
 
     void injectDouyinScript() {
-        fetchLatestDouyinScript(); // 后台拉最新，下次生效
+        // 纯离线内置：Vue + 脚本全部走 assets，不再在线拉取
         String loader = "(function(){"
             + "function bad(m){var d=document.createElement('div');d.style.cssText='position:fixed;top:0;left:0;right:0;z-index:999999;background:#c0392b;color:#fff;font-size:12px;padding:2px';d.textContent='脚本注入失败:'+m;(document.body||document.documentElement).appendChild(d);}"
             + "if(typeof window.GM_addStyle=='undefined'){window.GM_addStyle=function(c){var s=document.createElement('style');s.textContent=c;document.head.appendChild(s);};}"
