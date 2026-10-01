@@ -150,6 +150,25 @@ public class SniffActivity extends Activity {
                 if (url != null && (url.contains("douyin.com") || url.contains("iesdouyin"))) {
                     injectDouyinScript();
                 }
+                // DK：直播房间页 → 持续解析（reload 由看门狗触发，回到这里重新武装提取）
+                if (url != null && url.contains("live.douyin.com")) {
+                    final String fu = url;
+                    boolean newRoom = (douyinLiveUrl == null || !douyinLiveUrl.equals(fu));
+                    if (newRoom || !douyinParsing) {
+                        if (newRoom) {
+                            synchronized (douyinCands) { douyinCands.clear(); }
+                        }
+                        douyinLiveUrl = fu;
+                        douyinParsing = true;
+                        main.postDelayed(new Runnable() { public void run() {
+                            douyinLiveExtract(fu, CookieManager.getInstance().getCookie("https://live.douyin.com"));
+                        }}, 3000);
+                        startDouyinWatchdog();
+                    }
+                } else {
+                    douyinLiveUrl = null;
+                    douyinParsing = false;
+                }
                 BiliResolver.tryParse(SniffActivity.this, url);
                 etUrl.setText(url);
             }
