@@ -29,6 +29,7 @@ public class RecManager {
     public static final java.util.concurrent.ConcurrentHashMap<Integer, RecJob> stoppedJobs =
         new java.util.concurrent.ConcurrentHashMap<>();
     private static volatile int recSeq = 0;
+    private static volatile com.arthenica.ffmpegkit.FFmpegSession ffkSession = null;
     private static android.os.PowerManager.WakeLock recWake = null;
     private static Context sCtx;
     public static void init(Context appCtx) { if (sCtx == null) sCtx = appCtx; }
@@ -51,6 +52,7 @@ public class RecManager {
     }
 
     static void startRecJob(final String url) {
+        if (url.toLowerCase().contains(".m3u8")) { startFfmpegRec(url); return; }
         RecJob job = new RecJob();
         job.id = ++recSeq;
         job.notifId = 9000 + job.id;
@@ -131,7 +133,58 @@ public class RecManager {
     }
 
     /** 停止（暂停）录制：断流、通知取消，文件保留可继续 */
+    /** m3u8：ffmpeg-kit 直接拉 HLS 录成 MP4（-c copy 边下边封装） */
+    static void startFfmpegRec(final String url) {
+        try {
+            RecJob job = new RecJob();
+            job.id = ++recSeq;
+            job.notifId = 9000 + job.id;
+            job.url = url;
+            job.name = "直播·原画";
+            job.startTs = System.currentTimeMillis();
+            java.io.File out = new java.io.File(
+                android.os.Environment.getExternalStoragePublicDirectory(android.os.Environment.DIRECTORY_MOVIES),
+                "资源嗅探_" + System.currentTimeMillis() + ".mp4");
+            job.file = out;
+            // MediaStore 登记（IS_PENDING 隐藏，完成转正）
+            android.content.ContentValues cv = new android.content.ContentValues();
+            cv.put(android.provider.MediaStore.Video.Media.DISPLAY_NAME, out.getName());
+            cv.put(android.provider.MediaStore.Video.Media.MIME_TYPE, "video/mp4");
+            cv.put(android.provider.MediaStore.Video.Media.RELATIVE_PATH, "Movies/录制");
+            cv.put(android.provider.MediaStore.Video.Media.IS_PENDING, 1);
+            android.net.Uri storeUri = sCtx.getContentResolver()
+                .insert(android.provider.MediaStore.Video.Media.EXTERNAL_CONTENT_URI, cv);
+            job.storeUri = storeUri;
+            recJobs.put(job.id, job);
+            acquireWake();
+            String args = "-y -user_agent \"" + "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36" + "\" -headers \"Referer: https://live.douyin.com/\\r\\n\" -i \"" + url + "\" -c copy -movflags +faststart -f mp4 \"" + out.getAbsolutePath() + "\"";
+            ffkSession = com.arthenica.ffmpegkit.FFmpegKit.executeWithArgumentsAsync(
+                com.arthenica.ffmpegkit.FFmpegKitConfig.parseArguments(args),
+                new com.arthenica.ffmpegkit.FFmpegSessionCompleteCallback() {
+                    public void apply(com.arthenica.ffmpegkit.FFmpegSession st) {
+                        try {
+                            android.content.ContentValues cv2 = new android.content.ContentValues();
+                            cv2.put(android.provider.MediaStore.Video.Media.IS_PENDING, 0);
+                            sCtx.getContentResolver().update(storeUri, cv2, null, null);
+                        } catch (Throwable e) { }
+                        recJobs.remove(job.id);
+                        job.state = null;
+                        stoppedJobs.put(job.id, job);
+                        releaseWakeIfIdle();
+                        ffkSession = null;
+                    }
+                });
+            acquireWake();
+        } catch (Throwable e) {
+            ffkSession = null;
+        }
+    }
+
     public static void recStop(int jid) {
+        if (ffkSession != null) {
+            com.arthenica.ffmpegkit.FFmpegKit.cancel(ffkSession.getSessionId());
+            return;
+        }
         RecJob job = recJobs.get(jid);
         if (job == null) return;
         job.paused = true;
@@ -150,6 +203,10 @@ public class RecManager {
     /** 结束录制：合并转封装成 mp4（后台执行），完成后从列表移除 */
     public static void recFinish(int jid) {
         RecJob live = recJobs.get(jid);
+        if (live != null && ffkSession != null) {
+            com.arthenica.ffmpegkit.FFmpegKit.cancel(ffkSession.getSessionId());
+            return;
+        }
         if (live != null) {
             live.finishNow = true;
             recStop(jid);
