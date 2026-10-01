@@ -425,7 +425,10 @@ public class SniffActivity extends Activity {
     void playUrl(String url) {
         try {
             playerUrl = url;
-            webView.loadUrl("file:///android_asset/player.html");
+            android.content.Intent i = new android.content.Intent(this, NativePlayerActivity.class);
+            i.putExtra("url", url);
+            i.putExtra("title", "资源嗅探");
+            startActivity(i);
         } catch (Exception e) {
             Toast.makeText(this, "打不开: " + e.getMessage(), Toast.LENGTH_SHORT).show();
         }
