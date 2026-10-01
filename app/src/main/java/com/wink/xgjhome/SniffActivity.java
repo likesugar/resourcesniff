@@ -857,10 +857,19 @@ public class SniffActivity extends Activity {
             @Override
             public boolean onMenuItemClick(android.view.MenuItem item) {
                 String t = item.getTitle().toString();
-                if (t.equals("下载")) downloadUrl(url);
+                if (t.equals("下载")) {
+                    RecEngine.startDownload(SniffActivity.this, url, "资源嗅探");
+                    Toast.makeText(SniffActivity.this, "已加入下载（管理页可查进度）", Toast.LENGTH_SHORT).show();
+                }
                 else if (t.equals("播放")) playUrl(url);
-                else if (t.equals("直播录制")) startRecord(url);
-                else if (t.equals("停止录制")) stopRecord(url);
+                else if (t.equals("直播录制")) {
+                    RecEngine.startRecording(SniffActivity.this, url, "资源嗅探");
+                    Toast.makeText(SniffActivity.this, "录制已开始（录制视频管理页可见）", Toast.LENGTH_LONG).show();
+                }
+                else if (t.equals("停止录制")) {
+                    RecEngine.stopRecording(SniffActivity.this, url);
+                    Toast.makeText(SniffActivity.this, "已结束录制", Toast.LENGTH_SHORT).show();
+                }
                 else if (t.equals("删除")) {
                     ViewGroup p = (ViewGroup) row.getParent();
                     if (p != null) p.removeView(row);
