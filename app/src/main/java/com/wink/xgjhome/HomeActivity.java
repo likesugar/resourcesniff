@@ -68,6 +68,23 @@ public class HomeActivity extends Activity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        // 全局崩溃落盘：/storage/emulated/0/Android/data/com.wink.xgjhome/files/crash.txt
+        Thread.setDefaultUncaughtExceptionHandler(new Thread.UncaughtExceptionHandler() {
+            @Override
+            public void uncaughtException(Thread t, Throwable e) {
+                try {
+                    java.io.File dir = getExternalFilesDir(null);
+                    if (dir == null) dir = getFilesDir();
+                    java.io.File f = new java.io.File(dir, "crash.txt");
+                    java.io.FileWriter fw = new java.io.FileWriter(f, true);
+                    fw.append("\n==== " + new java.util.Date().toString() + " thread=" + t.getName() + " ====\n");
+                    fw.append(android.util.Log.getStackTraceString(e));
+                    fw.close();
+                } catch (Throwable e2) { }
+                Thread.setDefaultUncaughtExceptionHandler(null);
+                throw new RuntimeException(e);
+            }
+        });
         setContentView(R.layout.activity_toolbox);
         applyTheme();
         applyImmersive();
@@ -119,10 +136,18 @@ public class HomeActivity extends Activity {
         });
         d.findViewById(R.id.btn_go).setOnClickListener(new View.OnClickListener() {
             public void onClick(View v) {
-                Intent i = new Intent(HomeActivity.this, SniffActivity.class);
-                i.putExtra("input", et.getText().toString().trim());
-                startActivity(i);
-                d.dismiss();
+                try {
+                    Intent i = new Intent(HomeActivity.this, SniffActivity.class);
+                    i.putExtra("input", et.getText().toString().trim());
+                    startActivity(i);
+                    d.dismiss();
+                } catch (Throwable e) {
+                    new android.app.AlertDialog.Builder(HomeActivity.this)
+                            .setTitle("启动失败")
+                            .setMessage(android.util.Log.getStackTraceString(e))
+                            .setPositiveButton("好", null)
+                            .show();
+                }
             }
         });
         d.show();
