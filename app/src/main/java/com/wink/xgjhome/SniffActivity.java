@@ -471,7 +471,7 @@ public class SniffActivity extends Activity {
             }
             if (added && !douyinPickScheduled) {
                 douyinPickScheduled = true;
-                main.postDelayed(new Runnable() { public void run() { finishDouyinPick(); } }, 3000);
+                main.postDelayed(new Runnable() { public void run() { finishDouyinPick(); } }, 6000);
             }
             return;
         }
@@ -522,6 +522,16 @@ public class SniffActivity extends Activity {
         douyinPickScheduled = false;
         douyinParsing = false;
         if (snapshot.isEmpty()) return;
+        // DK 方案：原画优先——含 _or4 的排最前，含 _sd 的排最后
+        java.util.Collections.sort(snapshot, new java.util.Comparator<String>() {
+            public int compare(String a, String b) {
+                boolean ao = a.contains("_or4"), bo = b.contains("_or4");
+                if (ao != bo) return ao ? -1 : 1;
+                boolean as = a.contains("_sd"), bs = b.contains("_sd");
+                if (as != bs) return as ? 1 : -1;
+                return 0;
+            }
+        });
         boolean added = false;
         for (final String u : snapshot) {
             if (recordKeys.add("dy#" + u)) {
