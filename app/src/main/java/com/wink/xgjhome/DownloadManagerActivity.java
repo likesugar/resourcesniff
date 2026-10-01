@@ -57,30 +57,6 @@ public class DownloadManagerActivity extends Activity {
         setContentView(R.layout.activity_download);
         tabBar = findViewById(R.id.tabBar);
         listBox = findViewById(R.id.listBox);
-        // 沉浸式隐藏导航栏
-        getWindow().getDecorView().setSystemUiVisibility(
-                View.SYSTEM_UI_FLAG_LAYOUT_STABLE
-                        | View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION
-                        | View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN
-                        | View.SYSTEM_UI_FLAG_HIDE_NAVIGATION
-                        | View.SYSTEM_UI_FLAG_FULLSCREEN
-                        | View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY);
-    }
-
-    void initLegacy() {
-        FrameLayout root = new FrameLayout(this);
-        root.setBackgroundColor(0xFF000000);
-
-        LinearLayout column = new LinearLayout(this);
-        column.setOrientation(LinearLayout.VERTICAL);
-        root.addView(column, new FrameLayout.LayoutParams(
-                FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT));
-
-        // 顶部导航栏
-        tabBar = new LinearLayout(this);
-        tabBar.setOrientation(LinearLayout.HORIZONTAL);
-        tabBar.setGravity(Gravity.CENTER);
-        tabBar.setPadding(8, 18, 8, 10);
         for (String tab : TABS) {
             TextView tv = new TextView(this);
             tv.setText(tab);
@@ -97,22 +73,19 @@ public class DownloadManagerActivity extends Activity {
             });
             tabBar.addView(tv);
         }
-        column.addView(tabBar);
-
-        // 列表区
-        listBox = new LinearLayout(this);
-        listBox.setOrientation(LinearLayout.VERTICAL);
-        android.widget.ScrollView sv = new android.widget.ScrollView(this);
-        sv.addView(listBox, new LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
-        column.addView(sv, new LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.MATCH_PARENT));
-
-        setContentView(root);
         refreshTabs();
         refresh();
         handler.postDelayed(refreshRun, 2000);
+        // 沉浸式隐藏导航栏
+        getWindow().getDecorView().setSystemUiVisibility(
+                View.SYSTEM_UI_FLAG_LAYOUT_STABLE
+                        | View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION
+                        | View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN
+                        | View.SYSTEM_UI_FLAG_HIDE_NAVIGATION
+                        | View.SYSTEM_UI_FLAG_FULLSCREEN
+                        | View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY);
     }
+
 
     void refreshTabs() {
         for (int i = 0; i < tabBar.getChildCount(); i++) {
