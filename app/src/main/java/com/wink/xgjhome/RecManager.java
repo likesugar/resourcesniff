@@ -148,20 +148,16 @@ public class RecManager {
             job.url = url;
             job.name = "直播·原画_" + System.currentTimeMillis() / 1000 + ".ts";
             job.startTs = System.currentTimeMillis();
-            android.content.ContentValues cv = new android.content.ContentValues();
-            cv.put(android.provider.MediaStore.Video.Media.DISPLAY_NAME, job.name);
-            cv.put(android.provider.MediaStore.Video.Media.MIME_TYPE, "video/mp2ts");
-            cv.put(android.provider.MediaStore.Video.Media.RELATIVE_PATH, "Movies/录制");
-            cv.put(android.provider.MediaStore.Video.Media.IS_PENDING, 1);
-            job.storeUri = sCtx.getContentResolver()
-                .insert(android.provider.MediaStore.Video.Media.getContentUri("external_primary"), cv);
+            java.io.File dir = new java.io.File(sCtx.getExternalFilesDir(null), "录制");
+            dir.mkdirs();
+            job.file = new java.io.File(dir, job.name);
             recJobs.put(job.id, job);
             acquireWake();
             job.thread = new Thread(new Runnable() {
                 public void run() {
                     java.io.FileOutputStream fo = null;
                     try {
-                        fo = (java.io.FileOutputStream) sCtx.getContentResolver().openOutputStream(job.storeUri, "w");
+                        fo = new java.io.FileOutputStream(job.file, true);
                         java.util.LinkedHashSet<String> seen = new java.util.LinkedHashSet<>();
                         byte[] buf = new byte[65536];
                         String curUrl = job.url;
@@ -248,12 +244,7 @@ public class RecManager {
                         job.active = false;
                         recJobs.remove(job.id);
                         releaseWakeIfIdle();
-                        try {
-                            android.content.ContentValues cv2 = new android.content.ContentValues();
-                            cv2.put(android.provider.MediaStore.Video.Media.IS_PENDING, 0);
-                            sCtx.getContentResolver().update(job.storeUri, cv2, null, null);
-                        } catch (Throwable ignored) {}
-                        if (job.finishNow && job.bytes > 0) convertToMp4(job);
+                        if (job.finishNow && job.bytes > 0) convertFileToMp4(job);
                         else stoppedJobs.put(job.id, job);
                     }
                 }
@@ -352,6 +343,38 @@ public class RecManager {
         if (job == null) return;
         stoppedJobs.remove(job.id);
         new Thread(new Runnable() { public void run() { convertToMp4(job); } }).start();
+    }
+
+    /** ts 文件 → MP4 入相册 Movies/录制 */
+    static void convertFileToMp4(final RecJob job) {
+        job.state = "转换MP4中…";
+        new Thread(new Runnable() { public void run() {
+            try {
+                String mp4Name = job.name.endsWith(".ts") ? job.name.substring(0, job.name.length() - 3) + ".mp4" : job.name + ".mp4";
+                android.content.ContentValues cv = new android.content.ContentValues();
+                cv.put(android.provider.MediaStore.Video.Media.DISPLAY_NAME, mp4Name);
+                cv.put(android.provider.MediaStore.Video.Media.MIME_TYPE, "video/mp4");
+                cv.put(android.provider.MediaStore.Video.Media.RELATIVE_PATH, "Movies/录制");
+                android.net.Uri out = sCtx.getContentResolver().insert(
+                    android.provider.MediaStore.Video.Media.getContentUri("external_primary"), cv);
+                java.io.File tmp = new java.io.File(sCtx.getCacheDir(), "conv_" + System.currentTimeMillis() + ".mp4");
+                com.arthenica.ffmpegkit.FFmpegSession st = com.arthenica.ffmpegkit.FFmpegKit.executeWithArguments(
+                    new String[]{"-y", "-fflags", "+genpts", "-i", job.file.getAbsolutePath(), "-c", "copy", "-movflags", "+faststart", tmp.getAbsolutePath()});
+                if (st.getState().equals(com.arthenica.ffmpegkit.SessionState.COMPLETED) && tmp.length() > 0) {
+                    java.io.InputStream in = new java.io.FileInputStream(tmp);
+                    java.io.OutputStream os = sCtx.getContentResolver().openOutputStream(out);
+                    byte[] b = new byte[32768]; int n;
+                    while ((n = in.read(b)) > 0) os.write(b, 0, n);
+                    in.close(); os.close();
+                    job.file.delete();
+                    job.state = null;
+                } else job.state = "转换失败";
+                tmp.delete();
+            } catch (Throwable e) {
+                job.state = "转换失败: " + e.getClass().getSimpleName();
+            }
+            stoppedJobs.put(job.id, job);
+        } }).start();
     }
 
     static void convertToMp4(final RecJob job) {
