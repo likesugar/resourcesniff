@@ -111,6 +111,8 @@ public class SniffActivity extends Activity {
                     Uri u = request.getUrl();
                     if (!"http".equals(u.getScheme()) && !"https".equals(u.getScheme())) return null;
                     String url = u.toString();
+                    if (url.contains("/log/")) return null;
+                    maybeRecordDouyin(url);
                     if (isMediaUrl(url) && recordKeys.add(url)) {
                         foundUrls.add(url);
                         final String page = webView.getTitle();
@@ -128,11 +130,10 @@ public class SniffActivity extends Activity {
             }
 
             @Override
-            public void onPageStarted(WebView view, String url, android.graphics.Bitmap favicon) {
-                if (url != null && url.contains("douyin.com")) injectDouyinScript();
-            }
-
             public void onPageFinished(WebView view, String url) {
+                if (url != null && (url.contains("douyin.com") || url.contains("iesdouyin"))) {
+                    injectDouyinScript();
+                }
                 BiliResolver.tryParse(SniffActivity.this, url);
                 etUrl.setText(url);
             }
@@ -365,6 +366,132 @@ public class SniffActivity extends Activity {
             r.close();
             return sb.toString();
         }
+    }
+
+    // ==== DK 抖音解析规则 ====
+    private final java.util.List<String> douyinCands = new java.util.ArrayList<>();
+    private boolean douyinPickScheduled = false;
+    private final java.util.Set<String> seenMedia = new java.util.HashSet<>();
+    static final String UA_MOBILE = "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36";
+
+    void maybeRecordDouyin(final String url) {
+        String l = url.toLowerCase();
+        // 裸直播地址：去参数后含 douyincdn + /stage/ 且末段不带扩展名（签名地址每次都变会死循环）
+        String base = url;
+        int qi = base.indexOf('?');
+        if (qi > 0) base = base.substring(0, qi);
+        String lb = base.toLowerCase();
+        boolean bareLive = lb.contains("douyincdn") && lb.contains("/stage/")
+            && !lb.substring(lb.lastIndexOf('/') + 1).contains(".");
+        boolean hit = (l.contains(".flv") || l.contains(".m3u8") || l.contains(".mp4") || l.contains(".m4s"))
+            && (l.contains("douyinvod") || l.contains("/aweme/v1/play") || l.contains("playwm"))
+            && !l.contains("bilivideo") && !l.contains("upos-");
+        if (!bareLive && !hit) return;
+
+        final String f;
+        if (hit) {
+            // 抖音强制最高画质：ratio→1080p；biz_resolution→1088x1920（兼容 %3D 编码）
+            String hi = url
+                .replaceAll("ratio=[a-zA-Z0-9_]+", "ratio=1080p")
+                .replaceAll("biz_resolution(=|%3D|%3d)[a-zA-Z0-9_x]+", "biz_resolution$11088x1920")
+                .replaceAll("resolution(=|%3D|%3d)[a-zA-Z0-9_x]+", "resolution$11088x1920");
+            f = hi;
+        } else {
+            f = base;
+        }
+        synchronized (douyinCands) {
+            if (!douyinCands.contains(f)) douyinCands.add(f);
+        }
+        if (l.contains(".m3u8")) {
+            final String murl = url;
+            new Thread(new Runnable() { public void run() { pickBestVariant(murl); } }).start();
+        }
+        if (!douyinPickScheduled) {
+            douyinPickScheduled = true;
+            long delay = bareLive ? 3000 : 6000;
+            runOnUiThread(new Runnable() { public void run() {
+                new android.os.Handler(android.os.Looper.getMainLooper())
+                    .postDelayed(new Runnable() { public void run() { finishDouyinPick(); } }, 3000);
+            }});
+        }
+    }
+
+    /** 3~6 秒窗口后收口：候选里挑远端体积最大的进记录（照DK finishDouyinPick） */
+    void finishDouyinPick() {
+        java.util.List<String> snapshot;
+        synchronized (douyinCands) { snapshot = new java.util.ArrayList<String>(douyinCands); }
+        if (snapshot.isEmpty()) return;
+        douyinPickScheduled = false;
+        new Thread(new Runnable() {
+            public void run() {
+                String best = snapshot.get(0);
+                long bestLen = -1;
+                for (String u : snapshot) {
+                    long len = remoteSizeDouyin(u);
+                    if (len > bestLen) { bestLen = len; best = u; }
+                }
+                final String f = best;
+                runOnUiThread(new Runnable() { public void run() {
+                    if (recordKeys.add("dy#" + f)) {
+                        addRecord(f, "抖音");
+                        if (!isRecordsVisible) toggleRecords();
+                    }
+                }});
+            }
+        }).start();
+    }
+
+    long remoteSizeDouyin(String url) {
+        java.net.HttpURLConnection c = null;
+        try {
+            c = (java.net.HttpURLConnection) new java.net.URL(url).openConnection();
+            c.setConnectTimeout(6000);
+            c.setReadTimeout(6000);
+            c.setRequestMethod("HEAD");
+            c.setRequestProperty("User-Agent", UA_MOBILE);
+            c.setRequestProperty("Referer", "https://live.douyin.com/");
+            long len = c.getContentLengthLong();
+            return len < 0 ? 0 : len;
+        } catch (Throwable e) {
+            return -1;
+        } finally {
+            if (c != null) c.disconnect();
+        }
+    }
+
+    /** m3u8 主清单 → 挑最大 BANDWIDTH 子清单 */
+    void pickBestVariant(String masterUrl) {
+        try {
+            java.net.HttpURLConnection c = (java.net.HttpURLConnection) new java.net.URL(masterUrl).openConnection();
+            c.setConnectTimeout(8000); c.setReadTimeout(8000);
+            c.setRequestProperty("User-Agent", UA_MOBILE);
+            c.setRequestProperty("Referer", "https://live.douyin.com/");
+            if (c.getResponseCode() != 200) return;
+            java.io.InputStream in = c.getInputStream();
+            java.io.ByteArrayOutputStream bo = new java.io.ByteArrayOutputStream();
+            byte[] b = new byte[8192]; int n;
+            while ((n = in.read(b)) > 0) bo.write(b, 0, n);
+            in.close(); c.disconnect();
+            String body = bo.toString("UTF-8");
+            if (!body.contains("#EXT-X-STREAM-INF")) return;
+            long bestBw = -1; String best = null; long curBw = -1;
+            java.net.URI base = java.net.URI.create(masterUrl);
+            for (String ln : body.split("\n")) {
+                String t = ln.trim();
+                if (t.startsWith("#EXT-X-STREAM-INF")) {
+                    java.util.regex.Matcher bm = java.util.regex.Pattern.compile("BANDWIDTH=(\\d+)").matcher(t);
+                    curBw = bm.find() ? Long.parseLong(bm.group(1)) : -1;
+                } else if (!t.isEmpty() && !t.startsWith("#") && curBw > bestBw) {
+                    bestBw = curBw;
+                    best = base.resolve(t).toString();
+                }
+            }
+            if (best != null && seenMedia.add(best)) {
+                synchronized (douyinCands) {
+                    if (!douyinCands.contains(best)) douyinCands.add(best);
+                }
+            }
+        } catch (Throwable ignored) {}
     }
 
     static boolean isMediaUrl(String url) {
