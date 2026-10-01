@@ -601,7 +601,27 @@ public class SniffActivity extends Activity {
                         return;
                     }
                 }
-                failDouyin("各清晰度都没取到流地址");
+                // 兜底：页面里任意 m3u8/flv 直链（转义兼容 \/ \u002F）
+                String[] gens = {
+                    "https?:[^\\"'\\s]*?\\.m3u8[^\\"'\\s]*",
+                    "https?:[^\\"'\\s]*?\\.flv[^\\"'\\s]*"
+                };
+                for (String gp : gens) {
+                    java.util.regex.Matcher gm = java.util.regex.Pattern.compile(gp).matcher(html);
+                    if (gm.find()) {
+                        String u = gm.group(0).replace("\\u002F", "/").replace("\\/", "/");
+                        final String fu = u;
+                        main.post(new Runnable() { public void run() {
+                            if (recordKeys.add("dy#" + fu)) {
+                                addRecord(fu, "抖音直播(兜底)");
+                                if (!isRecordsVisible) toggleRecords();
+                            }
+                            douyinParsing = false;
+                        }});
+                        return;
+                    }
+                }
+                failDouyin("各清晰度都没取到流地址 html=" + html.length());
             } catch (Throwable e) {
                 failDouyin("解析异常:" + e.getMessage());
             }
