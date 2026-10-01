@@ -54,6 +54,20 @@ public class DownloadManagerActivity extends Activity {
             if (RecEngine.TYPE_DL.equals(t)) enqueueDownload(passthrough);
         }
 
+        setContentView(R.layout.activity_download);
+        tabBar = findViewById(R.id.tabBar);
+        listBox = findViewById(R.id.listBox);
+        // 沉浸式隐藏导航栏
+        getWindow().getDecorView().setSystemUiVisibility(
+                View.SYSTEM_UI_FLAG_LAYOUT_STABLE
+                        | View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION
+                        | View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN
+                        | View.SYSTEM_UI_FLAG_HIDE_NAVIGATION
+                        | View.SYSTEM_UI_FLAG_FULLSCREEN
+                        | View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY);
+    }
+
+    void initLegacy() {
         FrameLayout root = new FrameLayout(this);
         root.setBackgroundColor(0xFF000000);
 
@@ -143,44 +157,22 @@ public class DownloadManagerActivity extends Activity {
 
     LinearLayout buildCard(final JSONObject o) {
         final String url = o.optString("url");
-        LinearLayout row = new LinearLayout(this);
+        LinearLayout row = (LinearLayout) getLayoutInflater().inflate(R.layout.item_record, listBox, false);
+        TextView thumb = row.findViewById(R.id.r_thumb);
+        TextView tv = row.findViewById(R.id.r_title);
+        TextView tvUrl = row.findViewById(R.id.r_meta);
+        TextView menuBtn = row.findViewById(R.id.r_menu);
+        TextView unused1 = thumb; TextView unused2 = tvUrl; TextView unused3 = menuBtn;
         row.setOrientation(LinearLayout.HORIZONTAL);
         row.setPadding(20, 16, 20, 16);
         row.setBackgroundColor(0xFF151515);
 
-        // 左侧缩略图
-        TextView thumb = new TextView(this);
-        thumb.setTextSize(24);
-        thumb.setGravity(Gravity.CENTER);
-        thumb.setTextColor(0xFF4D9AFF);
-        thumb.setBackgroundColor(0xFF222222);
-        String icon = RecEngine.TYPE_DL.equals(o.optString("type")) ? "⬇" :
-                (RecEngine.ST_REC.equals(o.optString("status")) ? "⏺" : "▶");
-        thumb.setText(icon);
-        row.addView(thumb, new LinearLayout.LayoutParams(150, 150));
-
-        // 中部信息
-        LinearLayout info = new LinearLayout(this);
-        info.setOrientation(LinearLayout.VERTICAL);
-        info.setPadding(20, 4, 8, 4);
-        TextView t1 = new TextView(this);
-        t1.setText("时长 " + fmtDur(o.optLong("duration", 0)));
-        t1.setTextColor(0xFFDDDDDD); t1.setTextSize(13);
-        TextView t2 = new TextView(this);
-        t2.setText("大小 " + fmtSize(o.optLong("size", 0)));
-        t2.setTextColor(0xFFDDDDDD); t2.setTextSize(13);
-        TextView t3 = new TextView(this);
-        t3.setText("状态 " + o.optString("status", ""));
-        t3.setTextColor(0xFF4D9AFF); t3.setTextSize(13);
-        TextView t0 = new TextView(this);
-        t0.setText(o.optString("title", "") + " · " + o.optString("type", ""));
-        t0.setTextColor(0xFFFFFFFF); t0.setTextSize(13);
-        info.addView(t0);
-        info.addView(t1);
-        info.addView(t2);
-        info.addView(t3);
-        LinearLayout.LayoutParams ip = new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f);
-        row.addView(info, ip);
+        thumb.setText(RecEngine.TYPE_DL.equals(o.optString("type")) ? "⬇" :
+                (RecEngine.ST_REC.equals(o.optString("status")) ? "⏺" : "▶"));
+        tv.setText(o.optString("title", "") + " · " + o.optString("type", ""));
+        tvUrl.setText("时长 " + fmtDur(o.optLong("duration", 0))
+                + " · " + fmtSize(o.optLong("size", 0))
+                + " · " + o.optString("status", ""));
 
         // 右侧 ⋮
         TextView menu = new TextView(this);

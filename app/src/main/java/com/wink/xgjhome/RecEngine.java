@@ -181,5 +181,31 @@ public class RecEngine {
         Thread t = REC.remove(url);
         if (t != null) t.interrupt();
         update(ctx, url, "status", ST_DONE);
+        // ffmpeg-kit PTS 重建（小工具同款：消除追加分片的 PTS 跳变）
+        final Context fc = ctx;
+        final String fu = url;
+        new Thread(new Runnable() { public void run() {
+            try {
+                String path = get(fc, fu, "path");
+                if (path == null || path.isEmpty()) return;
+                java.io.File src = new java.io.File(path);
+                if (!src.exists() || src.length() == 0) return;
+                java.io.File tmp = new java.io.File(src.getParentFile(), "fix_tmp.ts");
+                String[] args = { "-y", "-fflags", "+genpts", "-i", src.getAbsolutePath(),
+                    "-c", "copy", "-map", "0", "-f", "mpegts", tmp.getAbsolutePath() };
+                com.arthenica.ffmpegkit.FFmpegKit.executeWithArgumentsAsync(args,
+                    new com.arthenica.ffmpegkit.FFmpegSessionCompleteCallback() {
+                        public void apply(com.arthenica.ffmpegkit.FFmpegSession st) {
+                            if (tmp.exists() && tmp.length() > 0) { src.delete(); tmp.renameTo(src); }
+                            else tmp.delete();
+                        }
+                    });
+            } catch (Throwable ignored) {}
+        }}).start();
+    }
+
+    static String get(Context ctx, String url, String key) {
+        for (JSONObject o : load(ctx)) if (url.equals(o.optString("url"))) return o.optString(key, "");
+        return null;
     }
 }

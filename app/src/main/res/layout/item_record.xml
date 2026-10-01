@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent" android:layout_height="wrap_content"
+    android:orientation="horizontal" android:gravity="center_vertical"
+    android:padding="16dp" android:background="#141414">
+
+    <TextView android:id="@+id/r_thumb"
+        android:layout_width="64dp" android:layout_height="48dp"
+        android:gravity="center" android:text="⏺"
+        android:textSize="20sp" android:textColor="#FFFFFF"
+        android:background="#222222"/>
+
+    <LinearLayout
+        android:layout_width="0dp" android:layout_height="wrap_content"
+        android:layout_weight="1" android:layout_marginLeft="14dp"
+        android:orientation="vertical">
+        <TextView android:id="@+id/r_title"
+            android:layout_width="match_parent" android:layout_height="wrap_content"
+            android:textColor="#FFFFFF" android:textSize="14sp"
+            android:singleLine="true" android:ellipsize="end"/>
+        <TextView android:id="@+id/r_meta"
+            android:layout_width="match_parent" android:layout_height="wrap_content"
+            android:textColor="#8A94A6" android:textSize="12sp" android:layout_marginTop="4dp"/>
+    </LinearLayout>
+
+    <TextView android:id="@+id/r_menu"
+        android:layout_width="wrap_content" android:layout_height="wrap_content"
+        android:text="⋮" android:textColor="#FFFFFF" android:textSize="20sp"
+        android:padding="10dp" android:gravity="center"/>
+</LinearLayout>
