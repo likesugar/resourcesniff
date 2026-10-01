@@ -34,9 +34,13 @@ function useNative(){
   else showErr('原生内核不可用');
 }
 function replay(){ destroyPlayer(); initPlayer(); }
-function destroyPlayer(){ try{ if(player){ player.pause(); player.destroy(); } }catch(e){} player=null; }
+function destroyPlayer(){ try{ if(player){ player.pause(); player.destroy(); } }catch(e){} player=null;
+  try{ document.getElementById('container').innerHTML=''; }catch(e){}
+}
 function initPlayer(){
   if(!url){ showErr('无播放地址'); return; }
+  if(player) return;
+  try{ document.getElementById('container').innerHTML=''; }catch(e){}
   try{
     player = new Jessibuca({
       container: document.getElementById('container'),
