@@ -24,7 +24,6 @@ public class NativePlayerActivity extends Activity {
     private String url;
     private String title;
     private boolean usingWeb = false;
-    private Button kernelBtn;
 
     @SuppressLint("SetJavaScriptEnabled")
     @Override
@@ -65,7 +64,11 @@ public class NativePlayerActivity extends Activity {
 
         // DKVideoPlayer：MediaPlayer 内核 + 标准控制层
         videoView = new VideoView(this);
-        videoView.setUrl(url);
+                controller.setOnKernelSwitchListener(new StandardVideoController.OnKernelSwitchListener() {
+            @Override
+            public void onKernelSwitch() { toggleKernel(); }
+        });
+videoView.setUrl(url);
         controller = new StandardVideoController(this);
         controller.addDefaultControlComponent(title != null ? title : "资源嗅探", url != null && url.contains(".m3u8"));
         videoView.setVideoController(controller);
@@ -89,20 +92,6 @@ public class NativePlayerActivity extends Activity {
         root.addView(wv, new FrameLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
 
-        // 控制层右上角悬浮的内核切换按钮（覆盖层，跟随控制层显隐简化为常驻小按钮）
-        kernelBtn = new Button(this);
-        kernelBtn.setText("🌐内核");
-        kernelBtn.setTextSize(11);
-        kernelBtn.setBackgroundResource(R.drawable.bg_btn_deep);
-        FrameLayout.LayoutParams kp = new FrameLayout.LayoutParams(
-                ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT,
-                Gravity.TOP | Gravity.END);
-        kp.setMargins(0, 12, 12, 0);
-        kernelBtn.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) { toggleKernel(); }
-        });
-        root.addView(kernelBtn, kp);
 
         setContentView(root);
         if (url == null || url.length() == 0) {
@@ -129,7 +118,6 @@ public class NativePlayerActivity extends Activity {
             videoView.start();
             Toast.makeText(this, "已切换：MediaPlayer 内核", Toast.LENGTH_SHORT).show();
         }
-        kernelBtn.setText(usingWeb ? "🌐原生" : "🌐网页");
     }
 
     @Override

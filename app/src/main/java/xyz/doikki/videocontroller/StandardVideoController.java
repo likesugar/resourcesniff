@@ -63,7 +63,13 @@ public class StandardVideoController extends GestureVideoController implements V
         mLockButton = findViewById(R.id.lock);
         mLockButton.setOnClickListener(this);
         mLoadingProgress = findViewById(R.id.loading);
+        View kernel = findViewById(R.id.kernel_switch);
+        if (kernel != null) kernel.setOnClickListener(this);
     }
+
+    public interface OnKernelSwitchListener { void onKernelSwitch(); }
+    private OnKernelSwitchListener mKernelListener;
+    public void setOnKernelSwitchListener(OnKernelSwitchListener l) { mKernelListener = l; }
 
     /**
      * 快速添加各个组件
@@ -92,6 +98,8 @@ public class StandardVideoController extends GestureVideoController implements V
         int i = v.getId();
         if (i == R.id.lock) {
             mControlWrapper.toggleLockState();
+        } else if (i == R.id.kernel_switch) {
+            if (mKernelListener != null) mKernelListener.onKernelSwitch();
         }
     }
 
