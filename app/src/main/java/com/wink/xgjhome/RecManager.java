@@ -52,7 +52,7 @@ public class RecManager {
     }
 
     static void startRecJob(final String url) {
-        if (url.toLowerCase().contains(".m3u8")) { startFfmpegRec(url); return; }
+        if (url.toLowerCase().contains(".m3u8")) { startHlsRec(url); return; }
         RecJob job = new RecJob();
         job.id = ++recSeq;
         job.notifId = 9000 + job.id;
@@ -134,6 +134,95 @@ public class RecManager {
 
     /** 停止（暂停）录制：断流、通知取消，文件保留可继续 */
     /** m3u8：ffmpeg-kit 直接拉 HLS 录成 MP4（-c copy 边下边封装） */
+
+    /** m3u8：纯 Java 解析播放清单，循环抓 .ts 分片合并（小工具 KB 同款请求头） */
+    static void startHlsRec(final String url) {
+        try {
+            final RecJob job = new RecJob();
+            job.id = ++recSeq;
+            job.notifId = 9000 + job.id;
+            job.url = url;
+            job.name = "直播_hls_" + System.currentTimeMillis() + ".ts";
+            job.startTs = System.currentTimeMillis();
+            android.content.ContentValues cv = new android.content.ContentValues();
+            cv.put(android.provider.MediaStore.Video.Media.DISPLAY_NAME, job.name);
+            cv.put(android.provider.MediaStore.Video.Media.MIME_TYPE, "video/mp2ts");
+            cv.put(android.provider.MediaStore.Video.Media.RELATIVE_PATH, "Movies/录制");
+            cv.put(android.provider.MediaStore.Video.Media.IS_PENDING, 1);
+            job.storeUri = sCtx.getContentResolver()
+                .insert(android.provider.MediaStore.Video.Media.getContentUri("external_primary"), cv);
+            recJobs.put(job.id, job);
+            acquireWake();
+            job.thread = new Thread(new Runnable() {
+                public void run() {
+                    java.io.FileOutputStream fo = null;
+                    try {
+                        fo = (java.io.FileOutputStream) sCtx.getContentResolver().openOutputStream(job.storeUri, "w");
+                        java.util.LinkedHashSet<String> seen = new java.util.LinkedHashSet<>();
+                        byte[] buf = new byte[65536];
+                        while (job.active) {
+                            java.net.HttpURLConnection pc = (java.net.HttpURLConnection) new java.net.URL(job.url).openConnection();
+                            pc.setConnectTimeout(8000); pc.setReadTimeout(8000);
+                            pc.setRequestProperty("User-Agent", "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36");
+                            pc.setRequestProperty("Referer", "https://live.douyin.com/");
+                            java.util.List<String> segs = new java.util.ArrayList<String>();
+                            if (pc.getResponseCode() == 200) {
+                                java.io.BufferedReader br = new java.io.BufferedReader(new java.io.InputStreamReader(pc.getInputStream()));
+                                String ln, lastInf = null;
+                                while ((ln = br.readLine()) != null) {
+                                    ln = ln.trim();
+                                    if (ln.startsWith("#EXTINF")) lastInf = ln;
+                                    else if (!ln.isEmpty() && !ln.startsWith("#") && lastInf != null) {
+                                        String seg = ln;
+                                        if (!seg.startsWith("http")) seg = new java.net.URL(new java.net.URL(job.url), seg).toString();
+                                        segs.add(seg);
+                                        lastInf = null;
+                                    }
+                                }
+                                br.close();
+                            }
+                            pc.disconnect();
+                            for (String seg : segs) {
+                                if (!job.active) break;
+                                if (!seen.add(seg)) continue;
+                                java.net.HttpURLConnection sc = (java.net.HttpURLConnection) new java.net.URL(seg).openConnection();
+                                sc.setConnectTimeout(8000); sc.setReadTimeout(15000);
+                                sc.setRequestProperty("User-Agent", "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36");
+                                sc.setRequestProperty("Referer", "https://live.douyin.com/");
+                                if (sc.getResponseCode() == 200 && fo != null) {
+                                    java.io.InputStream in = sc.getInputStream();
+                                    int n;
+                                    while (job.active && (n = in.read(buf)) > 0) { fo.write(buf, 0, n); job.bytes += n; }
+                                    fo.flush();
+                                    in.close();
+                                }
+                                sc.disconnect();
+                            }
+                            if (job.finishNow) break;
+                            Thread.sleep(2000);
+                        }
+                    } catch (Throwable t) {
+                    } finally {
+                        try { if (fo != null) fo.close(); } catch (Exception ignored) {}
+                        if (job.startTs > 0) job.secs += (System.currentTimeMillis() - job.startTs) / 1000;
+                        job.startTs = 0;
+                        job.active = false;
+                        recJobs.remove(job.id);
+                        releaseWakeIfIdle();
+                        try {
+                            android.content.ContentValues cv2 = new android.content.ContentValues();
+                            cv2.put(android.provider.MediaStore.Video.Media.IS_PENDING, 0);
+                            sCtx.getContentResolver().update(job.storeUri, cv2, null, null);
+                        } catch (Throwable ignored) {}
+                        if (job.finishNow) convertToMp4(job);
+                        else stoppedJobs.put(job.id, job);
+                    }
+                }
+            });
+            job.thread.start();
+        } catch (Throwable e) { }
+    }
+
     static void startFfmpegRec(final String url) {
         try {
             RecJob job = new RecJob();

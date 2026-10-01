@@ -935,8 +935,10 @@ public class SniffActivity extends Activity {
                         android.content.ClipboardManager cm = (android.content.ClipboardManager) getSystemService(Context.CLIPBOARD_SERVICE);
                         cm.setPrimaryClip(android.content.ClipData.newPlainText("stream", url));
                     } catch (Throwable e) { }
+                    RecManager.init(getApplicationContext());
+                    RecManager.startRecJob(url); // 自动开始录制
                     startActivity(new Intent(SniffActivity.this, RecordActivity.class));
-                    Toast.makeText(SniffActivity.this, "已复制流地址，到下载页点「读取剪贴板录制」", Toast.LENGTH_LONG).show();
+                    Toast.makeText(SniffActivity.this, "已开始录制，可在下载页管理", Toast.LENGTH_LONG).show();
                 }
                 else if (t.equals("停止录制")) {
                     RecManager.recStopAll();
