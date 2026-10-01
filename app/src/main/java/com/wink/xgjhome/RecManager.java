@@ -139,7 +139,7 @@ public class RecManager {
     /** 停止（暂停）录制：断流、通知取消，文件保留可继续 */
     /** m3u8：ffmpeg-kit 直接拉 HLS 录成 MP4（-c copy 边下边封装） */
 
-    /** m3u8：纯 Java 解析播放清单，循环抓 .ts 分片合并（小工具 KB 同款请求头） */
+    /** m3u8：纯 Java 解析播放清单，循环抓 .ts 分片合并（小工具 KB 同款请求头，容错重试） */
     static void startHlsRec(final String url) {
         try {
             final RecJob job = new RecJob();
@@ -165,54 +165,75 @@ public class RecManager {
                         java.util.LinkedHashSet<String> seen = new java.util.LinkedHashSet<>();
                         byte[] buf = new byte[65536];
                         String curUrl = job.url;
-                        while (job.active) {
-                            java.net.HttpURLConnection pc = (java.net.HttpURLConnection) new java.net.URL(curUrl).openConnection();
-                            pc.setConnectTimeout(8000); pc.setReadTimeout(8000);
-                            pc.setRequestProperty("User-Agent", "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36");
-                            pc.setRequestProperty("Referer", "https://live.douyin.com/");
+                        int failStreak = 0;
+                        while (job.active && failStreak < 30) {
+                            // ---- 拉清单（独立容错）----
                             java.util.List<String> segs = new java.util.ArrayList<String>();
-                            String variant = null;
-                            if (pc.getResponseCode() == 200) {
-                                java.io.BufferedReader br = new java.io.BufferedReader(new java.io.InputStreamReader(pc.getInputStream()));
-                                String ln, lastInf = null;
-                                boolean inVariant = false;
-                                while ((ln = br.readLine()) != null) {
-                                    ln = ln.trim();
-                                    if (ln.startsWith("#EXT-X-STREAM-INF")) { inVariant = true; continue; }
-                                    if (inVariant && !ln.isEmpty() && !ln.startsWith("#")) {
-                                        String v = ln;
-                                        if (!v.startsWith("http")) v = new java.net.URL(new java.net.URL(curUrl), v).toString();
-                                        variant = v;
-                                        inVariant = false;
-                                        continue;
+                            java.util.List<String> variants = new java.util.ArrayList<String>();
+                            boolean ok = false;
+                            java.net.HttpURLConnection pc = null;
+                            try {
+                                pc = (java.net.HttpURLConnection) new java.net.URL(curUrl).openConnection();
+                                pc.setConnectTimeout(8000); pc.setReadTimeout(8000);
+                                pc.setRequestProperty("User-Agent", "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36");
+                                pc.setRequestProperty("Referer", "https://live.douyin.com/");
+                                if (pc.getResponseCode() == 200) {
+                                    ok = true;
+                                    java.io.BufferedReader br = new java.io.BufferedReader(new java.io.InputStreamReader(pc.getInputStream()));
+                                    String ln, lastInf = null;
+                                    boolean inVariant = false;
+                                    while ((ln = br.readLine()) != null) {
+                                        ln = ln.trim();
+                                        if (ln.startsWith("#EXT-X-STREAM-INF")) { inVariant = true; continue; }
+                                        if (inVariant && !ln.isEmpty() && !ln.startsWith("#")) {
+                                            String v = ln;
+                                            if (!v.startsWith("http")) v = new java.net.URL(new java.net.URL(curUrl), v).toString();
+                                            variants.add(v); inVariant = false; continue;
+                                        }
+                                        if (ln.startsWith("#EXTINF")) lastInf = ln;
+                                        else if (!ln.isEmpty() && !ln.startsWith("#") && lastInf != null) {
+                                            String seg = ln;
+                                            if (!seg.startsWith("http")) seg = new java.net.URL(new java.net.URL(curUrl), seg).toString();
+                                            segs.add(seg); lastInf = null;
+                                        }
                                     }
-                                    if (ln.startsWith("#EXTINF")) lastInf = ln;
-                                    else if (!ln.isEmpty() && !ln.startsWith("#") && lastInf != null) {
-                                        String seg = ln;
-                                        if (!seg.startsWith("http")) seg = new java.net.URL(new java.net.URL(curUrl), seg).toString();
-                                        segs.add(seg);
-                                        lastInf = null;
-                                    }
+                                    br.close();
                                 }
-                                br.close();
+                            } catch (Throwable pe) {
+                            } finally {
+                                if (pc != null) { try { pc.disconnect(); } catch (Throwable ignored) {} }
                             }
-                            pc.disconnect();
-                            if (variant != null && segs.isEmpty()) { curUrl = variant; continue; }
+                            // master 清单：优先 _or4 原画，其次第一个变体
+                            if (!variants.isEmpty() && segs.isEmpty()) {
+                                String pick = variants.get(0);
+                                for (String v : variants) if (v.contains("_or4")) { pick = v; break; }
+                                curUrl = pick; failStreak = 0; continue;
+                            }
+                            if (!ok) { failStreak++; job.state = "清单失败x" + failStreak; Thread.sleep(2000); continue; }
+                            // ---- 逐分片下载（独立容错）----
                             for (String seg : segs) {
                                 if (!job.active) break;
                                 if (!seen.add(seg)) continue;
-                                java.net.HttpURLConnection sc = (java.net.HttpURLConnection) new java.net.URL(seg).openConnection();
-                                sc.setConnectTimeout(8000); sc.setReadTimeout(15000);
-                                sc.setRequestProperty("User-Agent", "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36");
-                                sc.setRequestProperty("Referer", "https://live.douyin.com/");
-                                if (sc.getResponseCode() == 200 && fo != null) {
-                                    java.io.InputStream in = sc.getInputStream();
-                                    int n;
-                                    while (job.active && (n = in.read(buf)) > 0) { fo.write(buf, 0, n); job.bytes += n; }
-                                    fo.flush();
-                                    in.close();
+                                java.net.HttpURLConnection sc = null;
+                                try {
+                                    sc = (java.net.HttpURLConnection) new java.net.URL(seg).openConnection();
+                                    sc.setConnectTimeout(8000); sc.setReadTimeout(15000);
+                                    sc.setRequestProperty("User-Agent", "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36");
+                                    sc.setRequestProperty("Referer", "https://live.douyin.com/");
+                                    if (sc.getResponseCode() == 200 && fo != null) {
+                                        java.io.InputStream in = sc.getInputStream();
+                                        int n;
+                                        while (job.active && (n = in.read(buf)) > 0) { fo.write(buf, 0, n); job.bytes += n; }
+                                        fo.flush();
+                                        in.close();
+                                        failStreak = 0;
+                                    } else failStreak++;
+                                } catch (Throwable se) {
+                                    failStreak++;
+                                    job.state = "分片失败x" + failStreak;
+                                } finally {
+                                    if (sc != null) { try { sc.disconnect(); } catch (Throwable ignored) {} }
                                 }
-                                sc.disconnect();
                             }
                             if (job.finishNow) break;
                             Thread.sleep(2000);
@@ -231,14 +252,13 @@ public class RecManager {
                             cv2.put(android.provider.MediaStore.Video.Media.IS_PENDING, 0);
                             sCtx.getContentResolver().update(job.storeUri, cv2, null, null);
                         } catch (Throwable ignored) {}
-                        if (job.finishNow) convertToMp4(job);
+                        if (job.finishNow && job.bytes > 0) convertToMp4(job);
                         else stoppedJobs.put(job.id, job);
                     }
                 }
             });
             job.thread.start();
         } catch (Throwable e) {
-            // 失败可见化：放进已停止列表，state 显示原因
             try {
                 RecJob jb = new RecJob();
                 jb.id = ++recSeq;
