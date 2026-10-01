@@ -70,6 +70,8 @@ public class SniffActivity extends Activity {
 
         WebSettings ws = webView.getSettings();
         ws.setJavaScriptEnabled(true);
+        ws.setUserAgentString(UA_MOBILE); // 手机UA：抖音直播流按移动端下发
+        isMobileUa = true;
         ws.setDomStorageEnabled(true);
         ws.setMediaPlaybackRequiresUserGesture(false);
         ws.setMixedContentMode(WebSettings.MIXED_CONTENT_ALWAYS_ALLOW);
@@ -402,9 +404,10 @@ public class SniffActivity extends Activity {
         int qi = base.indexOf('?');
         if (qi > 0) base = base.substring(0, qi);
         String lb = base.toLowerCase();
+        boolean anyM3u8 = l.contains(".m3u8");
         boolean bareLive = lb.contains("douyincdn") && lb.contains("/stage/")
             && !lb.substring(lb.lastIndexOf('/') + 1).contains(".");
-        if (bareLive) {
+        if (bareLive || (anyM3u8 && !l.contains("bilivideo") && !l.contains("upos-"))) {
             final String f = base;
             boolean added = false;
             synchronized (douyinCands) {
