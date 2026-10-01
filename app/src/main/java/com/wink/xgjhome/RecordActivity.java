@@ -117,22 +117,27 @@ public class RecordActivity extends Activity {
         return String.format(java.util.Locale.US, "%.0fKB", b / 1024.0);
     }
 
-    private final java.util.ArrayList<String> rowOrder = new java.util.ArrayList<String>();
+    private final java.util.ArrayList<String> rowOrder = new java.util.ArrayList<String>();  // 按任务id固定行位置
     private final java.util.HashMap<String, TextView> rowInfo = new java.util.HashMap<String, TextView>();
 
     private void rebuild() {
         int n = RecManager.recJobs.size() + RecManager.stoppedJobs.size();
         tvEmpty.setVisibility(n == 0 ? View.VISIBLE : View.GONE);
-        java.util.ArrayList<String> order = new java.util.ArrayList<String>();
         final java.util.LinkedHashMap<String, RecManager.RecJob> jobs = new java.util.LinkedHashMap<String, RecManager.RecJob>();
         final java.util.HashMap<String, Boolean> liveMap = new java.util.HashMap<String, Boolean>();
-        for (RecManager.RecJob j : RecManager.recJobs.values()) { order.add("L" + j.id); jobs.put("L" + j.id, j); liveMap.put("L" + j.id, true); }
-        for (RecManager.RecJob j : RecManager.stoppedJobs.values()) { order.add("S" + j.id); jobs.put("S" + j.id, j); liveMap.put("S" + j.id, false); }
-        if (order.equals(rowOrder)) {  // 结构没变只更新文字，避免闪
+        java.util.ArrayList<String> ids = new java.util.ArrayList<String>();
+        for (RecManager.RecJob j : RecManager.recJobs.values()) { ids.add("" + j.id); jobs.put("" + j.id, j); liveMap.put("" + j.id, true); }
+        for (RecManager.RecJob j : RecManager.stoppedJobs.values()) { if (!jobs.containsKey("" + j.id)) { ids.add("" + j.id); jobs.put("" + j.id, j); } liveMap.put("" + j.id, false); }
+        // 稳定顺序：新任务追加到末尾，消失的任务移除，已有任务位置永不变
+        java.util.ArrayList<String> order = new java.util.ArrayList<String>(rowOrder);
+        order.retainAll(ids);
+        for (String id : ids) if (!order.contains(id)) order.add(id);
+        if (order.equals(rowOrder)) {  // 结构没变只更新文字，不闪
             for (String key : order) {
                 TextView tv = rowInfo.get(key);
                 if (tv != null) tv.setText(buildInfo(jobs.get(key), liveMap.get(key)));
             }
+            rowOrder.clear(); rowOrder.addAll(order);
             return;
         }
         list.removeAllViews();
@@ -206,7 +211,11 @@ public class RecordActivity extends Activity {
         more.setGravity(Gravity.CENTER);
         more.setPadding(24, 24, 24, 24);
         more.setOnClickListener(new View.OnClickListener() {
-            public void onClick(View v) { showMenu(v, j, live); }
+            public void onClick(View v) {
+                RecManager.RecJob cur = RecManager.recJobs.get(j.id);
+                boolean nowLive = cur != null && cur.active;  // 点击时解析，避免行复用后菜单过期
+                showMenu(v, cur != null ? cur : j, nowLive);
+            }
         });
         row.addView(more);
 
