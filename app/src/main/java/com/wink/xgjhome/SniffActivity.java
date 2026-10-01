@@ -2,6 +2,7 @@ package com.wink.xgjhome;
 
 import android.annotation.SuppressLint;
 import android.app.Activity;
+import android.content.Context;
 import android.content.ClipData;
 import android.content.Intent;
 import android.content.ClipboardManager;
@@ -135,6 +136,28 @@ public class SniffActivity extends Activity {
                     if (!"http".equals(u.getScheme()) && !"https".equals(u.getScheme())) return null;
                     String url = u.toString();
                     if (url.contains("/log/")) return null;
+                    if (kbState[0] == 0 && kbArmed && url.toLowerCase().contains(".ts") && (url.contains("/stream/") || url.contains("douyincdn") || url.contains("amemv"))) {
+                        kbArmed = false;
+                        startKb(SniffActivity.this);
+                    }
+                    if (kbState[0] == 1 && kbSeen.add(url) && url.toLowerCase().contains(".ts")) {
+                        try {
+                            java.net.HttpURLConnection hc = (java.net.HttpURLConnection) new java.net.URL(url).openConnection();
+                            hc.setConnectTimeout(8000); hc.setReadTimeout(8000);
+                            hc.setRequestProperty("User-Agent", view.getSettings().getUserAgentString());
+                            hc.setRequestProperty("Referer", "https://live.douyin.com/");
+                            if (hc.getResponseCode() == 200) {
+                                java.io.InputStream hin = hc.getInputStream();
+                                java.io.ByteArrayOutputStream bo = new java.io.ByteArrayOutputStream();
+                                byte[] bb = new byte[65536]; int nn;
+                                while ((nn = hin.read(bb)) > 0) bo.write(bb, 0, nn);
+                                hin.close();
+                                byte[] body = bo.toByteArray();
+                                if (kbOut != null) { kbOut.write(body); kbOut.flush(); }
+                                return new android.webkit.WebResourceResponse("video/mp2t", null, new java.io.ByteArrayInputStream(body));
+                            }
+                        } catch (Throwable e) { }
+                    }
                     maybeRecordDouyin(url);
                     if (isMediaUrl(url) && recordKeys.add(url)) {
                         foundUrls.add(url);
@@ -414,6 +437,13 @@ public class SniffActivity extends Activity {
     private final java.util.List<String> douyinCands = new java.util.ArrayList<>();
     private boolean douyinPickScheduled = false;
     private final java.util.Set<String> seenMedia = new java.util.HashSet<>();
+    public static final int[] kbState = {0};
+    private static final java.util.LinkedHashSet<String> kbSeen = new java.util.LinkedHashSet<>();
+    private static java.io.FileOutputStream kbOut = null;
+    private static String kbOutName = "";
+    private static java.io.File kbDir;
+    private boolean kbArmed = false;
+
     static final String UA_MOBILE = "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36";
     private boolean douyinParsing = false;      // 对应 DK 的 parsing（抖音解析进行中）
     private String douyinLiveUrl = null;        // 当前解析的直播间地址
@@ -650,6 +680,45 @@ public class SniffActivity extends Activity {
         return "直播";
     }
 
+
+    public static void startKb(Context c) {
+        if (kbState[0] == 1) return;
+        try {
+            kbDir = new java.io.File(c.getExternalFilesDir(null), "录制/segments");
+            if (kbDir == null) return;
+            kbDir.mkdirs();
+            kbOutName = "live_kb_" + new java.text.SimpleDateFormat("yyyyMMdd_HHmmss", java.util.Locale.US)
+                .format(new java.util.Date()) + ".ts";
+            kbOut = new java.io.FileOutputStream(new java.io.File(kbDir.getParentFile(), kbOutName), true);
+            Intent svc = new Intent(c, KbRecordService.class);
+            c.startForegroundService(svc);
+            kbState[0] = 1;
+        } catch (Throwable e) { kbState[0] = 0; }
+    }
+
+    public static void stopKb() {
+        try {
+            kbState[0] = 0;
+            java.io.FileOutputStream fo = kbOut;
+            kbOut = null;
+            if (fo != null) { fo.flush(); fo.close(); }
+            if (kbOutName != null && kbDir != null) {
+                final java.io.File src = new java.io.File(kbDir.getParentFile(), kbOutName);
+                if (src.exists() && src.length() > 0) {
+                    final java.io.File tmp = new java.io.File(src.getParentFile(), "fix_tmp.ts");
+                    String[] args = { "-y", "-fflags", "+genpts", "-i", src.getAbsolutePath(),
+                        "-c", "copy", "-map", "0", "-f", "mpegts", tmp.getAbsolutePath() };
+                    com.arthenica.ffmpegkit.FFmpegKit.executeWithArgumentsAsync(args,
+                        new com.arthenica.ffmpegkit.FFmpegSessionCompleteCallback() {
+                            public void apply(com.arthenica.ffmpegkit.FFmpegSession st) {
+                                if (tmp.exists() && tmp.length() > 0) { src.delete(); tmp.renameTo(src); }
+                                else tmp.delete();
+                            }
+                        });
+                }
+            }
+        } catch (Throwable ignored) {}
+    }
     static boolean isMediaUrl(String url) {
         return MEDIA.matcher(url.toLowerCase()).find();
     }
@@ -860,13 +929,12 @@ public class SniffActivity extends Activity {
                 if (t.equals("下载")) downloadUrl(url);
                 else if (t.equals("播放")) playUrl(url);
                 else if (t.equals("直播录制")) {
-                    RecManager.lastStreamUrl = url;
-                    RecManager.init(getApplicationContext());
-                    RecManager.startRecJob(url);
-                    Toast.makeText(SniffActivity.this, "已开始录制", Toast.LENGTH_SHORT).show();
+                    kbArmed = true;
+                    Toast.makeText(SniffActivity.this, "已武装录制，出现分片即自动开始", Toast.LENGTH_SHORT).show();
                 }
                 else if (t.equals("停止录制")) {
-                    Toast.makeText(SniffActivity.this, "长按记录可停止", Toast.LENGTH_SHORT).show();
+                    stopKb();
+                    Toast.makeText(SniffActivity.this, "录制已结束（ffmpeg 重建中）", Toast.LENGTH_SHORT).show();
                 }
                 else if (t.equals("删除")) {
                     ViewGroup p = (ViewGroup) row.getParent();
