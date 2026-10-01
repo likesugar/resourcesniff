@@ -244,8 +244,15 @@ public class SniffActivity extends Activity {
         static final java.util.Set<String> parsed = new java.util.HashSet<String>();
 
         static String storedCookies(android.content.Context c) {
-            return c.getSharedPreferences("bili", android.content.Context.MODE_PRIVATE)
-                    .getString("cookies", null);
+            android.content.SharedPreferences sp =
+                    c.getSharedPreferences("bili", android.content.Context.MODE_PRIVATE);
+            long t = sp.getLong("time", 0);
+            // Cookie 有效期约 7 天：到期或无时间戳即删除，触发重新登录
+            if (t > 0 && System.currentTimeMillis() - t > 7L * 24 * 3600 * 1000) {
+                sp.edit().remove("cookies").remove("time").apply();
+                return null;
+            }
+            return sp.getString("cookies", null);
         }
 
         static void tryParse(final SniffActivity act, String pageUrl) {
