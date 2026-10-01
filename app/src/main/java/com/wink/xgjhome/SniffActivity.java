@@ -129,7 +129,7 @@ public class SniffActivity extends Activity {
             }
 
             public void onPageFinished(WebView view, String url) {
-                BiliParser.tryParse(SniffActivity.this, url);
+                BiliResolver.tryParse(SniffActivity.this, url);
                 etUrl.setText(url);
             }
         });
@@ -239,34 +239,13 @@ public class SniffActivity extends Activity {
         return null;
     }
 
-    /** B站视频解析（downkyi 思路提取）：view API 拿 cid → playurl API(fnval=16 DASH, qn=127) 取最高码率，入记录 */
-    static class BiliParser {
-        static final java.util.Map<Integer, String> QN = new java.util.HashMap<Integer, String>();
-        static {
-            QN.put(127, "8K超高清"); QN.put(126, "杜比视界"); QN.put(125, "HDR真彩");
-            QN.put(120, "4K超清"); QN.put(116, "1080P60"); QN.put(112, "1080P高码率");
-            QN.put(80, "1080P高清"); QN.put(74, "720P60"); QN.put(64, "720P高清");
-            QN.put(32, "480P清晰"); QN.put(16, "360P流畅");
-        }
+    /** B站解析（cookie 版）：登录后 SESSDATA 走 view+playurl API，DASH 标画质，durl 合并流可直接播/下 */
+    static class BiliResolver {
         static final java.util.Set<String> parsed = new java.util.HashSet<String>();
 
-        static boolean compareQ(int a, int b) {
-            return a > b;
-        }
-
-        static String httpGet(String url, String referer) throws Exception {
-            java.net.HttpURLConnection c = (java.net.HttpURLConnection) new java.net.URL(url).openConnection();
-            c.setConnectTimeout(8000); c.setReadTimeout(8000);
-            c.setRequestProperty("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36");
-            c.setRequestProperty("Referer", referer);
-            String cookie = android.webkit.CookieManager.getInstance().getCookie("https://api.bilibili.com/");
-            if (cookie != null && cookie.length() > 0) c.setRequestProperty("Cookie", cookie);
-            java.io.BufferedReader r = new java.io.BufferedReader(new java.io.InputStreamReader(c.getInputStream(), "UTF-8"));
-            StringBuilder sb = new StringBuilder();
-            String line;
-            while ((line = r.readLine()) != null) sb.append(line);
-            r.close();
-            return sb.toString();
+        static String storedCookies(android.content.Context c) {
+            return c.getSharedPreferences("bili", android.content.Context.MODE_PRIVATE)
+                    .getString("cookies", null);
         }
 
         static void tryParse(final SniffActivity act, String pageUrl) {
@@ -284,69 +263,96 @@ public class SniffActivity extends Activity {
                 final int pIdx = p;
                 if (!parsed.add(bvid + "#p" + pIdx)) return;
 
+                final String cookies = storedCookies(act);
+                if (cookies == null || !cookies.contains("SESSDATA=")) {
+                    // 首次：弹窗引导登录
+                    act.runOnUiThread(new Runnable() {
+                        @Override
+                        public void run() {
+                            new android.app.AlertDialog.Builder(act)
+                                    .setTitle("需要登录B站")
+                                    .setMessage("登录后才能解析并下载/播放最高画质，是否前往登录？")
+                                    .setNegativeButton("取消", null)
+                                    .setPositiveButton("去登录", new android.content.DialogInterface.OnClickListener() {
+                                        public void onClick(android.content.DialogInterface d, int w) {
+                                            act.startActivity(new android.content.Intent(act, BiliLoginActivity.class));
+                                        }
+                                    })
+                                    .show();
+                        }
+                    });
+                    parsed.remove(bvid + "#p" + pIdx); // 登录后重试
+                    return;
+                }
+
                 new Thread(new Runnable() {
                     @Override
                     public void run() {
                         try {
-                            // 1. view API → cid
-                            String vjson = httpGet("https://api.bilibili.com/x/web-interface/view?bvid=" + bvid,
-                                    "https://www.bilibili.com/");
+                            String vjson = httpGet("https://api.bilibili.com/x/web-interface/view?bvid=" + bvid, cookies);
                             org.json.JSONObject vroot = new org.json.JSONObject(vjson);
                             if (vroot.optInt("code", -1) != 0) return;
                             org.json.JSONArray pages = vroot.getJSONObject("data").getJSONArray("pages");
                             long cid = pages.getJSONObject(Math.min(pIdx - 1, pages.length() - 1)).getLong("cid");
                             final String title = vroot.getJSONObject("data").optString("title", "B站视频");
 
-                            // 2. playurl API（带 WebView Cookie，登录则可拿到高画质）
-                            String apiUrl = "https://api.bilibili.com/x/player/playurl?bvid=" + bvid
-                                    + "&cid=" + cid + "&qn=127&fnval=16&fourk=1";
-                            String pjson = httpGet(apiUrl, "https://www.bilibili.com/video/");
-                            org.json.JSONObject proot = new org.json.JSONObject(pjson);
-                            if (proot.optInt("code", -1) != 0) return;
-                            org.json.JSONObject pd = proot.getJSONObject("data");
-                            int qn = pd.optInt("quality", 0);
-                            String qname = QN.containsKey(qn) ? QN.get(qn) : ("qn" + qn);
+                            // DASH：只用来取最高画质标签
+                            String djson = httpGet("https://api.bilibili.com/x/player/playurl?bvid=" + bvid
+                                    + "&cid=" + cid + "&qn=127&fnval=16&fourk=1", cookies);
+                            org.json.JSONObject dd = new org.json.JSONObject(djson).getJSONObject("data");
+                            int qn = dd.optInt("quality", 0);
+                            final String qname = qnName(qn);
 
-                            String best = null; long bestBw = -1;
-                            if (pd.has("dash")) {
-                                org.json.JSONArray vids = pd.getJSONObject("dash").getJSONArray("video");
-                                for (int i = 0; i < vids.length(); i++) {
-                                    org.json.JSONObject v = vids.getJSONObject(i);
-                                    long bw = v.optLong("bandwidth", 0);
-                                    int id = v.optInt("id", 0);
-                                    // 优先画质 id 大的，同画质选码率高的
-                                    String q1 = QN.containsKey(id) ? QN.get(id) : ("qn" + id);
-                                    String q2 = QN.containsKey(qn) ? QN.get(qn) : ("qn" + qn);
-                                    boolean better = best == null || compareQ(id, qn) || (id == qn && bw > bestBw);
-                                    if (better) {
-                                        best = v.getString("baseUrl");
-                                        bestBw = bw;
-                                        qname = q1;
-                                    }
-                                }
-                            } else {
-                                org.json.JSONArray durls = pd.optJSONArray("durl");
-                                if (durls != null && durls.length() > 0) {
-                                    best = durls.getJSONObject(0).getString("url");
-                                }
+                            // durl：合并了音轨的完整流，可直接播放/下载
+                            String mjson = httpGet("https://api.bilibili.com/x/player/playurl?bvid=" + bvid
+                                    + "&cid=" + cid + "&qn=127&fnval=0&platform=html5", cookies);
+                            org.json.JSONObject md = new org.json.JSONObject(mjson).getJSONObject("data");
+                            String merged = null;
+                            org.json.JSONArray durls = md.optJSONArray("durl");
+                            if (durls != null && durls.length() > 0) {
+                                merged = durls.getJSONObject(0).optString("url",
+                                        durls.getJSONObject(0).optString("url"));
                             }
-                            if (best == null) return;
-                            final String fbest = best;
-                            final String fqn = qname;
+                            final String fmerged = merged;
                             act.runOnUiThread(new Runnable() {
                                 @Override
                                 public void run() {
-                                    String key = "bili#" + bvid + "#" + fqn;
-                                    if (!act.recordKeys.add(key)) return;
-                                    act.addRecord(fbest, "▶" + fqn + "·" + title);
+                                    String key = "bili#" + bvid + "#p" + pIdx;
+                                    if (act.recordKeys.contains(key)) return;
+                                    act.recordKeys.add(key);
+                                    String label = "▶" + qname + "·" + title;
+                                    act.addRecord(fmerged != null ? fmerged : ("RESOLVE:" + bvid + ":" + pIdx), label);
                                     if (!act.isRecordsVisible) act.toggleRecords();
                                 }
                             });
                         } catch (Exception e) { }
                     }
-
                 }).start();
             } catch (Exception e) { }
+        }
+
+        static String qnName(int qn) {
+            switch (qn) {
+                case 127: return "8K"; case 126: return "杜比"; case 125: return "HDR";
+                case 120: return "4K"; case 116: return "1080P60"; case 112: return "1080P高码率";
+                case 80: return "1080P"; case 74: return "720P60"; case 64: return "720P";
+                case 32: return "480P"; case 16: return "360P";
+                default: return "qn" + qn;
+            }
+        }
+
+        static String httpGet(String url, String cookies) throws Exception {
+            java.net.HttpURLConnection c = (java.net.HttpURLConnection) new java.net.URL(url).openConnection();
+            c.setConnectTimeout(8000); c.setReadTimeout(8000);
+            c.setRequestProperty("User-Agent", "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36");
+            c.setRequestProperty("Referer", "https://www.bilibili.com/");
+            if (cookies != null && cookies.length() > 0) c.setRequestProperty("Cookie", cookies);
+            java.io.BufferedReader r = new java.io.BufferedReader(new java.io.InputStreamReader(c.getInputStream(), "UTF-8"));
+            StringBuilder sb = new StringBuilder();
+            String line;
+            while ((line = r.readLine()) != null) sb.append(line);
+            r.close();
+            return sb.toString();
         }
     }
 

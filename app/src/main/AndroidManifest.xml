@@ -10,6 +10,7 @@
         android:theme="@style/AppTheme"
         android:allowBackup="true">
 
+        <activity android:name=".BiliLoginActivity" android:exported="false"/>
         <activity android:name=".SniffActivity"
             android:exported="false"
             android:configChanges="orientation|screenSize|screenLayout|keyboardHidden"/>
