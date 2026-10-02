@@ -948,6 +948,7 @@ public class SniffActivity extends Activity {
         boolean isDy = (title != null && title.contains("抖音")) || url.contains("douyin");
         // 兜底直链（无画质后缀）与带后缀的流并存时，只留带后缀的
         if (isDy && rank == 0 && hasHigherRank()) return;
+        if (isDy && rank == 0 && genericBase != null) return;  // 兜底只留一条(兜底/直播不重复)
         if (isDy && rank > 0 && genericBase != null && recByBase.containsKey(genericBase)) {
             dropRecord(genericBase);  // 高画质到了，删掉兜底那条
         }
