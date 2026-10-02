@@ -191,6 +191,12 @@ public class SniffActivity extends Activity {
                     if (!"http".equals(u.getScheme()) && !"https".equals(u.getScheme())) return null;
                     String url = u.toString();
                     if (url.contains("/log/")) return null;
+                    if (url.contains("guangdongvideo.com") || url.contains("live.fc2.com")) {
+                        String lu = url.toLowerCase();
+                        if (lu.contains(".m3u8") || lu.contains("playlist") || lu.contains("hls") || lu.contains(".ts")) {
+                            dumpFc2Debug("REQ: " + url);
+                        }
+                    }
                     boolean fc2Doc = (url.contains("live.fc2.com") || url.contains("guangdongvideo.com"))
                         && !url.contains(".js") && !url.contains(".css") && !url.contains(".png")
                         && !url.contains(".jpg") && !url.contains(".gif") && !url.contains(".ico");
