@@ -21,8 +21,57 @@ public class ShortcutEditActivity extends Activity {
     private EditText etName, etPkg, etCls, etData, etExtra, etCustom;
     private RadioButton rbView, rbMain, rbCustom;
     private android.widget.CheckBox cbNewTask, cbRoot;
-    private TextView iconPreview;
-    private String editKey = null;   // 编辑模式下为原条目索引键
+    private TextView iconHint;
+    private android.widget.ImageView iconView;
+    private android.graphics.Bitmap curIcon = null;   // 用户自选 > 应用图标
+    private String editKey = null;
+    private String iconPath = "";
+
+    private void pickSystemIcon() {
+        try {
+            Intent i = new Intent(Intent.ACTION_GET_CONTENT);
+            i.setType("image/*");
+            i.addCategory(Intent.CATEGORY_OPENABLE);
+            startActivityForResult(Intent.createChooser(i, "选择图标"), 7001);
+        } catch (Throwable t) { toast("无法打开系统选择器"); }
+    }
+
+    @Override
+    protected void onActivityResult(int req, int res, Intent data) {
+        super.onActivityResult(req, res, data);
+        if (req == 7001 && res == RESULT_OK && data != null && data.getData() != null) {
+            try {
+                android.graphics.BitmapFactory.Options o = new android.graphics.BitmapFactory.Options();
+                o.inJustDecodeBounds = true;
+                java.io.InputStream is = getContentResolver().openInputStream(data.getData());
+                android.graphics.BitmapFactory.decodeStream(is, null, o);
+                try { is.close(); } catch (Throwable ignored) {}
+                int size = Math.max(o.outWidth, o.outHeight);
+                int sample = 1;
+                while (size / sample > 192) sample *= 2;
+                o = new android.graphics.BitmapFactory.Options();
+                o.inSampleSize = sample;
+                is = getContentResolver().openInputStream(data.getData());
+                android.graphics.Bitmap bm = android.graphics.BitmapFactory.decodeStream(is, null, o);
+                try { is.close(); } catch (Throwable ignored) {}
+                if (bm != null) {
+                    curIcon = bm;
+                    iconView.setImageBitmap(bm);
+                    iconHint.setText("已使用自选图标");
+                }
+            } catch (Throwable t) { toast("读取图片失败"); }
+        }
+    }
+
+    private android.graphics.Bitmap iconToBitmap(Drawable d) {
+        int w = d.getIntrinsicWidth() > 0 ? d.getIntrinsicWidth() : 96;
+        int h = d.getIntrinsicHeight() > 0 ? d.getIntrinsicHeight() : 96;
+        android.graphics.Bitmap bm = android.graphics.Bitmap.createBitmap(w, h, android.graphics.Bitmap.Config.ARGB_8888);
+        android.graphics.Canvas cv = new android.graphics.Canvas(bm);
+        d.setBounds(0, 0, w, h);
+        d.draw(cv);
+        return bm;
+    }
 
     @Override
     protected void onCreate(Bundle b) {
@@ -83,14 +132,21 @@ public class ShortcutEditActivity extends Activity {
         body.setOrientation(LinearLayout.VERTICAL);
         body.setPadding(dp(14), dp(8), dp(14), dp(14));
 
-        iconPreview = new TextView(this);
-        iconPreview.setText("快捷方式的图标(点击更换)");
-        iconPreview.setTextColor(0xFF8A919E);
-        iconPreview.setTextSize(13);
-        iconPreview.setGravity(Gravity.CENTER);
-        iconPreview.setPadding(0, dp(4), 0, dp(4));
-        iconPreview.setOnClickListener(new View.OnClickListener() { public void onClick(View v) { pickApp(); } });
-        body.addView(iconPreview);
+        iconHint = new TextView(this);
+        iconHint.setText("快捷方式的图标(点击从系统选择)");
+        iconHint.setTextColor(0xFF8A919E);
+        iconHint.setTextSize(13);
+        iconHint.setGravity(Gravity.CENTER);
+        iconHint.setPadding(0, dp(4), 0, dp(4));
+        body.addView(iconHint);
+        iconView = new android.widget.ImageView(this);
+        iconView.setScaleType(android.widget.ImageView.ScaleType.FIT_CENTER);
+        LinearLayout.LayoutParams ivp = new LinearLayout.LayoutParams(dp(64), dp(64));
+        ivp.gravity = Gravity.CENTER_HORIZONTAL;
+        iconView.setLayoutParams(ivp);
+        iconView.setOnClickListener(new View.OnClickListener() { public void onClick(View v) { pickSystemIcon(); } });
+        body.addView(iconView);
+        if (curIcon != null) iconView.setImageBitmap(curIcon);
 
         etName = field(body, "名称");
         etPkg = field(body, "包名");
@@ -98,23 +154,10 @@ public class ShortcutEditActivity extends Activity {
             public void beforeTextChanged(CharSequence c, int a, int s2, int d2) { }
             public void onTextChanged(CharSequence c, int a, int s2, int d2) { }
             public void afterTextChanged(android.text.Editable e) {
+                if (curIcon != null) return;  // 用户自选图标优先
                 try {
-                    Drawable d2 = getPackageManager().getApplicationIcon(e.toString());
-                    int w = d2.getIntrinsicWidth() > 0 ? d2.getIntrinsicWidth() : 96;
-                    android.graphics.Bitmap bm = android.graphics.Bitmap.createBitmap(w,
-                        d2.getIntrinsicHeight() > 0 ? d2.getIntrinsicHeight() : 96, android.graphics.Bitmap.Config.ARGB_8888);
-                    android.graphics.Canvas cv = new android.graphics.Canvas(bm);
-                    d2.setBounds(0, 0, bm.getWidth(), bm.getHeight());
-                    d2.draw(cv);
-                    iconPreview.setBackgroundResource(0);
-                    iconPreview.setText("");
-                    android.widget.ImageView iv = new android.widget.ImageView(ShortcutEditActivity.this);
-                    iv.setImageBitmap(bm);
-                    iv.setScaleType(android.widget.ImageView.ScaleType.FIT_CENTER);
-                    body.removeView(iconPreview);
-                    body.addView(iv, body.indexOfChild(etName));
-                    iconPreview = null;
-                    iv.setOnClickListener(new View.OnClickListener() { public void onClick(View v) { pickApp(); } });
+                    curIcon = iconToBitmap(getPackageManager().getApplicationIcon(e.toString()));
+                    iconView.setImageBitmap(curIcon);
                 } catch (Throwable ignored) {}
             }
         });
@@ -167,6 +210,13 @@ public class ShortcutEditActivity extends Activity {
                     if (it.length > 6) etCustom.setText(it[6]); }
                 if (it.length > 7) cbNewTask.setChecked(!it[7].equals("0"));
                 if (it.length > 8) cbRoot.setChecked(it[8].equals("1"));
+                if (it.length > 10 && it[10].length() > 0) {
+                    iconPath = it[10];
+                    try {
+                        android.graphics.Bitmap bm2 = android.graphics.BitmapFactory.decodeFile(iconPath);
+                        if (bm2 != null) { curIcon = bm2; iconView.setImageBitmap(bm2); iconHint.setText("已使用自选图标"); }
+                    } catch (Throwable ignored) {}
+                }
             }
         }
     }
@@ -262,6 +312,18 @@ public class ShortcutEditActivity extends Activity {
         if (name.length() == 0 || pkg.length() == 0) { toast("名称和包名不能为空"); return; }
         String rec = joinFields();
         String key = editKey != null ? editKey : ("s" + System.currentTimeMillis());
+        if (curIcon != null) {
+            try {
+                java.io.File idir = new java.io.File(getFilesDir(), "sc_icons");
+                idir.mkdirs();
+                java.io.File ifile = new java.io.File(idir, key + ".png");
+                java.io.FileOutputStream fo = new java.io.FileOutputStream(ifile);
+                curIcon.compress(android.graphics.Bitmap.CompressFormat.PNG, 90, fo);
+                fo.close();
+                iconPath = ifile.getAbsolutePath();
+                rec = joinFields();  // 重新生成含路径的记录
+            } catch (Throwable ignored) {}
+        }
         ShortcutActivity.saveByKey(this, key, rec);
         if (alsoPin) {
             Intent i = buildIntent(false);
@@ -269,8 +331,10 @@ public class ShortcutEditActivity extends Activity {
                 try {
                     android.content.pm.ShortcutManager sm = (android.content.pm.ShortcutManager) getSystemService(SHORTCUT_SERVICE);
                     if (sm != null && sm.isRequestPinShortcutSupported()) {
-                        android.content.pm.ShortcutInfo si = new android.content.pm.ShortcutInfo.Builder(this, key)
-                            .setShortLabel(name).setLongLabel(name).setIntent(i).build();
+                        android.content.pm.ShortcutInfo.Builder sb2 = new android.content.pm.ShortcutInfo.Builder(this, key)
+                            .setShortLabel(name).setLongLabel(name).setIntent(i);
+                        if (curIcon != null) sb2.setIcon(android.graphics.drawable.Icon.createWithBitmap(curIcon));
+                        android.content.pm.ShortcutInfo si = sb2.build();
                         sm.requestPinShortcut(si, null);
                     } else toast("桌面不支持固定快捷方式");
                 } catch (Throwable t) { toast("固定失败: " + t.getClass().getSimpleName()); }
@@ -292,7 +356,8 @@ public class ShortcutEditActivity extends Activity {
             + etExtra.getText().toString().trim() + "\u0001"
             + am2 + "\u0001" + cu + "\u0001"
             + (cbNewTask.isChecked() ? "1" : "0") + "\u0001"
-            + (cbRoot.isChecked() ? "1" : "0");
+            + (cbRoot.isChecked() ? "1" : "0") + "\u0001"
+            + iconPath;
     }
 
     private void toast(String s2) { Toast.makeText(this, s2, Toast.LENGTH_SHORT).show(); }

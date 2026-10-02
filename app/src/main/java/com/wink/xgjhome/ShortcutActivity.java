@@ -81,8 +81,10 @@ public class ShortcutActivity extends Activity {
         }, null));
         for (final String[] us : userShortcuts()) {
             final String key = us[9];
-            String ic = us[0].length() > 0 ? us[0].substring(0, 1) : "?";
-            cells.add(smallCard(ic, us[0], new View.OnClickListener() {
+            String iconPath = us.length > 10 ? us[10] : "";
+            android.graphics.Bitmap bmp = iconPath.length() > 0 ? android.graphics.BitmapFactory.decodeFile(iconPath) : null;
+            final View iconCell = bmp != null ? iconImage(bmp) : iconText(us[0].length() > 0 ? us[0].substring(0, 1) : "?");
+            cells.add(smallCardEx(iconCell, us[0], new View.OnClickListener() {
                 public void onClick(View v) { launchShortcut(us); }
             }, new View.OnLongClickListener() {
                 public boolean onLongClick(View v) { itemMenu(us, key); return true; }
@@ -101,20 +103,24 @@ public class ShortcutActivity extends Activity {
     }
 
     private View smallCard(String icon, String name, View.OnClickListener click, View.OnLongClickListener longClick) {
-        LinearLayout card = new LinearLayout(this);
-        card.setOrientation(LinearLayout.VERTICAL);
-        card.setGravity(Gravity.CENTER);
-        card.setBackgroundColor(Color0.card());
-        int pad = dp(14);
-        card.setPadding(pad, pad, pad, pad);
         TextView ic = new TextView(this);
         ic.setText(icon);
         ic.setTextSize(20);
         ic.setGravity(Gravity.CENTER);
         ic.setTextColor(Color0.text());
         ic.setBackgroundColor(Color0.btnBg());
+        return smallCardEx(ic, name, click, longClick);
+    }
+
+    private View smallCardEx(View iconCell, String name, View.OnClickListener click, View.OnLongClickListener longClick) {
+        LinearLayout card = new LinearLayout(this);
+        card.setOrientation(LinearLayout.VERTICAL);
+        card.setGravity(Gravity.CENTER);
+        card.setBackgroundColor(Color0.card());
+        int pad = dp(14);
+        card.setPadding(pad, pad, pad, pad);
         LinearLayout.LayoutParams ilp = new LinearLayout.LayoutParams(dp(40), dp(40));
-        card.addView(ic, ilp);
+        card.addView(iconCell, ilp);
         TextView tv = new TextView(this);
         tv.setText(name);
         tv.setTextSize(13);
@@ -242,6 +248,23 @@ public class ShortcutActivity extends Activity {
         e.apply();
     }
 
+    private View iconText(String t) {
+        TextView tv = new TextView(this);
+        tv.setText(t);
+        tv.setTextSize(20);
+        tv.setGravity(Gravity.CENTER);
+        tv.setTextColor(Color0.text());
+        tv.setBackgroundColor(Color0.btnBg());
+        return tv;
+    }
+
+    private View iconImage(android.graphics.Bitmap bm) {
+        android.widget.ImageView iv = new android.widget.ImageView(this);
+        iv.setScaleType(android.widget.ImageView.ScaleType.FIT_CENTER);
+        iv.setImageBitmap(bm);
+        return iv;
+    }
+
     private java.util.ArrayList<String[]> userShortcuts() {
         java.util.ArrayList<String[]> out = new java.util.ArrayList<String[]>();
         try {
@@ -252,8 +275,8 @@ public class ShortcutActivity extends Activity {
                 if (raw == null) continue;
                 String[] p2 = raw.split("\\u0001");
                 if (p2.length >= 3) {
-                    String[] full = new String[10];
-                    for (int j2 = 0; j2 < 10; j2++) full[j2] = j2 < p2.length ? p2[j2] : (j2 == 7 ? "1" : "");
+                    String[] full = new String[11];
+                    for (int j2 = 0; j2 < 11; j2++) full[j2] = j2 < p2.length ? p2[j2] : (j2 == 7 ? "1" : "");
                     if (full[9].length() == 0) full[9] = "s" + i;
                     out.add(full);
                 }
@@ -269,7 +292,7 @@ public class ShortcutActivity extends Activity {
             for (int i = 0; i < list.size(); i++) {
                 String[] it = list.get(i);
                 StringBuilder sb = new StringBuilder();
-                for (int j = 0; j < 10; j++) {
+                for (int j = 0; j < 11; j++) {
                     if (j > 0) sb.append("\\u0001");
                     String v = (j < it.length && it[j] != null) ? it[j] : "";
                     if (v.length() == 0 && j == 7) v = "1";
