@@ -1119,6 +1119,17 @@ public class SniffActivity extends Activity {
     void playUrl(String url) {
         // FC2 中转流：IJK 播不了，走系统播放器
         if (url != null && url.contains("127.0.0.1:8123/relay")) {
+            // 1) 优先 Via 浏览器（实测能播这路流）
+            for (String pkg : new String[]{"mark.via.gp", "mark.via"}) {
+                try {
+                    android.content.Intent vi = new android.content.Intent(Intent.ACTION_VIEW);
+                    vi.setPackage(pkg);
+                    vi.setDataAndType(android.net.Uri.parse(url), "application/x-mpegURL");
+                    vi.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                    if (vi.resolveActivity(getPackageManager()) != null) { startActivity(vi); return; }
+                } catch (Throwable ignored) {}
+            }
+            // 2) 系统播放器
             String[] types = {"application/x-mpegURL", "video/*"};
             for (String tp : types) {
                 try {
