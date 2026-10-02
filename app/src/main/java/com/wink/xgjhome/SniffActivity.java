@@ -1117,6 +1117,24 @@ public class SniffActivity extends Activity {
 
     /** 内置 jessibuca 播放器：player.html 通过 AndroidPlayer 桥取地址 */
     void playUrl(String url) {
+        // FC2 中转流：IJK 播不了，走系统播放器
+        if (url != null && url.contains("127.0.0.1:8123/relay")) {
+            try {
+                android.content.Intent i = new android.content.Intent(Intent.ACTION_VIEW);
+                i.setDataAndType(android.net.Uri.parse(url), "application/x-mpegURL");
+                i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                startActivity(i);
+                return;
+            } catch (Throwable e) {
+                try {
+                    android.content.Intent i2 = new android.content.Intent(Intent.ACTION_VIEW);
+                    i2.setDataAndType(android.net.Uri.parse(url), "video/*");
+                    i2.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                    startActivity(i2);
+                    return;
+                } catch (Throwable ignored) {}
+            }
+        }
         try {
             finish(); // 播放前先退出资源嗅探
             playerUrl = url;
