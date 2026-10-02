@@ -214,6 +214,24 @@ public class LiveProxy {
                 return;
             }
 
+            if (path.startsWith("/fc2.flv")) {
+                // FC2 中转：先回 HTTP 头，再挂到 Fc2Relay 广播（tap 会先补 FLV 头）
+                OutputStream cOs = s.getOutputStream();
+                try {
+                    String hl2;
+                    while ((hl2 = br.readLine()) != null && !hl2.isEmpty()) { }
+                    cOs.write("HTTP/1.1 200 OK\r\nContent-Type: video/x-flv\r\nConnection: close\r\n\r\n".getBytes());
+                    cOs.flush();
+                    if (!Fc2Relay.tap(cOs)) return;  // 未连接：404 由断开体现
+                    while (Fc2Relay.isConnected() && !s.isClosed()) Thread.sleep(200);
+                } catch (Throwable ignored) {
+                } finally {
+                    try { Fc2Relay.untap(cOs); } catch (Throwable ignored) {}
+                    try { s.close(); } catch (Throwable ignored) {}
+                }
+                return;
+            }
+
             if (path.startsWith("/bili")) {
                 // B站中转：u=原始媒体地址，带 B站 Referer/UA；流式转发 + Range 支持
                 try {

@@ -125,6 +125,17 @@ public class SniffActivity extends Activity {
                 if (js != null) sb.append(js);
                 return sb.toString();
             }
+            @android.webkit.JavascriptInterface
+            public void onWsUrl(String u) {
+                if (u == null || !u.contains("ws.php")) return;
+                Fc2Relay.start(u);
+                if (!fc2Added.getAndSet(true)) {
+                    main.post(new Runnable() { public void run() {
+                        addRecord("http://127.0.0.1:8123/fc2.flv", "FC2·直播");
+                        if (!isRecordsVisible) toggleRecords();
+                    }});
+                }
+            }
         }, "AndroidPlayer");
 
         webView.setWebChromeClient(new WebChromeClient());
@@ -200,6 +211,9 @@ public class SniffActivity extends Activity {
             public void onPageFinished(WebView view, String url) {
                 if (url != null && (url.contains("douyin.com") || url.contains("iesdouyin"))) {
                     injectDouyinScript();
+                }
+                if (url != null && (url.contains("live.fc2.com") || url.contains("guangdongvideo.com"))) {
+                    injectFc2Hook();
                 }
                 // DK：直播房间页 → 持续解析（reload 由看门狗触发，回到这里重新武装提取）
                 if (url != null && url.contains("live.douyin.com")) {
@@ -533,6 +547,23 @@ public class SniffActivity extends Activity {
             main.postDelayed(this, 1000);
         }
     };
+
+    private final java.util.concurrent.atomic.AtomicBoolean fc2Added = new java.util.concurrent.atomic.AtomicBoolean(false);
+
+    /** FC2：钩住页面 WebSocket 拿 ws-flv 地址 */
+    void injectFc2Hook() {
+        fc2Added.set(false);
+        String js = "(function(){if(window.__fc2Hooked)return;window.__fc2Hooked=1;"
+            + "var OW=window.WebSocket;"
+            + "function NW(u,p){try{AndroidPlayer.onWsUrl(String(u));}catch(e){}"
+            + "if(p===undefined)return new OW(u);return new OW(u,p);}"
+            + "NW.prototype=OW.prototype;NW.CONNECTING=OW.CONNECTING;NW.OPEN=OW.OPEN;NW.CLOSING=OW.CLOSING;NW.CLOSED=OW.CLOSED;"
+            + "window.WebSocket=NW;})();";
+        try { webView.evaluateJavascript(js, null); } catch (Throwable ignored) {}
+        main.postDelayed(new Runnable() { public void run() {
+            try { webView.evaluateJavascript("(function(){window.__fc2Hooked=0;})();", null); } catch (Throwable ignored) {}
+        }}, 8000);
+    }
 
     void startDouyinWatchdog() {
         main.removeCallbacks(douyinWatchdog);
