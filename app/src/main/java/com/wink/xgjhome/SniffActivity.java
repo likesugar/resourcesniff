@@ -89,7 +89,7 @@ public class SniffActivity extends Activity {
         btnSwitchUa = findViewById(R.id.btn_switch_ua);
         Button btnGo = findViewById(R.id.btn_go);
         Button btnRecords = findViewById(R.id.btn_records);
-        Button btnRefresh = findViewById(R.id.btn_refresh);
+        btnRefresh = findViewById(R.id.btn_refresh);
         btnRefresh.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
@@ -1066,18 +1066,8 @@ public class SniffActivity extends Activity {
     }
 
     void downloadUrl(String url) {
-        try {
-            android.app.DownloadManager.Request req = new android.app.DownloadManager.Request(android.net.Uri.parse(url));
-            String rf = refererFor(url);
-            if (rf != null) req.addRequestHeader("Referer", rf);
-            req.setNotificationVisibility(android.app.DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED);
-            req.setDestinationInExternalPublicDir(android.os.Environment.DIRECTORY_MOVIES,
-                    "资源嗅探_" + System.currentTimeMillis() + ".ts");
-            ((android.app.DownloadManager) getSystemService(DOWNLOAD_SERVICE)).enqueue(req);
-            Toast.makeText(this, "已加入下载（Movies）", Toast.LENGTH_SHORT).show();
-        } catch (Exception e) {
-            Toast.makeText(this, "下载失败: " + e.getMessage(), Toast.LENGTH_LONG).show();
-        }
+        try { DlManager.start(url); } catch (Throwable e) { }
+        Toast.makeText(this, "已加入下载，可在下载页查看", Toast.LENGTH_SHORT).show();
     }
 
     void startRecord(final String url) {

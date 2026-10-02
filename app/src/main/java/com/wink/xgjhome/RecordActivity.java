@@ -24,10 +24,32 @@ public class RecordActivity extends Activity {
     private Runnable tick;
     private LinearLayout list;
     private TextView tvEmpty;
+    private TextView[] tabBtns;
+    private View[] tabLines;
+    private int curTab = 0;  // 0全部 1视频 2录制 3下载
+
+    private void restyleTabs() {
+        for (int i = 0; i < tabBtns.length; i++) {
+            boolean sel = i == curTab;
+            tabBtns[i].setTextColor(sel ? Color.WHITE : 0xFF8A919E);
+            tabBtns[i].setTypeface(sel ? Typeface.DEFAULT_BOLD : Typeface.DEFAULT);
+            tabLines[i].setBackgroundColor(sel ? 0xFF3D7BFF : 0x00000000);
+        }
+    }
+
+    private static String dlInfo(DlManager.DlJob j) {
+        if (j.active && !j.failed) {
+            String sz = fmtSize(j.doneBytes) + (j.total > 0 ? " / " + fmtSize(j.total) : "");
+            return "下载大小: " + sz + "\n状态: 下载中";
+        }
+        if (j.failed) return "下载大小: " + fmtSize(j.doneBytes) + "\n状态: " + j.state;
+        return "下载大小: " + fmtSize(j.doneBytes) + "\n状态: " + j.state;
+    }
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        DlManager.init(this);
         FrameLayout root = new FrameLayout(this);
         root.setBackgroundColor(Color.BLACK);
 
@@ -78,6 +100,39 @@ public class RecordActivity extends Activity {
         head.addView(recNow);
         col.addView(head);
 
+        // 扁平化顶部导航栏：全部/视频/录制/下载
+        LinearLayout tabBar = new LinearLayout(this);
+        tabBar.setOrientation(LinearLayout.HORIZONTAL);
+        tabBar.setPadding(0, 0, 0, 16);
+        final String[] tabs = {"全部", "视频", "录制", "下载"};
+        tabBtns = new TextView[tabs.length];
+        tabLines = new View[tabs.length];
+        for (int i = 0; i < tabs.length; i++) {
+            final int idx = i;
+            LinearLayout tc = new LinearLayout(this);
+            tc.setOrientation(LinearLayout.VERTICAL);
+            tc.setGravity(Gravity.CENTER_HORIZONTAL);
+            LinearLayout.LayoutParams tlp = new LinearLayout.LayoutParams(0, -2, 1f);
+            tc.setLayoutParams(tlp);
+            TextView tb = new TextView(this);
+            tb.setText(tabs[i]);
+            tb.setTextSize(15);
+            tb.setGravity(Gravity.CENTER);
+            tb.setPadding(0, 16, 0, 12);
+            tb.setOnClickListener(new View.OnClickListener() {
+                public void onClick(View v) { curTab = idx; restyleTabs(); rebuild(); }
+            });
+            View line = new View(this);
+            line.setBackgroundColor(0x00000000);
+            tc.addView(tb, new LinearLayout.LayoutParams(-1, -2));
+            tc.addView(line, new LinearLayout.LayoutParams(-1, 4));
+            tabBtns[i] = tb;
+            tabLines[i] = line;
+            tabBar.addView(tc);
+        }
+        restyleTabs();
+        col.addView(tabBar);
+
         tvEmpty = new TextView(this);
         tvEmpty.setText("暂无录制任务");
         tvEmpty.setTextColor(0xFF8A919E);
@@ -121,36 +176,141 @@ public class RecordActivity extends Activity {
     private final java.util.HashMap<String, TextView> rowInfo = new java.util.HashMap<String, TextView>();
 
     private void rebuild() {
-        int n = RecManager.recJobs.size() + RecManager.stoppedJobs.size();
-        tvEmpty.setVisibility(n == 0 ? View.VISIBLE : View.GONE);
-        final java.util.LinkedHashMap<String, RecManager.RecJob> jobs = new java.util.LinkedHashMap<String, RecManager.RecJob>();
-        final java.util.HashMap<String, Boolean> liveMap = new java.util.HashMap<String, Boolean>();
-        java.util.ArrayList<String> ids = new java.util.ArrayList<String>();
-        for (RecManager.RecJob j : RecManager.recJobs.values()) { ids.add("" + j.id); jobs.put("" + j.id, j); liveMap.put("" + j.id, true); }
-        for (RecManager.RecJob j : RecManager.stoppedJobs.values()) { if (!jobs.containsKey("" + j.id)) { ids.add("" + j.id); jobs.put("" + j.id, j); } liveMap.put("" + j.id, false); }
-        // 稳定顺序：新任务追加到末尾，消失的任务移除，已有任务位置永不变
+        // key -> [type(0录制/1下载), job, live]
+        final java.util.LinkedHashMap<String, Object[]> meta = new java.util.LinkedHashMap<String, Object[]>();
+        for (RecManager.RecJob j : RecManager.recJobs.values()) meta.put("R" + j.id, new Object[]{0, j, (Boolean) j.active});
+        for (RecManager.RecJob j : RecManager.stoppedJobs.values()) if (!meta.containsKey("R" + j.id)) meta.put("R" + j.id, new Object[]{0, j, Boolean.FALSE});
+        for (DlManager.DlJob j : DlManager.jobs()) meta.put("D" + j.id, new Object[]{1, j, Boolean.FALSE});
+
+        // 分类：录制中/下载中 → 下载；录制完成/暂停 → 录制；下载完成 → 视频
+        java.util.HashMap<String, String> cat = new java.util.HashMap<String, String>();
+        for (java.util.Map.Entry<String, Object[]> e : meta.entrySet()) {
+            int type = (Integer) e.getValue()[0];
+            boolean live = (Boolean) e.getValue()[2];
+            cat.put(e.getKey(), type == 1 ? (((DlManager.DlJob) e.getValue()[1]).active ? "下载" : "视频")
+                                          : (live ? "下载" : "录制"));
+        }
+        String want = new String[]{"全部", "视频", "录制", "下载"}[curTab];
+
+        // 稳定顺序
         java.util.ArrayList<String> order = new java.util.ArrayList<String>(rowOrder);
-        order.retainAll(ids);
-        for (String id : ids) if (!order.contains(id)) order.add(id);
-        if (order.equals(rowOrder)) {  // 结构没变只更新文字，不闪
-            for (String key : order) {
-                TextView tv = rowInfo.get(key);
-                if (tv != null) tv.setText(buildInfo(jobs.get(key), liveMap.get(key)));
+        order.retainAll(meta.keySet());
+        for (String k : meta.keySet()) if (!order.contains(k)) order.add(k);
+        rowOrder.clear(); rowOrder.addAll(order);
+
+        // 当前tab要显示的
+        java.util.ArrayList<String> shown = new java.util.ArrayList<String>();
+        for (String k : order) if (want.equals("全部") || want.equals(cat.get(k))) shown.add(k);
+        tvEmpty.setVisibility(shown.isEmpty() ? View.VISIBLE : View.GONE);
+
+        // 已显示行 == 当前应显示行 → 只刷文字
+        java.util.ArrayList<String> curRows = new java.util.ArrayList<String>();
+        for (int i = 0; i < list.getChildCount(); i++) {
+            Object t = list.getChildAt(i).getTag();
+            if (t instanceof String) curRows.add((String) t);
+        }
+        if (curRows.equals(shown)) {
+            for (String key : shown) {
+                Runnable u = rowUpdaters.get(key);
+                if (u != null) u.run();
             }
-            rowOrder.clear(); rowOrder.addAll(order);
             return;
         }
         list.removeAllViews();
-        rowInfo.clear();
-        rowOrder.clear();
-        rowOrder.addAll(order);
-        for (String key : order) {
-            RecManager.RecJob j = jobs.get(key);
-            boolean live = liveMap.get(key);
+        rowUpdaters.clear();
+        for (String key : shown) {
+            Object[] m = meta.get(key);
             java.util.concurrent.atomic.AtomicReference<TextView> infoRef = new java.util.concurrent.atomic.AtomicReference<TextView>();
-            addRow(list, j, live, infoRef);
-            rowInfo.put(key, infoRef.get());
+            LinearLayout row;
+            if ((Integer) m[0] == 0) {
+                RecManager.RecJob j = (RecManager.RecJob) m[1];
+                final boolean live = (Boolean) m[2];
+                addRow(list, j, live, infoRef);
+                row = (LinearLayout) list.getChildAt(list.getChildCount() - 1);
+                final RecManager.RecJob fj = j;
+                rowUpdaters.put(key, new Runnable() { public void run() { if (infoRef.get() != null) infoRef.get().setText(buildInfo(fj, live)); } });
+            } else {
+                final DlManager.DlJob j = (DlManager.DlJob) m[1];
+                addDlRow(list, j, infoRef);
+                row = (LinearLayout) list.getChildAt(list.getChildCount() - 1);
+            }
+            row.setTag(key);
         }
+    }
+
+    private final java.util.HashMap<String, Runnable> rowUpdaters = new java.util.HashMap<String, Runnable>();
+
+    private void addDlRow(LinearLayout parent, final DlManager.DlJob j, final java.util.concurrent.atomic.AtomicReference<TextView> infoRef) {
+        LinearLayout row = new LinearLayout(this);
+        row.setOrientation(LinearLayout.HORIZONTAL);
+        row.setGravity(Gravity.CENTER_VERTICAL);
+        row.setPadding(0, 24, 0, 24);
+        FrameLayout thumb = new FrameLayout(this);
+        LinearLayout.LayoutParams tp = new LinearLayout.LayoutParams(140, 90);
+        tp.rightMargin = 24;
+        thumb.setLayoutParams(tp);
+        thumb.setBackgroundColor(0xFF1E242E);
+        TextView play = new TextView(this);
+        play.setText("⇣");
+        play.setTextColor(0xFF8A919E);
+        play.setGravity(Gravity.CENTER);
+        thumb.addView(play, new FrameLayout.LayoutParams(-1, -1));
+        row.addView(thumb);
+        LinearLayout mid = new LinearLayout(this);
+        mid.setOrientation(LinearLayout.VERTICAL);
+        LinearLayout.LayoutParams mp = new LinearLayout.LayoutParams(0, -2);
+        mp.weight = 1;
+        mid.setLayoutParams(mp);
+        TextView tvName = new TextView(this);
+        tvName.setText(j.title);
+        tvName.setTextColor(Color.WHITE);
+        tvName.setTextSize(16);
+        tvName.setTypeface(Typeface.DEFAULT_BOLD);
+        tvName.setSingleLine(true);
+        mid.addView(tvName);
+        TextView tvInfo = new TextView(this);
+        tvInfo.setText(dlInfo(j));
+        tvInfo.setTextColor(0xFF8A919E);
+        tvInfo.setTextSize(13);
+        tvInfo.setLineSpacing(4, 1);
+        mid.addView(tvInfo);
+        row.addView(mid);
+        TextView more = new TextView(this);
+        more.setText("⋮");
+        more.setTextColor(Color.WHITE);
+        more.setTextSize(22);
+        more.setGravity(Gravity.CENTER);
+        more.setPadding(24, 24, 24, 24);
+        more.setOnClickListener(new View.OnClickListener() {
+            public void onClick(View v) { showDlMenu(v, j); }
+        });
+        row.addView(more);
+        parent.addView(row);
+        infoRef.set(tvInfo);
+    }
+
+    private void showDlMenu(View anchor, final DlManager.DlJob j) {
+        PopupMenu pm = new PopupMenu(this, anchor);
+        if (j.active) pm.getMenu().add("取消");
+        if (j.done) pm.getMenu().add("播放");
+        pm.getMenu().add("删除");
+        pm.setOnMenuItemClickListener(new PopupMenu.OnMenuItemClickListener() {
+            public boolean onMenuItemClick(android.view.MenuItem it) {
+                String t = it.getTitle().toString();
+                if (t.equals("取消")) DlManager.cancel(j.id);
+                else if (t.equals("播放")) {
+                    try {
+                        Intent i = new Intent(Intent.ACTION_VIEW);
+                        i.setDataAndType(android.net.Uri.parse("file://" + j.file.getAbsolutePath()), "video/mp2t");
+                        i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_GRANT_READ_URI_PERMISSION);
+                        startActivity(i);
+                    } catch (Throwable e) { Toast.makeText(RecordActivity.this, "打不开", Toast.LENGTH_SHORT).show(); }
+                } else if (t.equals("删除")) { DlManager.cancel(j.id); }
+                rebuild();
+                return true;
+            }
+        });
+        pm.show();
     }
 
     // 按抖音流地址后缀标注画质：优先原画 > 蓝光 > 高清，其余不标
