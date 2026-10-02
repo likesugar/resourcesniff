@@ -314,6 +314,7 @@ public class RecManager {
             job.active = true;
             job.paused = false;
             job.state = null;
+            job.startTs = System.currentTimeMillis();  // 续录时长继续走
             recJobs.put(job.id, job);
             acquireWake();
             startBgPlayer(job);
@@ -462,20 +463,30 @@ public class RecManager {
         } catch (Throwable e) { return -1; }
     }
 
+    static volatile int bgGen = 0;  // 会话代号：旧会话回调不作数
+
     static void startBgSession(final RecJob job) {
+        final int gen = ++bgGen;
         bgCancel = false;
+        // 续录：分段号接着已有 seg 继续编，避免覆盖旧分段
+        int segN = 0;
+        try {
+            java.io.File[] fs = job.file.listFiles();
+            if (fs != null) for (java.io.File f : fs) if (f.getName().startsWith("seg")) segN++;
+        } catch (Throwable ignored) {}
         String[] args = { "-y", "-user_agent", BG_UA,
             "-headers", "Referer: https://live.douyin.com/\r\n",
             "-i", job.url, "-c", "copy",
             "-f", "segment", "-segment_time", "30", "-reset_timestamps", "1",
+            "-segment_start_number", String.valueOf(segN),
             new java.io.File(job.file, "seg%03d.ts").getAbsolutePath() };
         bgSession = com.arthenica.ffmpegkit.FFmpegKit.executeWithArgumentsAsync(args,
             new com.arthenica.ffmpegkit.FFmpegSessionCompleteCallback() {
                 public void apply(com.arthenica.ffmpegkit.FFmpegSession st) {
-                    if (bgCancel) return;
+                    if (gen != bgGen || bgCancel) return;  // 旧会话/已暂停：直接作废
                     if (job.active) {
                         try { Thread.sleep(1000); } catch (Throwable e) { }
-                        if (job.active) startBgSession(job);  // 断流自动重连续录
+                        if (job.active && gen == bgGen) startBgSession(job);  // 断流自动重连续录
                     }
                 }
             });
