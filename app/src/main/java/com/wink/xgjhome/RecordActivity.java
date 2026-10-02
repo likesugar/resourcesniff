@@ -14,18 +14,8 @@ import android.widget.FrameLayout;
 import android.widget.LinearLayout;
 import android.widget.PopupMenu;
 import android.widget.ScrollView;
-import android.widget.EditText;
 import android.widget.TextView;
 import android.widget.Toast;
-import android.content.DialogInterface;
-import android.content.Intent;
-import android.content.pm.PackageManager;
-import android.content.pm.ResolveInfo;
-import android.content.pm.ShortcutInfo;
-import android.content.pm.ShortcutManager;
-import android.graphics.Bitmap;
-import android.graphics.Canvas;
-import android.graphics.drawable.Drawable;
 
 /** 录制下载页：一列任务，右侧 ⋮ 弹菜单（开始/播放/结束录制/取消） */
 public class RecordActivity extends Activity {
@@ -107,19 +97,6 @@ public class RecordActivity extends Activity {
             }
         });
         head.addView(recNow);
-        TextView scBtn = new TextView(this);
-        scBtn.setText("创建快捷方式");
-        scBtn.setTextColor(Color.WHITE);
-        scBtn.setTextSize(14);
-        scBtn.setPadding(20, 12, 20, 12);
-        LinearLayout.LayoutParams sp = new LinearLayout.LayoutParams(-2, -2);
-        sp.leftMargin = 16;
-        scBtn.setLayoutParams(sp);
-        scBtn.setBackgroundColor(0xFF3A5A40);
-        scBtn.setOnClickListener(new View.OnClickListener() {
-            public void onClick(View v) { showShortcutDialog(); }
-        });
-        head.addView(scBtn);
         col.addView(head);
 
         // 扁平化顶部导航栏：全部/视频/录制/下载
@@ -169,20 +146,6 @@ public class RecordActivity extends Activity {
         sv.addView(col);
         root.addView(sv);
         setContentView(root);
-
-        TextView shortcutCard = new TextView(this);
-        shortcutCard.setText("⚡ 创建快捷方式");
-        shortcutCard.setTextColor(Color.WHITE);
-        shortcutCard.setTextSize(15);
-        shortcutCard.setPadding(28, 24, 28, 24);
-        shortcutCard.setBackgroundColor(0xFF1E242E);
-        shortcutCard.setOnClickListener(new View.OnClickListener() {
-            public void onClick(View v) { showShortcutDialog(); }
-        });
-        col.addView(shortcutCard, 0);
-        LinearLayout.LayoutParams scp = new LinearLayout.LayoutParams(-1, -2);
-        scp.bottomMargin = 20;
-        shortcutCard.setLayoutParams(scp);
 
         handler = new Handler();
         tick = new Runnable() {
@@ -643,128 +606,6 @@ public class RecordActivity extends Activity {
             startActivity(it);
         } catch (Throwable t) {
             Toast.makeText(this, "打开失败: " + t, Toast.LENGTH_SHORT).show();
-        }
-    }
-    private EditText scNameEt, scPkgEt, scClsEt;
-
-    /** 创建快捷方式卡片：名称/包名/活动 留空自填，或从已装应用选择 */
-    private void showShortcutDialog() {
-        android.widget.LinearLayout box = new android.widget.LinearLayout(this);
-        box.setOrientation(android.widget.LinearLayout.VERTICAL);
-        int pad = (int) (24 * getResources().getDisplayMetrics().density);
-        box.setPadding(pad, pad / 2, pad, 0);
-
-        scNameEt = new EditText(this);
-        scNameEt.setHint("名称（桌面显示）");
-        box.addView(scNameEt);
-        scPkgEt = new EditText(this);
-        scPkgEt.setHint("包名（如 com.xxx.xxx，可留空从列表选）");
-        box.addView(scPkgEt);
-        scClsEt = new EditText(this);
-        scClsEt.setHint("活动（如 com.xxx.MainActivity，可留空自动取入口）");
-        box.addView(scClsEt);
-
-        TextView pick = new TextView(this);
-        pick.setText("从已装应用选择");
-        pick.setTextColor(0xFF8AB4F8);
-        pick.setTextSize(14);
-        pick.setPadding(0, pad / 2, 0, pad / 2);
-        pick.setOnClickListener(new View.OnClickListener() {
-            public void onClick(View v) { showAppPicker(); }
-        });
-        box.addView(pick);
-
-        new android.app.AlertDialog.Builder(this)
-            .setTitle("创建快捷方式")
-            .setView(box)
-            .setPositiveButton("创建", new DialogInterface.OnClickListener() {
-                public void onClick(DialogInterface d, int w) { createShortcut(); }
-            })
-            .setNegativeButton("取消", null)
-            .show();
-    }
-
-    private void showAppPicker() {
-        try {
-            PackageManager pm = getPackageManager();
-            Intent li = new Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER);
-            java.util.List<ResolveInfo> apps = pm.queryIntentActivities(li, 0);
-            java.util.Collections.sort(apps, new java.util.Comparator<ResolveInfo>() {
-                public int compare(ResolveInfo a, ResolveInfo b) {
-                    return String.valueOf(a.loadLabel(pm)).compareToIgnoreCase(String.valueOf(b.loadLabel(pm)));
-                }
-            });
-            final ResolveInfo[] arr = apps.toArray(new ResolveInfo[0]);
-            String[] names = new String[arr.length];
-            for (int i = 0; i < arr.length; i++) names[i] = arr[i].loadLabel(pm) + " (" + arr[i].activityInfo.packageName + ")";
-            new android.app.AlertDialog.Builder(this)
-                .setTitle("选择应用")
-                .setItems(names, new DialogInterface.OnClickListener() {
-                    public void onClick(DialogInterface d, int w) {
-                        scPkgEt.setText(arr[w].activityInfo.packageName);
-                        scClsEt.setText(arr[w].activityInfo.name);
-                        if (scNameEt.getText().length() == 0) scNameEt.setText(String.valueOf(arr[w].loadLabel(pm)));
-                    }
-                })
-                .show();
-        } catch (Throwable e) {
-            Toast.makeText(this, "获取应用列表失败", Toast.LENGTH_SHORT).show();
-        }
-    }
-
-    private void createShortcut() {
-        String name = scNameEt.getText().toString().trim();
-        String pkg = scPkgEt.getText().toString().trim();
-        String cls = scClsEt.getText().toString().trim();
-        if (name.length() == 0 || pkg.length() == 0) {
-            Toast.makeText(this, "名称和包名不能为空", Toast.LENGTH_SHORT).show();
-            return;
-        }
-        final PackageManager pm = getPackageManager();
-        // bilux 同款三级退路：显式ACTION_VIEW → 显式MAIN/LAUNCHER → 系统入口
-        Intent launch = null;
-        if (cls.length() > 0) {
-            launch = tryJumpIntent(new Intent(Intent.ACTION_VIEW).setComponent(new android.content.ComponentName(pkg, cls)));
-            if (launch == null) launch = tryJumpIntent(new Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER)
-                .setComponent(new android.content.ComponentName(pkg, cls)));
-        }
-        if (launch == null) launch = pm.getLaunchIntentForPackage(pkg);
-        if (launch == null) {
-            Toast.makeText(this, "找不到该应用的入口，请核对包名/活动", Toast.LENGTH_LONG).show();
-            return;
-        }
-        launch.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-        try {
-            ShortcutManager sm = (ShortcutManager) getSystemService(Context.SHORTCUT_SERVICE);
-            ShortcutInfo.Builder cb = new ShortcutInfo.Builder(this, "sc_" + System.currentTimeMillis())
-                .setShortLabel(name).setLongLabel(name).setIntent(launch);
-            try {
-                Drawable d = pm.getApplicationIcon(pkg);
-                int w = d.getIntrinsicWidth() > 0 ? d.getIntrinsicWidth() : 96;
-                int h = d.getIntrinsicHeight() > 0 ? d.getIntrinsicHeight() : 96;
-                Bitmap bm = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888);
-                Canvas cv = new Canvas(bm);
-                d.setBounds(0, 0, w, h);
-                d.draw(cv);
-                cb.setIcon(android.graphics.drawable.Icon.createWithBitmap(bm));
-            } catch (Throwable ignored) {}
-            if (sm != null && sm.isRequestPinShortcutSupported()) {
-                sm.requestPinShortcut(cb.build(), null);
-                Toast.makeText(this, "请在系统弹窗中确认添加", Toast.LENGTH_LONG).show();
-                return;
-            }
-        } catch (Throwable e) { }
-        Toast.makeText(this, "此桌面不支持固定快捷方式", Toast.LENGTH_LONG).show();
-    }
-
-    /** 试跳一次用于校验组件有效性；成功返回该Intent，失败返回null */
-    private Intent tryJumpIntent(Intent i) {
-        try {
-            i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-            startActivity(i);
-            return i;
-        } catch (Throwable t) {
-            return null;
         }
     }
 }
