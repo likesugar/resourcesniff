@@ -122,6 +122,10 @@ public class LiveProxy {
             c.setRequestProperty("User-Agent", "Mozilla/5.0 (Linux; Android 13) Chrome/120 Mobile");
             if (url.contains("guangdongvideo.com")) {
                 c.setRequestProperty("Referer", "https://guangdongvideo.com/");
+            } else if (url.contains("doppiocdn") || url.contains("stripchat")) {
+                // stripchat 系 CDN：必须带站点 Referer
+                c.setRequestProperty("Referer", "https://zh.stripchat.cam/");
+                c.setRequestProperty("Origin", "https://zh.stripchat.cam");
             } else {
                 // 其他站：Referer 用目标自己域名
                 try {
