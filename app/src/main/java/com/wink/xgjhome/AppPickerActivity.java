@@ -24,6 +24,7 @@ public class AppPickerActivity extends Activity {
     private java.util.List<android.content.pm.PackageInfo> all = new java.util.ArrayList<android.content.pm.PackageInfo>();
     private java.util.List<android.content.pm.PackageInfo> shown = new java.util.ArrayList<android.content.pm.PackageInfo>();
     private boolean showSystem = false;
+    private boolean loaded = false;
     private boolean hideNoActs = true;    // 隐藏无可列出活动的包
     private boolean onlyExported = false; // 仅可直启(exported)活动
     private String searchText = "";
@@ -125,12 +126,21 @@ public class AppPickerActivity extends Activity {
         root.addView(sv, new LinearLayout.LayoutParams(-1, 0, 1f));
         setContentView(root);
 
-        loadApps();
-        applyFilter();
+        new Thread(new Runnable() { public void run() { loadApps(); runOnUiThread(new Runnable() { public void run() { loaded = true; applyFilter(); } }); } }).start();
     }
+
+    private final java.util.HashMap<String, Integer> actCount = new java.util.HashMap<String, Integer>();
+    private final java.util.HashMap<String, Bitmap> iconCache = new java.util.HashMap<String, Bitmap>();
 
     private void loadApps() {
         try { all = pm.getInstalledPackages(0); } catch (Throwable e) { all = new java.util.ArrayList<android.content.pm.PackageInfo>(); }
+        for (android.content.pm.PackageInfo pi : all) {
+            try {
+                android.content.pm.ActivityInfo[] acts = pm.getPackageInfo(pi.packageName, android.content.pm.PackageManager.GET_ACTIVITIES).activities;
+                actCount.put(pi.packageName, acts == null ? 0 : acts.length);
+            } catch (Throwable t) { actCount.put(pi.packageName, 0); }
+            try { iconCache.put(pi.packageName, iconToBmp(pi)); } catch (Throwable t) { }
+        }
         java.util.Collections.sort(all, new java.util.Comparator<android.content.pm.PackageInfo>() {
             public int compare(android.content.pm.PackageInfo a, android.content.pm.PackageInfo b) {
                 return labelOf(a).compareToIgnoreCase(labelOf(b));
@@ -139,14 +149,24 @@ public class AppPickerActivity extends Activity {
     }
 
     private void applyFilter() {
+        list.removeAllViews();
+        if (!loaded) {
+            TextView loading = new TextView(this);
+            loading.setText("加载中…");
+            loading.setTextColor(0xFF8A919E);
+            loading.setTextSize(14);
+            loading.setGravity(Gravity.CENTER);
+            loading.setPadding(0, dp(40), 0, 0);
+            list.addView(loading);
+            tvCount.setText("加载中…");
+            return;
+        }
         shown.clear();
         for (android.content.pm.PackageInfo pi : all) {
             if (!showSystem && (pi.applicationInfo.flags & android.content.pm.ApplicationInfo.FLAG_SYSTEM) != 0) continue;
             if (hideNoActs) {
-                try {
-                    android.content.pm.ActivityInfo[] acts = pm.getPackageInfo(pi.packageName, android.content.pm.PackageManager.GET_ACTIVITIES).activities;
-                    if (acts == null || acts.length == 0) continue;
-                } catch (Throwable ignored) {}
+                Integer cnt = actCount.get(pi.packageName);
+                if (cnt != null && cnt == 0) continue;
             }
             if (searchText.length() > 0) {
                 String l = labelOf(pi).toLowerCase();
@@ -176,7 +196,9 @@ public class AppPickerActivity extends Activity {
 
             ImageView ic = new ImageView(this);
             ic.setScaleType(ImageView.ScaleType.FIT_CENTER);
-            ic.setImageBitmap(iconToBmp(pi));
+            Bitmap icb = iconCache.get(pi.packageName);
+            if (icb == null) icb = iconToBmp(pi);
+            ic.setImageBitmap(icb);
             row.addView(ic, new LinearLayout.LayoutParams(dp(46), dp(46)));
 
             LinearLayout mid = new LinearLayout(this);

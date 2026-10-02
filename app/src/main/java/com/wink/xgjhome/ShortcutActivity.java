@@ -125,10 +125,14 @@ public class ShortcutActivity extends Activity {
         cells.add(smallCard("⚡", "新建快捷键", new View.OnClickListener() {
             public void onClick(View v) { startActivity(new Intent(ShortcutActivity.this, ShortcutEditActivity.class)); }
         }, null));
+        android.content.pm.PackageManager pm0 = getPackageManager();
         for (final String[] us : userShortcuts()) {
             final String key = z(us, 10);
             View iconCell;
-            android.graphics.Bitmap bmp = z(us, 9).length() > 0 ? android.graphics.BitmapFactory.decodeFile(z(us, 9)) : null;
+            // 优先目标应用真实图标，其次自选图，最后首字
+            android.graphics.Bitmap bmp = null;
+            try { bmp = iconToBmp(pm0.getApplicationIcon(z(us, 1))); } catch (Throwable ignored) {}
+            if (bmp == null && z(us, 9).length() > 0) bmp = android.graphics.BitmapFactory.decodeFile(z(us, 9));
             if (bmp != null) iconCell = iconImage(bmp);
             else iconCell = iconText(z(us, 0).length() > 0 ? z(us, 0).substring(0, 1) : "?");
             cells.add(smallCardEx(iconCell, z(us, 0), new View.OnClickListener() {
@@ -190,6 +194,16 @@ public class ShortcutActivity extends Activity {
         tv.setTextColor(Color0.text());
         tv.setBackgroundColor(Color0.btnBg());
         return tv;
+    }
+
+    private android.graphics.Bitmap iconToBmp(android.graphics.drawable.Drawable d) {
+        int w = d.getIntrinsicWidth() > 0 ? d.getIntrinsicWidth() : 96;
+        int h = d.getIntrinsicHeight() > 0 ? d.getIntrinsicHeight() : 96;
+        android.graphics.Bitmap bm = android.graphics.Bitmap.createBitmap(w, h, android.graphics.Bitmap.Config.ARGB_8888);
+        android.graphics.Canvas cv = new android.graphics.Canvas(bm);
+        d.setBounds(0, 0, w, h);
+        d.draw(cv);
+        return bm;
     }
 
     private View iconImage(android.graphics.Bitmap bm) {
