@@ -110,12 +110,25 @@ public class HomeActivity extends Activity {
             public void onClick(View v) {
                 if (LanShareServer.isRunning()) {
                     LanShareServer.stop();
+                    android.app.NotificationManager nm = (android.app.NotificationManager) getSystemService(NOTIFICATION_SERVICE);
+                    nm.cancel(1001);
                     android.widget.Toast.makeText(HomeActivity.this, "局域网共享已关闭", android.widget.Toast.LENGTH_SHORT).show();
                 } else {
                     LanShareServer.start();
-                    android.widget.Toast.makeText(HomeActivity.this,
-                        "局域网共享已开启\n电脑浏览器打开 http://" + LanShareServer.localIp() + ":" + LanShareServer.PORT,
-                        android.widget.Toast.LENGTH_LONG).show();
+                    String url = "http://" + LanShareServer.localIp() + ":" + LanShareServer.PORT;
+                    android.app.NotificationManager nm = (android.app.NotificationManager) getSystemService(NOTIFICATION_SERVICE);
+                    if (android.os.Build.VERSION.SDK_INT >= 26) {
+                        nm.createNotificationChannel(new android.app.NotificationChannel("lan", "局域网共享", android.app.NotificationManager.IMPORTANCE_LOW));
+                    }
+                    android.app.Notification.Builder nb = android.os.Build.VERSION.SDK_INT >= 26
+                        ? new android.app.Notification.Builder(HomeActivity.this, "lan")
+                        : new android.app.Notification.Builder(HomeActivity.this);
+                    nb.setSmallIcon(android.R.drawable.ic_menu_share)
+                      .setContentTitle("局域网共享已开启")
+                      .setContentText("电脑打开 " + url)
+                      .setStyle(new android.app.Notification.BigTextStyle().bigText("电脑浏览器打开 " + url + " 可查看并打开记录中的链接"))
+                      .setOngoing(true);
+                    nm.notify(1001, nb.build());
                 }
             }
         });

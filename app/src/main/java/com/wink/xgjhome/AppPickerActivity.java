@@ -79,31 +79,6 @@ public class AppPickerActivity extends Activity {
         etSearch.setTextSize(14);
         etSearch.setSingleLine(true);
         row2.addView(etSearch, new LinearLayout.LayoutParams(0, -2, 1f));
-        final TextView tg2 = new TextView(this);
-        tg2.setText("无活动:隐");
-        tg2.setTextSize(12);
-        tg2.setTextColor(0xFF3D7BFF);
-        tg2.setPadding(dp(10), dp(6), dp(10), dp(6));
-        tg2.setBackgroundColor(0xFF1B222B);
-        tg2.setOnClickListener(new View.OnClickListener() { public void onClick(View v) {
-            hideNoActs = !hideNoActs;
-            tg2.setText(hideNoActs ? "无活动:隐" : "无活动:显");
-            if (hideNoActs && actCount.isEmpty()) {
-                tg2.setText("扫描中…");
-                new Thread(new Runnable() { public void run() {
-                    for (android.content.pm.PackageInfo pi : all) {
-                        try {
-                            android.content.pm.ActivityInfo[] acts = pm.getPackageInfo(pi.packageName, android.content.pm.PackageManager.GET_ACTIVITIES).activities;
-                            actCount.put(pi.packageName, acts == null ? 0 : acts.length);
-                        } catch (Throwable t) { actCount.put(pi.packageName, 0); }
-                    }
-                    runOnUiThread(new Runnable() { public void run() { applyFilter(); } });
-                } }).start();
-                return;
-            }
-            applyFilter();
-        }});
-        row2.addView(tg2);
         final TextView tg3 = new TextView(this);
         tg3.setText("仅可直启:关");
         tg3.setTextSize(12);
@@ -174,10 +149,6 @@ public class AppPickerActivity extends Activity {
         shown.clear();
         for (android.content.pm.PackageInfo pi : all) {
             if (!showSystem && (pi.applicationInfo.flags & android.content.pm.ApplicationInfo.FLAG_SYSTEM) != 0) continue;
-            if (hideNoActs) {
-                Integer cnt = actCount.get(pi.packageName);
-                if (cnt != null && cnt == 0) continue;
-            }
             if (searchText.length() > 0) {
                 String l = labelOf(pi).toLowerCase();
                 if (!l.contains(searchText) && !pi.packageName.toLowerCase().contains(searchText)) continue;
