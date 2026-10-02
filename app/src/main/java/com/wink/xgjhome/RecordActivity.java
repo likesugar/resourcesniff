@@ -153,6 +153,16 @@ public class RecordActivity extends Activity {
         }
     }
 
+    // 按抖音流地址后缀标注画质：优先原画 > 蓝光 > 高清，其余不标
+    private static String qualify(RecManager.RecJob j) {
+        String u = (j.url != null ? j.url : "") + " " + (j.name != null ? j.name : "");
+        String q = null;
+        if (u.contains("_or4")) q = "原画";
+        else if (u.contains("_uhd")) q = "蓝光";
+        else if (u.contains("_hd")) q = "高清";
+        return q == null ? j.name : "抖音·" + q + " " + j.name;
+    }
+
     private String buildInfo(RecManager.RecJob j, boolean live) {
         long secs = j.secs + (live && j.startTs > 0 ? (System.currentTimeMillis() - j.startTs) / 1000 : 0);
         return "录制时长: " + fmtDur(secs)
@@ -187,7 +197,7 @@ public class RecordActivity extends Activity {
         mid.setLayoutParams(mp);
 
         TextView tvName = new TextView(this);
-        tvName.setText(j.name);
+        tvName.setText(qualify(j));
         tvName.setTextColor(Color.WHITE);
         tvName.setTextSize(16);
         tvName.setTypeface(Typeface.DEFAULT_BOLD);
@@ -256,10 +266,34 @@ public class RecordActivity extends Activity {
         pm.getMenu().add("打开所在目录").setOnMenuItemClickListener(new android.view.MenuItem.OnMenuItemClickListener() {
             public boolean onMenuItemClick(android.view.MenuItem it) { openDir(); return true; }
         });
+        pm.getMenu().add("打开录制合并目录").setOnMenuItemClickListener(new android.view.MenuItem.OnMenuItemClickListener() {
+            public boolean onMenuItemClick(android.view.MenuItem it) { openMergedDir(); return true; }
+        });
         pm.getMenu().add("取消").setOnMenuItemClickListener(new android.view.MenuItem.OnMenuItemClickListener() {
             public boolean onMenuItemClick(android.view.MenuItem it) { RecManager.recCancel(j.id); rebuild(); return true; }
         });
         pm.show();
+    }
+
+    private void openMergedDir() {
+        // SAF 直达应用专属目录，绕开 /Android/data 权限（避免文件管理器"工作区创建失败"）
+        try {
+            android.net.Uri doc = android.provider.DocumentsContract.buildDocumentUri(
+                "com.android.externalstorage.documents", "primary:Android/data/com.wink.xgjhome/files/录制合并");
+            Intent i = new Intent(Intent.ACTION_VIEW);
+            i.setDataAndType(doc, android.provider.DocumentsContract.Document.MIME_TYPE_DIR);
+            i.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION | Intent.FLAG_ACTIVITY_NEW_TASK);
+            startActivity(i);
+            return;
+        } catch (Throwable ignored) {}
+        try {
+            Intent i = new Intent(Intent.ACTION_OPEN_DOCUMENT_TREE);
+            i.putExtra(android.provider.DocumentsContract.EXTRA_INITIAL_URI,
+                android.provider.DocumentsContract.buildDocumentUri("com.android.externalstorage.documents",
+                    "primary:Android/data/com.wink.xgjhome/files"));
+            i.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION | Intent.FLAG_ACTIVITY_NEW_TASK);
+            startActivity(i);
+        } catch (Throwable t) { openDir(); }
     }
 
     private void openDir() {

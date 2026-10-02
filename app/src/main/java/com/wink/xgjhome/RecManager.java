@@ -330,6 +330,10 @@ public class RecManager {
             stopBgSession();
             stopBgPlayer();
             live.active = false;
+            if (live.startTs > 0) {  // 结束时固化已录时长
+                live.secs += (System.currentTimeMillis() - live.startTs) / 1000;
+                live.startTs = 0;
+            }
             recJobs.remove(live.id);
             releaseWakeIfIdle();
             mergeSegs(live);
@@ -508,6 +512,10 @@ public class RecManager {
         stopBgPlayer();
         job.active = false;
         job.paused = true;
+        if (job.startTs > 0) {
+            job.secs += (System.currentTimeMillis() - job.startTs) / 1000;
+            job.startTs = 0;
+        }
         job.state = why;
         recJobs.remove(job.id);
         stoppedJobs.put(job.id, job);
