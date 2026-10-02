@@ -147,7 +147,8 @@ public class SniffActivity extends Activity {
                     String st = "url: " + fUrl
                         + "\n时间: " + new java.text.SimpleDateFormat("HH:mm:ss", java.util.Locale.US).format(new java.util.Date())
                         + "\n状态: " + (Fc2Relay.getHls() != null ? "HLS=" + Fc2Relay.getHls()
-                            : (Fc2Relay.isConnected() ? "已连,信令: " + Fc2Relay.debugInfo() : "未连接"));
+                            : (Fc2Relay.isConnected() ? "已连,信令: " + Fc2Relay.debugInfo() : "未连接"))
+                        + "\n日志: " + Fc2Relay.lastLog();
                     try { Toast.makeText(SniffActivity.this, "FC2诊断已写入", Toast.LENGTH_SHORT).show(); } catch (Throwable ignored) {}
                     dumpFc2Debug(st);
                 }};

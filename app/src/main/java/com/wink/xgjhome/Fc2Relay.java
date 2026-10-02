@@ -16,6 +16,7 @@ public class Fc2Relay {
     private static volatile boolean connected = false;
     private static volatile String hlsUrl = null;
     private static volatile String debugInfo = "";
+    private static volatile String lastLog = "";
     private static volatile int retry = 0;
     private static volatile String cookie = null;
     private static int msgId = 0;
@@ -24,20 +25,34 @@ public class Fc2Relay {
     public static boolean isConnected() { return connected; }
     public static String getHls() { return hlsUrl; }
     public static String debugInfo() { return debugInfo; }
+    public static String lastLog() { return lastLog; }
 
     public static synchronized void start(String url) { start(url, null); }
 
     public static synchronized void start(String url, String ck) {
         if (url == null || (!url.startsWith("ws://") && !url.startsWith("wss://"))) return;
-        if (running && url.equals(wsUrl)) return;
+        // 同一频道的连接还在跑就不重启（页面会频繁重建连接，不能跟着清零）
+        if (running && isConnected()) {
+            if (wsUrl != null && sameChannel(wsUrl, url)) return;
+        }
+        String keepHls = hlsUrl;
         stop();
         wsUrl = url;
         cookie = ck;
         retry = 0;
-        hlsUrl = null;
-        debugInfo = "";
+        hlsUrl = keepHls;  // 粘住已取得的 HLS
         running = true;
         new Thread(new Runnable() { public void run() { loop(); } }).start();
+    }
+
+    private static boolean sameChannel(String a, String b) {
+        int ia = a.indexOf("/control/channels/");
+        int ib = b.indexOf("/control/channels/");
+        if (ia < 0 || ib < 0) return a.equals(b);
+        int ja = a.indexOf('?', ia), jb = b.indexOf('?', ib);
+        String ca = a.substring(ia, ja > 0 ? ja : a.length());
+        String cb = b.substring(ib, jb > 0 ? jb : b.length());
+        return ca.equals(cb);
     }
 
     public static synchronized void stop() {
@@ -130,21 +145,21 @@ public class Fc2Relay {
                 if (!fin) continue;
                 String msg = txtAcc.toString("UTF-8");
                 txtAcc.reset();
+                lastLog = ("< " + (msg.length() > 80 ? msg.substring(0, 80) : msg)) + "\n" + lastLog;
+                if (lastLog.length() > 1500) lastLog = lastLog.substring(0, 1500);
                 boolean[] gp = {gotPlaylists};
                 handleMessage(msg, out, gp);
                 gotPlaylists = gp[0];
 
                 // 就绪后每5秒重发 get_hls_information，直到拿到列表（官方实现同款重试）
                 if (msg.contains("connect_complete") || msg.contains("initial_connect")) {
-                    if (!ready) {  // 就绪立刻请求
-                        sendText(out, msg("get_hls_information"));
-                        lastHb = System.currentTimeMillis();
-                    }
                     ready = true;
+                    lastHb = System.currentTimeMillis();  // v146 成功时序:就绪后约5秒首请求
                 }
-                if (ready && !gotPlaylists && System.currentTimeMillis() - lastHb > 3000) {
+                if (ready && !gotPlaylists && System.currentTimeMillis() - lastHb > 5000) {
                     sendText(out, msg("get_hls_information"));
                     lastHb = System.currentTimeMillis();
+                    lastLog = "> get_hls_information @" + System.currentTimeMillis() % 100000 + "\n" + lastLog;
                 }
             }
 
