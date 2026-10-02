@@ -196,7 +196,7 @@ public class SniffActivity extends Activity {
                     if (url.contains("/log/")) return null;
                     if (url.contains("stripchat")) {
                         String lu2 = url.toLowerCase();
-                        if (lu2.contains(".m3u8")) {
+                        if (lu2.contains(".m3u8") && !lu2.contains("ping")) {  // ping.m3u8 是保活心跳，不是流
                             final String fUrl3 = url;
                             final String chKey2 = url.substring(0, url.indexOf('?') > 0 ? url.indexOf('?') : url.length());
                             main.post(new Runnable() { public void run() {
