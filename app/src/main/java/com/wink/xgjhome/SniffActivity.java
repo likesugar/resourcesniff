@@ -201,11 +201,21 @@ public class SniffActivity extends Activity {
                         }
                         if (lu2.contains(".m3u8") && !lu2.contains("ping")) {  // ping.m3u8 是保活心跳，不是流
                             // LL-HLS 参数剥掉，转成标准 HLS（播放器/ffmpeg 才能循环加载）
-                            String liveUrl = url
-                                .replaceAll("([?&])playlistType=[^&]*", "$1")
-                                .replaceAll("([?&])_HLS_msn=[^&]*", "$1")
-                                .replaceAll("([?&])_HLS_part=[^&]*", "$1")
-                                .replaceAll("[?&]$", "");
+                            String liveUrl = url;
+                            try {
+                                java.net.URL pu = new java.net.URL(url);
+                                java.util.ArrayList<String[]> keep = new java.util.ArrayList<String[]>();
+                                String[] parts = pu.getQuery() == null ? new String[0] : pu.getQuery().split("&");
+                                for (String kv : parts) {
+                                    if (kv.startsWith("playlistType=") || kv.startsWith("_HLS_msn=") || kv.startsWith("_HLS_part=")) continue;
+                                    keep.add(new String[]{kv});
+                                }
+                                StringBuilder qb = new StringBuilder(pu.getProtocol() + "://" + pu.getHost() + pu.getPath());
+                                for (int qi2 = 0; qi2 < keep.size(); qi2++) {
+                                    qb.append(qi2 == 0 ? '?' : '&').append(keep.get(qi2)[0]);
+                                }
+                                liveUrl = qb.toString();
+                            } catch (Throwable ignored) {}
                             String fUrl3 = liveUrl;
                             if (!probeHls("http://127.0.0.1:8123/relay?u=" + java.net.URLEncoder.encode(liveUrl, "UTF-8"))) {
                                 fUrl3 = url;  // 剥参数版不可用，回退原始LL-HLS地址
@@ -776,7 +786,7 @@ public class SniffActivity extends Activity {
 
     private static android.content.Context sDumpCtx;
 
-    private static void dumpFc2Debug(String st) {
+    public static void dumpFc2Debug(String st) {
         try {
             java.io.File dir = sDumpCtx.getExternalFilesDir(null).getParentFile();
             java.io.FileWriter fw = new java.io.FileWriter(new java.io.File(dir, "fc2_debug.txt"), true);

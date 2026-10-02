@@ -163,8 +163,9 @@ public class LiveProxy {
 
             if (path.startsWith("/relay")) {
                 // 通用中转：u=原始地址（m3u8 内容递归改写；分片流式转发）
+                String raw = null;
                 try {
-                    String raw = URLDecoder.decode(queryParam(path, "u"), "UTF-8");
+                    raw = URLDecoder.decode(queryParam(path, "u"), "UTF-8");
                     HttpURLConnection oc = (HttpURLConnection) new URL(raw).openConnection();
                     oc.setConnectTimeout(8000);
                     oc.setReadTimeout(8000);
@@ -209,8 +210,10 @@ public class LiveProxy {
                         return;
                     }
                     oc.disconnect();
+                    try { SniffActivity.dumpFc2Debug("RELAY-ERR code=" + code + " " + raw); } catch (Throwable ignored) {}
                     writeResp(s, "404 Not Found", "text/plain", "upstream err".getBytes());
                 } catch (Throwable e) {
+                    try { SniffActivity.dumpFc2Debug("RELAY-EXC " + e.getClass().getSimpleName() + " " + raw); } catch (Throwable ignored) {}
                     writeResp(s, "404 Not Found", "text/plain", "relay err".getBytes());
                 }
                 return;
