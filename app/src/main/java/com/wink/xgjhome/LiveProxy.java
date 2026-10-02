@@ -219,6 +219,19 @@ public class LiveProxy {
                 return;
             }
 
+            if (path.startsWith("/scseg")) {
+                // stripchat 分片中转：带站点头取上游，录制开启时 tee 一份写文件
+                try {
+                    String raw2 = URLDecoder.decode(queryParam(path, "u"), "UTF-8");
+                    byte[] body2 = StripRec.httpGetBytes(raw2);
+                    try { StripRec.feed(raw2, body2); } catch (Throwable ignored) {}
+                    writeResp(s, "200 OK", "video/iso.segment", body2);
+                } catch (Throwable e2) {
+                    writeResp(s, "404 Not Found", "text/plain", "scseg err".getBytes());
+                }
+                return;
+            }
+
             if (path.startsWith("/live.ts")) {
                 // 桥接 TS 流：outPipe 是 FIFO，阻塞式直读即可（不能轮询 length）
                 try {

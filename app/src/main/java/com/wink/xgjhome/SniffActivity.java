@@ -202,27 +202,61 @@ public class SniffActivity extends Activity {
                         }
                         // 旁路录制（零接触版）：页面请求原样放行，后台自己另拉一份写文件，
                         // 避免触碰页面分片被反广告拦截检测识别
-                        if (lu2.endsWith(".mp4") && (lu2.contains("_part") || lu2.contains("init")) && StripRec.isRunning()) {
-                            final String fUrl4 = url;
-                            if (StripRec.submit(fUrl4)) {   // 单线程排队+去重，延迟让页面优先
-                                new Thread(new Runnable() { public void run() {
-                                    try { Thread.sleep(500); } catch (Throwable ignored) {}
-                                    try {
-                                        byte[] body = StripRec.httpGetBytes(fUrl4);
-                                        StripRec.feed(fUrl4, body);
-                                    } catch (Throwable e2) {
-                                        try { SniffActivity.dumpFc2Debug("SC-DUAL-ERR " + fUrl4.substring(0, Math.min(90, fUrl4.length()))); } catch (Throwable ignored) {}
-                                    }
-                                } }).start();
-                            }
-                        }
+                        // 分片改为经 /scseg 中转（见列表改写），这里不再双取
                         // 排除：心跳(ping)、主列表(/master/、_auto)——单拉无数据；其余媒体列表都收
                         if (lu2.contains("ping.m3u8") || lu2.contains("/master/") || lu2.contains("_auto.m3u8")) {
                             dumpFc2Debug("SC-SKIP: " + url);
                             return null;
                         }
                         dumpFc2Debug("SC-LIVE: " + url);
-                        if (lu2.contains(".m3u8") && !lu2.contains("ping")) {  // ping.m3u8 是保活心跳，不是流
+                        if (lu2.contains(".m3u8") && !lu2.contains("ping")) {
+                            // 拉列表 → 分片地址改写为 /scseg(中转tee) → 返回页面；页面无感知
+                            try {
+                                byte[] plb = StripRec.httpGetBytes(url);
+                                String body = new String(plb, "UTF-8");
+                                java.net.URL pb2 = new java.net.URL(url);
+                                String dirBase = pb2.getProtocol() + "://" + pb2.getHost() + pb2.getPath().substring(0, pb2.getPath().lastIndexOf('/') + 1);
+                                StripRec.lastPlaylist = url;
+                                StringBuilder sb2 = new StringBuilder();
+                                for (String ln : body.split("\n")) {
+                                    String t2 = ln.trim();
+                                    if (!t2.isEmpty() && !t2.startsWith("#")) {
+                                        String abs = t2.startsWith("http") ? t2 : (t2.startsWith("/") ? pb2.getProtocol() + "://" + pb2.getHost() + t2 : dirBase + t2);
+                                        ln = "http://127.0.0.1:8123/scseg?u=" + java.net.URLEncoder.encode(abs, "UTF-8");
+                                    } else if (t2.startsWith("#EXT-X-MAP")) {
+                                        // init 分段也改写，让录制拿到 init
+                                        java.util.regex.Matcher mu = java.util.regex.Pattern.compile("URI=\"([^\"]+)\"").matcher(t2);
+                                        if (mu.find()) {
+                                            String iu = mu.group(1);
+                                            String abs = iu.startsWith("http") ? iu : (iu.startsWith("/") ? pb2.getProtocol() + "://" + pb2.getHost() + iu : dirBase + iu);
+                                            ln = ln.replace(mu.group(1), "http://127.0.0.1:8123/scseg?u=" + java.net.URLEncoder.encode(abs, "UTF-8"));
+                                        }
+                                    }
+                                    sb2.append(ln).append("\n");
+                                }
+                                byte[] out2 = sb2.toString().getBytes("UTF-8");
+                                // 进记录（一次）
+                                final String chKey3 = url.substring(0, url.indexOf('?') > 0 ? url.indexOf('?') : url.length());
+                                if (fc2HlsSeen.add(chKey3)) {
+                                    java.util.regex.Matcher mr2 = java.util.regex.Pattern.compile("RESOLUTION=(\\d+)x(\\d+)").matcher(body);
+                                    String qLabel3 = mr2.find() ? mr2.group(2) + "p" : "直播";
+                                    final String recUrl = url;
+                                    final String recTitle = "Stripchat·" + qLabel3;
+                                    main.post(new Runnable() { public void run() {
+                                        try {
+                                            addRecord(recUrl, recTitle);
+                                            if (!isRecordsVisible) toggleRecords();
+                                        } catch (Throwable ignored) {}
+                                    }});
+                                }
+                                return new android.webkit.WebResourceResponse("application/vnd.apple.mpegurl", null,
+                                    new java.io.ByteArrayInputStream(out2));
+                            } catch (Throwable e3) {
+                                try { SniffActivity.dumpFc2Debug("SC-RW-ERR " + e3.getClass().getSimpleName()); } catch (Throwable ignored) {}
+                                return null;
+                            }
+                        }
+                        if (false) {  // 旧逻辑保留位
                             // LL-HLS 参数剥掉，转成标准 HLS（播放器/ffmpeg 才能循环加载）
                             String liveUrl = url;
                             try {
