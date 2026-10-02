@@ -127,34 +127,37 @@ public class SniffActivity extends Activity {
             }
             @android.webkit.JavascriptInterface
             public void onWsUrl(String u) {
-                if (u == null) return;
-                final boolean fc2Ws = u.startsWith("ws://") || u.startsWith("wss://");
-                if (!fc2Ws) return;
-                main.post(new Runnable() { public void run() {
-                    try { Toast.makeText(SniffActivity.this, "捕获WS: " + u.substring(0, Math.min(48, u.length())), Toast.LENGTH_LONG).show(); } catch (Throwable ignored) {}
-                }});
+                // 已改为窃听页面自身连接的回包（onHlsJson），不再自建连接避免多连接踢线
+            }
+
+            @android.webkit.JavascriptInterface
+            public void onHlsJson(String data) {
+                if (data == null || !data.contains("url")) return;
+                String best = null; int bestMode = -1;
                 try {
-                    java.net.URL wu = new java.net.URL(u.replaceFirst("^ws", "http"));
-                    String ck = CookieManager.getInstance().getCookie("https://" + wu.getHost());
-                    Fc2Relay.start(u, ck);
-                } catch (Throwable e) { Fc2Relay.start(u); }
-                // 轮询等 HLS 地址出来
-                final String fUrl2 = u;
-                main.post(new Runnable() { public void run() { pollFc2Hls(fUrl2, 0); } });
-                // 诊断写文件 + toast
-                final String fUrl = u;
-                Runnable dump = new Runnable() { public void run() {
-                    String st = "url: " + fUrl
-                        + "\n时间: " + new java.text.SimpleDateFormat("HH:mm:ss", java.util.Locale.US).format(new java.util.Date())
-                        + "\n状态: " + (Fc2Relay.getHls() != null ? "HLS=" + Fc2Relay.getHls()
-                            : (Fc2Relay.isConnected() ? "已连,信令: " + Fc2Relay.debugInfo() : "未连接"))
-                        + "\n日志: " + Fc2Relay.lastLog();
-                    try { Toast.makeText(SniffActivity.this, "FC2诊断已写入", Toast.LENGTH_SHORT).show(); } catch (Throwable ignored) {}
-                    dumpFc2Debug(st);
-                }};
-                main.postDelayed(dump, 6000);
-                main.postDelayed(dump, 20000);
-                main.postDelayed(dump, 40000);
+                    java.util.regex.Matcher mu = java.util.regex.Pattern.compile("\"url\"\\s*:\\s*\"([^\"]+)\"").matcher(data);
+                    java.util.regex.Matcher mm = java.util.regex.Pattern.compile("\"mode\"\\s*:\\s*(\\d+)").matcher(data);
+                    java.util.ArrayList<String> urls = new java.util.ArrayList<String>();
+                    java.util.ArrayList<Integer> modes = new java.util.ArrayList<Integer>();
+                    while (mu.find()) urls.add(mu.group(1).replace("\\/", "/"));
+                    while (mm.find()) modes.add(Integer.parseInt(mm.group(1)));
+                    for (int i = 0; i < urls.size() && i < modes.size(); i++) {
+                        int m = modes.get(i);
+                        int cmp = m >= 90 ? m - 90 : m;
+                        if (cmp > bestMode) { bestMode = cmp; best = urls.get(i); }
+                    }
+                } catch (Throwable ignored) {}
+                if (best == null) return;
+                final String hls = best;
+                main.post(new Runnable() { public void run() {
+                    try {
+                        if (fc2HlsSeen.add(hls)) {
+                            addRecord(hls, "FC2·直播");
+                            if (!isRecordsVisible) toggleRecords();
+                            dumpFc2Debug("记录已添加: " + hls);
+                        }
+                    } catch (Throwable e) { dumpFc2Debug("记录添加失败: " + e.getClass().getSimpleName()); }
+                }});
             }
         }, "AndroidPlayer");
 
@@ -207,8 +210,11 @@ public class SniffActivity extends Activity {
                                 String html = bo.toString("UTF-8");
                                 String hook = "<script>(function(){if(window.__fc2Hooked)return;window.__fc2Hooked=1;"
                                     + "var OW=window.WebSocket;"
-                                    + "function NW(u,p){try{AndroidPlayer.onWsUrl(String(u));}catch(e){}"
-                                    + "if(p===undefined)return new OW(u);return new OW(u,p);}"
+                                    + "function NW(u,p){var ws=(p===undefined)?new OW(u):new OW(u,p);"
+                                    + "try{ws.addEventListener('message',function(ev){"
+                                    + "try{if(typeof ev.data==='string'&&ev.data.indexOf('playlists')>=0){AndroidPlayer.onHlsJson(ev.data);}}catch(e){}"
+                                    + "});}catch(e){}"
+                                    + "return ws;}"
                                     + "NW.prototype=OW.prototype;NW.CONNECTING=OW.CONNECTING;NW.OPEN=OW.OPEN;NW.CLOSING=OW.CLOSING;NW.CLOSED=OW.CLOSED;"
                                     + "window.WebSocket=NW;})();</script>";
                                 int hp = html.indexOf("<head>");
