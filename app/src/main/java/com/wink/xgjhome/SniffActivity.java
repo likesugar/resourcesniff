@@ -168,6 +168,33 @@ public class SniffActivity extends Activity {
                     if (!"http".equals(u.getScheme()) && !"https".equals(u.getScheme())) return null;
                     String url = u.toString();
                     if (url.contains("/log/")) return null;
+                    if (request.isForMainFrame() && (url.contains("live.fc2.com") || url.contains("guangdongvideo.com"))) {
+                        // FC2 系主文档：提前装 WebSocket 钩子
+                        try {
+                            java.net.HttpURLConnection hc = (java.net.HttpURLConnection) new java.net.URL(url).openConnection();
+                            hc.setConnectTimeout(10000); hc.setReadTimeout(15000);
+                            hc.setRequestProperty("User-Agent", view.getSettings().getUserAgentString());
+                            if (hc.getResponseCode() == 200) {
+                                java.io.ByteArrayOutputStream bo = new java.io.ByteArrayOutputStream();
+                                java.io.InputStream in = hc.getInputStream();
+                                byte[] b2 = new byte[8192]; int n2;
+                                while ((n2 = in.read(b2)) > 0) bo.write(b2, 0, n2);
+                                in.close(); hc.disconnect();
+                                String html = bo.toString("UTF-8");
+                                String hook = "<script>(function(){if(window.__fc2Hooked)return;window.__fc2Hooked=1;"
+                                    + "var OW=window.WebSocket;"
+                                    + "function NW(u,p){try{AndroidPlayer.onWsUrl(String(u));}catch(e){}"
+                                    + "if(p===undefined)return new OW(u);return new OW(u,p);}"
+                                    + "NW.prototype=OW.prototype;NW.CONNECTING=OW.CONNECTING;NW.OPEN=OW.OPEN;NW.CLOSING=OW.CLOSING;NW.CLOSED=OW.CLOSED;"
+                                    + "window.WebSocket=NW;})();</script>";
+                                int hp = html.indexOf("<head>");
+                                html = hp >= 0 ? html.substring(0, hp + 6) + hook + html.substring(hp + 6) : hook + html;
+                                return new android.webkit.WebResourceResponse("text/html", "UTF-8",
+                                    new java.io.ByteArrayInputStream(html.getBytes("UTF-8")));
+                            }
+                            hc.disconnect();
+                        } catch (Throwable ignored) {}
+                    }
                     if (kbState[0] == 0 && kbArmed && url.toLowerCase().contains(".ts") && (url.contains("/stream/") || url.contains("douyincdn") || url.contains("amemv"))) {
                         kbArmed = false;
                         startKb(SniffActivity.this);
