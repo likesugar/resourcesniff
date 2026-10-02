@@ -206,14 +206,18 @@ public class SniffActivity extends Activity {
                                 .replaceAll("([?&])_HLS_msn=[^&]*", "$1")
                                 .replaceAll("([?&])_HLS_part=[^&]*", "$1")
                                 .replaceAll("[?&]$", "");
-                            final String fUrl3 = liveUrl;
+                            String fUrl3 = liveUrl;
+                            if (!probeHls("http://127.0.0.1:8123/relay?u=" + java.net.URLEncoder.encode(liveUrl, "UTF-8"))) {
+                                fUrl3 = url;  // 剥参数版不可用，回退原始LL-HLS地址
+                            }
+                            final String fUrl3f = fUrl3;
                             final String chKey2 = liveUrl.substring(0, liveUrl.indexOf('?') > 0 ? liveUrl.indexOf('?') : liveUrl.length());
                             main.post(new Runnable() { public void run() {
                                 try {
                                     if (fc2HlsSeen.add(chKey2)) {
                                         String proxied3;
-                                        try { proxied3 = "http://127.0.0.1:8123/relay?u=" + java.net.URLEncoder.encode(fUrl3, "UTF-8"); }
-                                        catch (Throwable e3) { proxied3 = fUrl3; }
+                                        try { proxied3 = "http://127.0.0.1:8123/relay?u=" + java.net.URLEncoder.encode(fUrl3f, "UTF-8"); }
+                                        catch (Throwable e3) { proxied3 = fUrl3f; }
                                         addRecord(proxied3, "Stripchat·直播");
                                         if (!isRecordsVisible) toggleRecords();
                                     }
