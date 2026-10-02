@@ -29,6 +29,41 @@ public class DlManager {
 
     public static java.util.Collection<DlJob> jobs() { return JOBS.values(); }
 
+    private static final java.util.concurrent.ConcurrentHashMap<Integer, com.arthenica.ffmpegkit.FFmpegSession> HLS_SESS =
+        new java.util.concurrent.ConcurrentHashMap<Integer, com.arthenica.ffmpegkit.FFmpegSession>();
+
+    /** HLS(m3u8) 下载：ffmpeg 合流拷贝到本地 ts，完成后入相册+历史 */
+    public static void startHls(final String url) {
+        final DlJob j = new DlJob();
+        j.id = SEQ.incrementAndGet();
+        j.url = url;
+        j.title = "HLS_" + System.currentTimeMillis() / 1000;
+        j.file = new java.io.File(sCtx.getExternalFilesDir(null), "下载/hls" + j.id + ".ts");
+        try { j.file.getParentFile().mkdirs(); } catch (Throwable ignored) {}
+        JOBS.put(j.id, j);
+        j.state = "下载中";
+        String[] args = { "-y", "-i", url, "-c", "copy", "-f", "mpegts", j.file.getAbsolutePath() };
+        com.arthenica.ffmpegkit.FFmpegSession st = com.arthenica.ffmpegkit.FFmpegKit.executeWithArgumentsAsync(args,
+            new com.arthenica.ffmpegkit.FFmpegSessionCompleteCallback() {
+                public void apply(com.arthenica.ffmpegkit.FFmpegSession st2) {
+                    boolean ok = st2.getState().equals(com.arthenica.ffmpegkit.SessionState.COMPLETED)
+                        && j.file.exists() && j.file.length() > 0;
+                    if (ok) {
+                        j.doneBytes = j.file.length();
+                        j.state = insertGallery(j) ? "已完成" : "完成(未入相册)";
+                        HistoryStore.add(sCtx, "视频", j.title, "file://" + j.file.getAbsolutePath());
+                        j.done = true; j.active = false;
+                    } else {
+                        j.failed = true; j.active = false;
+                        j.state = "下载失败(" + st2.getState() + ")";
+                        try { j.file.delete(); } catch (Throwable ignored) {}
+                    }
+                    HLS_SESS.remove(j.id);
+                }
+            });
+        HLS_SESS.put(j.id, st);
+    }
+
     public static void start(String url) {
         final DlJob j = new DlJob();
         j.id = SEQ.incrementAndGet();
@@ -102,6 +137,8 @@ public class DlManager {
         if (j == null) return;
         j.active = false;
         JOBS.remove(id);
+        com.arthenica.ffmpegkit.FFmpegSession hs = HLS_SESS.remove(id);
+        if (hs != null) { try { com.arthenica.ffmpegkit.FFmpegKit.cancel(hs.getSessionId()); } catch (Throwable ignored) {} }
         try { if (j.file != null) j.file.delete(); } catch (Throwable ignored) {}
     }
 }

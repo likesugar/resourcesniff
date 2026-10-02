@@ -204,9 +204,11 @@ public class SniffActivity extends Activity {
                             main.post(new Runnable() { public void run() {
                                 try {
                                     if (fc2HlsSeen.add(chKey)) {
-                                        addRecord(fUrl, "FC2·直播");
+                                        String proxied = "http://127.0.0.1:8123/relay?u="
+                                            + java.net.URLEncoder.encode(fUrl, "UTF-8");
+                                        addRecord(proxied, "FC2·直播");
                                         if (!isRecordsVisible) toggleRecords();
-                                        dumpFc2Debug("记录已添加: " + fUrl);
+                                        dumpFc2Debug("记录已添加: " + proxied);
                                     }
                                 } catch (Throwable e) { dumpFc2Debug("记录添加失败: " + e.getClass().getSimpleName()); }
                             }});
@@ -1205,8 +1207,15 @@ public class SniffActivity extends Activity {
     }
 
     void downloadUrl(String url) {
-        try { DlManager.start(url); } catch (Throwable e) { }
-        Toast.makeText(this, "已加入下载，可在下载页查看", Toast.LENGTH_SHORT).show();
+        try {
+            String lu = url.toLowerCase();
+            if (lu.contains("127.0.0.1:8123/relay") || lu.contains(".m3u8") || lu.contains("playlist")) {
+                DlManager.startHls(url);  // HLS 流：ffmpeg 后台下载，卡片在下载页"下载"栏
+            } else {
+                DlManager.start(url);
+            }
+        } catch (Throwable e) { }
+        Toast.makeText(this, "已加入下载，可在下载页-下载 查看", Toast.LENGTH_SHORT).show();
     }
 
     void startRecord(final String url) {
