@@ -205,6 +205,10 @@ public class SniffActivity extends Activity {
                             final String chKey = url.substring(0, url.indexOf('?') > 0 ? url.indexOf('?') : url.length());
                             new Thread(new Runnable() { public void run() {
                                 String pick = pickFc2Quality(fUrl);
+                                String qLabel = "直播";
+                                if (pick != null && pick.contains("/90/")) qLabel = "原画";
+                                else if (pick != null && pick.contains("/40/")) qLabel = "高清";
+                                final String titleQ = "FC2·" + qLabel;
                                 if (pick == null) pick = fUrl;
                                 final String pickUrl = pick;
                                 String proxied;
@@ -214,7 +218,7 @@ public class SniffActivity extends Activity {
                                 main.post(new Runnable() { public void run() {
                                     try {
                                         if (fc2HlsSeen.add(chKey)) {
-                                            addRecord(proxiedF, "FC2·直播");
+                                            addRecord(proxiedF, titleQ);
                                             if (!isRecordsVisible) toggleRecords();
                                             dumpFc2Debug("记录已添加: " + proxiedF);
                                         }
