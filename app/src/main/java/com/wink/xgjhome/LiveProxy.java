@@ -120,7 +120,15 @@ public class LiveProxy {
             c.setConnectTimeout(6000);
             c.setReadTimeout(6000);
             c.setRequestProperty("User-Agent", "Mozilla/5.0 (Linux; Android 13) Chrome/120 Mobile");
-            c.setRequestProperty("Referer", "https://guangdongvideo.com/");
+            if (url.contains("guangdongvideo.com")) {
+                c.setRequestProperty("Referer", "https://guangdongvideo.com/");
+            } else {
+                // 其他站：Referer 用目标自己域名
+                try {
+                    java.net.URL hu = new java.net.URL(url);
+                    c.setRequestProperty("Referer", "https://" + hu.getHost() + "/");
+                } catch (Throwable ignored) {}
+            }
             if (c.getResponseCode() != 200) { c.disconnect(); return null; }
             InputStream in = c.getInputStream();
             ByteArrayOutputStream bo = new ByteArrayOutputStream();

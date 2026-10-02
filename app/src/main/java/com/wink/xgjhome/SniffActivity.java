@@ -202,7 +202,10 @@ public class SniffActivity extends Activity {
                             main.post(new Runnable() { public void run() {
                                 try {
                                     if (fc2HlsSeen.add(chKey2)) {
-                                        addRecord(fUrl3, "Stripchat·直播");
+                                        String proxied3;
+                                        try { proxied3 = "http://127.0.0.1:8123/relay?u=" + java.net.URLEncoder.encode(fUrl3, "UTF-8"); }
+                                        catch (Throwable e3) { proxied3 = fUrl3; }
+                                        addRecord(proxied3, "Stripchat·直播");
                                         if (!isRecordsVisible) toggleRecords();
                                     }
                                 } catch (Throwable ignored) {}
@@ -1134,7 +1137,7 @@ public class SniffActivity extends Activity {
     /** 内置 jessibuca 播放器：player.html 通过 AndroidPlayer 桥取地址 */
     void playUrl(String url) {
         // FC2 中转流：按 http 链接直接唤起浏览器播放
-        if (url != null && url.contains("127.0.0.1:8123/relay")) {
+        if (url != null && url.contains("127.0.0.1:8123/relay") && url.contains("guangdongvideo")) {
             try {
                 android.content.Intent i = new android.content.Intent(Intent.ACTION_VIEW);
                 i.setData(android.net.Uri.parse(url));
