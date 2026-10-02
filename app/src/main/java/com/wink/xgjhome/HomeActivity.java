@@ -4,6 +4,7 @@ import android.app.Activity;
 import android.content.ClipboardManager;
 import android.content.Intent;
 import android.widget.EditText;
+import android.widget.LinearLayout;
 import android.os.Build;
 import android.os.Bundle;
 import android.view.View;
@@ -107,22 +108,7 @@ public class HomeActivity extends Activity {
             }
         });
         findViewById(R.id.lanToggle).setOnClickListener(new View.OnClickListener() {
-            public void onClick(View v) {
-                if (LanShareServer.isRunning()) {
-                    stopService(new Intent(HomeActivity.this, LanShareService.class));
-                    android.widget.Toast.makeText(HomeActivity.this, "局域网共享已关闭", android.widget.Toast.LENGTH_SHORT).show();
-                } else {
-                    // 权限只在第一次点时申请一次，之后开关直接起/停，不再弹窗
-                    if (android.os.Build.VERSION.SDK_INT >= 33
-                        && !getSharedPreferences("settings", MODE_PRIVATE).getBoolean("permAsked", false)
-                        && checkSelfPermission("android.permission.POST_NOTIFICATIONS") != android.content.pm.PackageManager.PERMISSION_GRANTED) {
-                        getSharedPreferences("settings", MODE_PRIVATE).edit().putBoolean("permAsked", true).apply();
-                        requestPermissions(new String[]{"android.permission.POST_NOTIFICATIONS"}, 900);
-                    }
-                    try { LiveProxy.start(); } catch (Throwable ignored) {}  // 中转8123同步拉起
-                    startService(new Intent(HomeActivity.this, LanShareService.class));
-                }
-            }
+            public void onClick(View v) { showLanDialog(); }
         });
         findViewById(R.id.cardShortcut).setOnClickListener(new View.OnClickListener() {
             public void onClick(View v) {
@@ -138,6 +124,65 @@ public class HomeActivity extends Activity {
     @Override
     protected void onResume() {
         super.onResume();
+    }
+
+    /** 🗄️ 局域网共享弹窗：开关 + 电脑访问地址 */
+    private void showLanDialog() {
+        boolean on = LanShareServer.isRunning();
+        LinearLayout box = new LinearLayout(this);
+        box.setOrientation(LinearLayout.VERTICAL);
+        int pad = (int) (22 * getResources().getDisplayMetrics().density);
+        box.setPadding(pad, pad / 2, pad, 0);
+
+        TextView status = new TextView(this);
+        status.setTextSize(14);
+        status.setTextColor(0xFF444444);
+        String url = "http://" + LanShareServer.localIp() + ":" + LanShareServer.getPort();
+        if (on) {
+            status.setText("已开启，电脑浏览器访问：\n" + url + "\n（可查看并打开记录中的链接）");
+        } else {
+            status.setText("已关闭。开启后，同一 WiFi 下\n电脑浏览器可访问并打开记录中的链接。");
+        }
+        box.addView(status);
+
+        LinearLayout swRow = new LinearLayout(this);
+        swRow.setOrientation(LinearLayout.HORIZONTAL);
+        swRow.setGravity(android.view.Gravity.CENTER_VERTICAL);
+        swRow.setPadding(0, pad / 2, 0, 0);
+        TextView swLabel = new TextView(this);
+        swLabel.setText("局域网共享");
+        swLabel.setTextSize(16);
+        swLabel.setTextColor(0xFF222222);
+        swRow.addView(swLabel, new LinearLayout.LayoutParams(0, -2, 1f));
+        final android.widget.Switch sw = new android.widget.Switch(this);
+        sw.setChecked(on);
+        swRow.addView(sw);
+        box.addView(swRow);
+
+        sw.setOnClickListener(new View.OnClickListener() {
+            public void onClick(View v) {
+                if (sw.isChecked()) {
+                    if (android.os.Build.VERSION.SDK_INT >= 33
+                        && checkSelfPermission("android.permission.POST_NOTIFICATIONS") != android.content.pm.PackageManager.PERMISSION_GRANTED
+                        && !getSharedPreferences("settings", MODE_PRIVATE).getBoolean("permAsked", false)) {
+                        getSharedPreferences("settings", MODE_PRIVATE).edit().putBoolean("permAsked", true).apply();
+                        requestPermissions(new String[]{"android.permission.POST_NOTIFICATIONS"}, 900);
+                    }
+                    try { LiveProxy.start(); } catch (Throwable ignored) {}
+                    startService(new Intent(HomeActivity.this, LanShareService.class));
+                    status.setText("已开启，电脑浏览器访问：\nhttp://" + LanShareServer.localIp() + ":" + LanShareServer.getPort());
+                } else {
+                    stopService(new Intent(HomeActivity.this, LanShareService.class));
+                    status.setText("已关闭。");
+                }
+            }
+        });
+
+        new android.app.AlertDialog.Builder(this)
+            .setTitle("🗄️ 局域网共享")
+            .setView(box)
+            .setPositiveButton("完成", null)
+            .show();
     }
 
     private void showSniffDialog() {
