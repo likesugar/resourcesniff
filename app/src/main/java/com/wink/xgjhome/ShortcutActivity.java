@@ -53,14 +53,17 @@ public class ShortcutActivity extends Activity {
         LinearLayout row = null;
         java.util.ArrayList<View> cells = new java.util.ArrayList<View>();
         cells.add(smallCard("⚡", "新建快捷键", new View.OnClickListener() {
-            public void onClick(View v) { showDialog(); }
+            public void onClick(View v) {
+                startActivity(new Intent(ShortcutActivity.this, ShortcutEditActivity.class));
+            }
         }, null));
         for (final String[] us : userShortcuts()) {
+            final String key = us[9];
             String ic = us[0].length() > 0 ? us[0].substring(0, 1) : "?";
             cells.add(smallCard(ic, us[0], new View.OnClickListener() {
-                public void onClick(View v) { launchShortcut(us[1], us[2]); }
+                public void onClick(View v) { launchShortcut(us); }
             }, new View.OnLongClickListener() {
-                public boolean onLongClick(View v) { confirmDelete(us); return true; }
+                public boolean onLongClick(View v) { itemMenu(us, key); return true; }
             }));
         }
         for (int i = 0; i < cells.size(); i++) {
@@ -104,143 +107,117 @@ public class ShortcutActivity extends Activity {
         return card;
     }
 
-    private void showDialog() {
-        LinearLayout box = new LinearLayout(this);
-        box.setOrientation(LinearLayout.VERTICAL);
-        int pad = dp(24);
-        box.setPadding(pad, pad / 2, pad, 0);
-
-        scNameEt = input("名字（桌面显示）");
-        box.addView(scNameEt);
-        scPkgEt = input("包名（可留空从列表选）");
-        box.addView(scPkgEt);
-        scClsEt = input("活动（可留空自动取入口）");
-        box.addView(scClsEt);
-
-        TextView pick = new TextView(this);
-        pick.setText("从已装应用选择 ›");
-        pick.setTextColor(0xFF3D7BFF);
-        pick.setTextSize(14);
-        pick.setPadding(0, pad / 2, 0, 0);
-        pick.setOnClickListener(new View.OnClickListener() {
-            public void onClick(View v) { showAppPicker(); }
-        });
-        box.addView(pick);
-
+    private void itemMenu(final String[] us, final String key) {
         new android.app.AlertDialog.Builder(this)
-            .setTitle("新建快捷键").setView(box)
-            .setPositiveButton("确认", new android.content.DialogInterface.OnClickListener() {
-                public void onClick(android.content.DialogInterface d, int w) { createShortcut(); }
-            })
-            .setNegativeButton("取消", null).show();
-    }
-
-    private EditText input(String hint) {
-        EditText et = new EditText(this);
-        et.setHint(hint);
-        et.setBackground(null);
-        et.setTextColor(0xFFE8ECF2);
-        et.setHintTextColor(0xFF7A828E);
-        et.setTextSize(15);
-        return et;
-    }
-
-    private void showAppPicker() {
-        try {
-            android.content.pm.PackageManager pm = getPackageManager();
-            Intent li = new Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER);
-            java.util.List<android.content.pm.ResolveInfo> apps = pm.queryIntentActivities(li, 0);
-            java.util.Collections.sort(apps, new java.util.Comparator<android.content.pm.ResolveInfo>() {
-                public int compare(android.content.pm.ResolveInfo a, android.content.pm.ResolveInfo b) {
-                    return String.valueOf(a.loadLabel(pm)).compareToIgnoreCase(String.valueOf(b.loadLabel(pm)));
-                }
-            });
-            final android.content.pm.ResolveInfo[] arr = apps.toArray(new android.content.pm.ResolveInfo[0]);
-            String[] names = new String[arr.length];
-            for (int i = 0; i < arr.length; i++)
-                names[i] = arr[i].loadLabel(pm) + " (" + arr[i].activityInfo.packageName + ")";
-            new android.app.AlertDialog.Builder(this)
-                .setTitle("选择应用")
-                .setItems(names, new android.content.DialogInterface.OnClickListener() {
-                    public void onClick(android.content.DialogInterface d, int w) {
-                        scPkgEt.setText(arr[w].activityInfo.packageName);
-                        scClsEt.setText(arr[w].activityInfo.name);
-                        if (scNameEt.getText().length() == 0) scNameEt.setText(String.valueOf(arr[w].loadLabel(pm)));
+            .setTitle(us[0])
+            .setItems(new String[]{"打开", "编辑", "删除"}, new android.content.DialogInterface.OnClickListener() {
+                public void onClick(android.content.DialogInterface d, int w) {
+                    if (w == 0) launchShortcut(us);
+                    else if (w == 1) {
+                        Intent i = new Intent(ShortcutActivity.this, ShortcutEditActivity.class);
+                        i.putExtra("key", key);
+                        startActivity(i);
+                    } else {
+                        deleteByKey(key);
+                        renderGrid();
                     }
-                }).show();
-        } catch (Throwable e) {
-            Toast.makeText(this, "获取应用列表失败", Toast.LENGTH_SHORT).show();
-        }
+                }
+            }).show();
     }
 
-    private void createShortcut() {
-        String name = scNameEt.getText().toString().trim();
-        String pkg = scPkgEt.getText().toString().trim();
-        String cls = scClsEt.getText().toString().trim();
-        if (name.length() == 0 || pkg.length() == 0) {
-            Toast.makeText(this, "名字和包名不能为空", Toast.LENGTH_SHORT).show();
+    private void launchShortcut(String[] us) {
+        String pkg = us[1], cls = us[2];
+        String data = us[3];
+        String extras = us[4];
+        int am2 = parseInt0(us[5]);
+        String custom = us[6];
+        boolean newTask = !us[7].equals("0");
+        boolean root = us[8].equals("1");
+        if (root) {
+            try {
+                String cmd = "am start -n " + pkg + (cls.length() > 0 ? "/" + cls : "");
+                Process p2 = Runtime.getRuntime().exec(new String[]{"su", "-c", cmd});
+                if (p2.waitFor() == 0) return;
+                Toast.makeText(this, "Root启动失败", Toast.LENGTH_SHORT).show();
+            } catch (Throwable t) { Toast.makeText(this, "无Root权限", Toast.LENGTH_SHORT).show(); }
             return;
         }
-        java.util.ArrayList<String[]> list = userShortcuts();
-        list.add(new String[]{name, pkg, cls});
-        saveUserShortcuts(list);
-        renderGrid();  // 新卡片出现在"新建快捷键"后面
         try {
-            android.content.pm.PackageManager pm = getPackageManager();
-            Intent launch = null;
-            if (cls.length() > 0) {
-                launch = new Intent(Intent.ACTION_VIEW).setComponent(new android.content.ComponentName(pkg, cls));
-                try { launch.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK); startActivity(launch); }
-                catch (Throwable t) {
-                    launch = new Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER)
-                        .setComponent(new android.content.ComponentName(pkg, cls));
-                }
+            Intent i = new Intent();
+            if (am2 == 1) { i.setAction(Intent.ACTION_MAIN); i.addCategory(Intent.CATEGORY_LAUNCHER); }
+            else if (am2 == 2 && custom.length() > 0) i.setAction(custom);
+            else i.setAction(Intent.ACTION_VIEW);
+            if (data.length() > 0) { try { i.setData(android.net.Uri.parse(data)); } catch (Throwable ignored) {} }
+            if (cls.length() > 0) i.setComponent(new android.content.ComponentName(pkg, cls));
+            for (String ln : extras.split("\n")) {
+                ln = ln.trim();
+                int eq = ln.indexOf('=');
+                if (eq <= 0) continue;
+                String k = ln.substring(0, eq), v = ln.substring(eq + 1);
+                try {
+                    if (v.matches("-?\\d+")) i.putExtra(k, Long.parseLong(v));
+                    else if (v.equals("true") || v.equals("false")) i.putExtra(k, Boolean.parseBoolean(v));
+                    else i.putExtra(k, v);
+                } catch (Throwable t) { i.putExtra(k, v); }
             }
-            if (launch == null) launch = pm.getLaunchIntentForPackage(pkg);
-            if (launch == null) { Toast.makeText(this, "应用入口无效，仅保存了卡片", Toast.LENGTH_LONG).show(); return; }
-            launch.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-            android.content.pm.ShortcutManager sm = (android.content.pm.ShortcutManager) getSystemService(SHORTCUT_SERVICE);
-            if (sm != null && sm.isRequestPinShortcutSupported()) {
-                android.content.pm.ShortcutInfo si = new android.content.pm.ShortcutInfo.Builder(this, "us_" + System.currentTimeMillis())
-                    .setShortLabel(name).setLongLabel(name).setIntent(launch).build();
-                sm.requestPinShortcut(si, null);
-            }
-        } catch (Throwable ignored) {}
-    }
-
-    private void launchShortcut(String pkg, String cls) {
+            if (newTask) i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+            startActivity(i);
+            return;
+        } catch (Throwable t) { }
         try {
-            android.content.pm.PackageManager pm = getPackageManager();
-            if (cls.length() > 0) {
-                Intent i = new Intent(Intent.ACTION_VIEW).setComponent(new android.content.ComponentName(pkg, cls));
-                try { i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK); startActivity(i); return; } catch (Throwable t) { }
-                i = new Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER)
-                    .setComponent(new android.content.ComponentName(pkg, cls));
-                try { i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK); startActivity(i); return; } catch (Throwable t) { }
-            }
-            Intent i = pm.getLaunchIntentForPackage(pkg);
+            Intent i = getPackageManager().getLaunchIntentForPackage(pkg);
             if (i != null) { i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK); startActivity(i); return; }
-            Toast.makeText(this, "未能打开目标应用", Toast.LENGTH_LONG).show();
-        } catch (Throwable e) {
-            Toast.makeText(this, "未能打开目标应用", Toast.LENGTH_LONG).show();
-        }
+        } catch (Throwable ignored) {}
+        Toast.makeText(this, "未能打开目标应用", Toast.LENGTH_LONG).show();
     }
 
-    private void confirmDelete(final String[] us) {
-        new android.app.AlertDialog.Builder(this)
-            .setTitle("删除快捷键卡片").setMessage(us[0])
-            .setPositiveButton("删除", new android.content.DialogInterface.OnClickListener() {
-                public void onClick(android.content.DialogInterface d, int w) {
-                    java.util.ArrayList<String[]> list = userShortcuts();
-                    for (int i = 0; i < list.size(); i++) {
-                        String[] it = list.get(i);
-                        if (it[0].equals(us[0]) && it[1].equals(us[1]) && it[2].equals(us[2])) { list.remove(i); break; }
-                    }
-                    saveUserShortcuts(list);
-                    renderGrid();
-                }
-            })
-            .setNegativeButton("取消", null).show();
+    private int parseInt0(String s2) { try { return Integer.parseInt(s2); } catch (Throwable e) { return 0; } }
+
+    private void deleteByKey(String key) {
+        android.content.SharedPreferences sp = getSharedPreferences("home_shortcuts", MODE_PRIVATE);
+        int n = sp.getInt("count", 0);
+        java.util.ArrayList<String> all = new java.util.ArrayList<String>();
+        for (int i = 0; i < n; i++) {
+            String r = sp.getString("s" + i, null);
+            if (r == null) continue;
+            String[] p3 = r.split("\\u0001");
+            String k = p3.length > 9 ? p3[9] : "";
+            if (!k.equals(key)) all.add(r);
+        }
+        android.content.SharedPreferences.Editor e = sp.edit();
+        e.putInt("count", all.size());
+        for (int i = 0; i < all.size(); i++) e.putString("s" + i, all.get(i));
+        for (int i = all.size(); i < n; i++) e.remove("s" + i);
+        e.apply();
+    }
+
+    public static String[] findByKey(android.content.Context c, String key) {
+        android.content.SharedPreferences sp = c.getSharedPreferences("home_shortcuts", android.content.Context.MODE_PRIVATE);
+        String raw = sp.getString("k_" + key, null);
+        if (raw == null) return null;
+        String[] p3 = raw.split("\\u0001");
+        String[] full = new String[10];
+        for (int j2 = 0; j2 < 10; j2++) full[j2] = j2 < p3.length ? p3[j2] : "";
+        if (full[7].length() == 0) full[7] = "1";
+        return full;
+    }
+
+    public static void saveByKey(android.content.Context c, String key, String rec) {
+        android.content.SharedPreferences sp = c.getSharedPreferences("home_shortcuts", android.content.Context.MODE_PRIVATE);
+        int n = sp.getInt("count", 0);
+        java.util.ArrayList<String> all = new java.util.ArrayList<String>();
+        for (int i = 0; i < n; i++) { String r = sp.getString("s" + i, null); if (r != null) all.add(r); }
+        for (int i = 0; i < all.size(); i++) {
+            String[] p3 = all.get(i).split("\\u0001");
+            String k = p3.length > 9 ? p3[9] : "";
+            if (k.equals(key)) { all.set(i, rec + "\\u0001" + key); rec = null; break; }
+        }
+        if (rec != null) all.add(rec + "\\u0001" + key);
+        android.content.SharedPreferences.Editor e = sp.edit();
+        e.putInt("count", all.size());
+        for (int i = 0; i < all.size(); i++) e.putString("s" + i, all.get(i));
+        e.putString("k_" + key, rec == null ? sp.getString("k_" + key, rec) : rec);
+        e.apply();
     }
 
     private java.util.ArrayList<String[]> userShortcuts() {
@@ -252,7 +229,12 @@ public class ShortcutActivity extends Activity {
                 String raw = sp.getString("s" + i, null);
                 if (raw == null) continue;
                 String[] p2 = raw.split("\\u0001");
-                if (p2.length >= 3) out.add(new String[]{p2[0], p2[1], p2[2]});
+                if (p2.length >= 3) {
+                    String[] full = new String[10];
+                    for (int j2 = 0; j2 < 10; j2++) full[j2] = j2 < p2.length ? p2[j2] : (j2 == 7 ? "1" : "");
+                    if (full[9].length() == 0) full[9] = "s" + i;
+                    out.add(full);
+                }
             }
         } catch (Throwable ignored) {}
         return out;
@@ -262,8 +244,19 @@ public class ShortcutActivity extends Activity {
         try {
             android.content.SharedPreferences.Editor e = getSharedPreferences("home_shortcuts", MODE_PRIVATE).edit();
             e.putInt("count", list.size());
-            for (int i = 0; i < list.size(); i++)
-                e.putString("s" + i, list.get(i)[0] + "\\u0001" + list.get(i)[1] + "\\u0001" + list.get(i)[2]);
+            for (int i = 0; i < list.size(); i++) {
+                String[] it = list.get(i);
+                StringBuilder sb = new StringBuilder();
+                for (int j = 0; j < 10; j++) {
+                    if (j > 0) sb.append("\\u0001");
+                    String v = (j < it.length && it[j] != null) ? it[j] : "";
+                    if (v.length() == 0 && j == 7) v = "1";
+                    if (v.length() == 0 && j == 9) v = "s" + System.currentTimeMillis() + "_" + i;
+                    sb.append(v);
+                }
+                e.putString("s" + i, sb.toString());
+                e.putString("k_" + it[9], sb.toString());
+            }
             e.apply();
         } catch (Throwable ignored) {}
     }

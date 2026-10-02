@@ -108,7 +108,10 @@ public class HomeActivity extends Activity {
         });
         findViewById(R.id.cardShortcut).setOnClickListener(new View.OnClickListener() {
             public void onClick(View v) {
-                startActivity(new Intent(HomeActivity.this, ShortcutActivity.class));
+                try { startActivity(new Intent(HomeActivity.this, ShortcutActivity.class)); }
+                catch (Throwable t) {
+                    android.widget.Toast.makeText(HomeActivity.this, "打开失败: " + t, android.widget.Toast.LENGTH_LONG).show();
+                }
             }
         });
 
