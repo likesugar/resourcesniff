@@ -31,6 +31,12 @@ public class ShortcutActivity extends Activity {
             tv2.setText("CRASH:\n" + sw2.toString());
             sv2.addView(tv2);
             setContentView(sv2);
+            try {
+                java.io.File f = new java.io.File(getExternalFilesDir(null), "诊断toast.txt");
+                java.io.FileWriter fw = new java.io.FileWriter(f, true);
+                fw.write(new java.text.SimpleDateFormat("HH:mm:ss", java.util.Locale.US).format(new java.util.Date()) + "\n" + sw2.toString() + "\n----------\n");
+                fw.close();
+            } catch (Throwable ignored) {}
         }
     }
 
