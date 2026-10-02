@@ -239,6 +239,14 @@ public class SniffActivity extends Activity {
                                 return null;  // 失败放行让 WebView 自己拉
                             }
                         }
+                        // 只收带清晰度的子列表(_240p.m3u8等)；_auto主列表/心跳单拉无数据，不进记录
+                        if (lu2.matches(".*_\\d+p\\.m3u8\\?.*") || lu2.matches(".*_\\d+p\\.m3u8")) {
+                            dumpFc2Debug("SC-LIVE: " + url);
+                        }
+                        else if (lu2.contains(".m3u8")) {
+                            dumpFc2Debug("SC-SKIP: " + url);
+                            return null;
+                        }
                         if (lu2.contains(".m3u8") && !lu2.contains("ping")) {  // ping.m3u8 是保活心跳，不是流
                             // LL-HLS 参数剥掉，转成标准 HLS（播放器/ffmpeg 才能循环加载）
                             String liveUrl = url;
