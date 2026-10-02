@@ -304,7 +304,9 @@ public class SniffActivity extends Activity {
                         } catch (Throwable e) { }
                     }
                     maybeRecordDouyin(url);
-                    if (isMediaUrl(url) && recordKeys.add(url)) {
+                    // stripchat 系由专属分支套中转处理，通用嗅探跳过，避免出现裸地址记录
+                    boolean stripchatRaw = (url.contains("stripchat") || url.contains("doppiocdn")) && url.toLowerCase().contains(".m3u8");
+                    if (isMediaUrl(url) && !stripchatRaw && recordKeys.add(url)) {
                         foundUrls.add(url);
                         final String page = webView.getTitle();
                         runOnUiThread(new Runnable() {
