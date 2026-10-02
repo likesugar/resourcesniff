@@ -605,6 +605,8 @@ public class SniffActivity extends Activity {
         String l = url.toLowerCase();
         if (url.contains("/log/")) return;
         if (l.contains("bilivideo") || l.contains("upos-")) return;
+        // stripchat 系（含 doppiocdn）有专属中转分支，不进抖音择优流程；ping.m3u8 是心跳
+        if (l.contains("stripchat") || l.contains("doppiocdn") || l.contains("ping.m3u8")) return;
         // 抖音直播：无参数裸地址 .../stage/xxxxx（不带 .flv?e= 签名参数，签名地址每次都变会死循环）
         String base = url;
         int qi = base.indexOf('?');
