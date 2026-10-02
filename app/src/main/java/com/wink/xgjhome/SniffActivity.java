@@ -52,6 +52,26 @@ public class SniffActivity extends Activity {
 
     private final ArrayList<String> foundUrls = new ArrayList<>();
     private final LinkedHashSet<String> recordKeys = new LinkedHashSet<>();
+    // 同一路流按画质去重：baseKey -> [rank, url, tv, tvUrl]
+    private final java.util.HashMap<String, Object[]> recByBase = new java.util.HashMap<>();
+
+    static int qualRank(String u) {
+        if (u.contains("_or4")) return 3;
+        if (u.contains("_uhd")) return 2;
+        if (u.contains("_hd")) return 1;
+        return 0;
+    }
+
+    static String qualName(int r) {
+        if (r >= 3) return "原画";
+        if (r == 2) return "蓝光";
+        if (r == 1) return "高清";
+        return null;
+    }
+
+    static String baseKey(String url) {
+        return url.replace("_or4", "\u0001").replace("_uhd", "\u0001").replace("_hd", "\u0001");
+    }
 
     @SuppressLint({"SetJavaScriptEnabled", "ClickableViewAccessibility"})
     @Override
@@ -878,6 +898,19 @@ public class SniffActivity extends Activity {
     void addRecord(final String url, String title) {
         // 流畅/极速不显示
         if (title != null && title.contains("抖音") && (url.contains("_ld.") || url.contains("_md."))) return;
+        // 同一路流只留一条最高画质：原画(_or4) > 蓝光(_uhd) > 高清(_hd)
+        final int rank = qualRank(url);
+        final String bk = baseKey(url);
+        if (recByBase.containsKey(bk)) {
+            Object[] prev = recByBase.get(bk);
+            int pr = (Integer) prev[0];
+            if (rank <= pr) return;  // 已有更高或同等画质，丢弃
+            prev[0] = rank; prev[1] = url;  // 原地升级为更高画质
+            String qn = qualName(rank);
+            ((TextView) prev[2]).setText(qn == null ? title : "抖音·" + qn);
+            ((TextView) prev[3]).setText(url);
+            return;
+        }
         LinearLayout row = new LinearLayout(this);
         row.setOrientation(LinearLayout.VERTICAL);
         row.setPadding(16, 12, 16, 12);
@@ -887,6 +920,8 @@ public class SniffActivity extends Activity {
         tv.setTextColor(0xFFFFFFFF);
         tv.setTextSize(13);
         String label = (title == null || title.length() == 0) ? "嗅探 " + (foundUrls.size()) : title;
+        String qn = qualName(rank);
+        if (qn != null) label = "抖音·" + qn;
         tv.setText(label);
         tv.setSingleLine(true);
 
@@ -916,21 +951,25 @@ public class SniffActivity extends Activity {
         tvUrl.setText(url);
         tvUrl.setSingleLine(true);
         row.addView(tvUrl);
+        row.setTag(url);  // 画质升级后菜单/复制取最新地址
 
         // 点行复制（不删除）
         row.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
+                String u = row.getTag() instanceof String ? (String) row.getTag() : url;
                 ClipboardManager cm = (ClipboardManager) getSystemService(CLIPBOARD_SERVICE);
-                cm.setPrimaryClip(ClipData.newPlainText("url", url));
+                cm.setPrimaryClip(ClipData.newPlainText("url", u));
                 Toast.makeText(SniffActivity.this, "已复制", Toast.LENGTH_SHORT).show();
             }
         });
 
+        recByBase.put(bk, new Object[]{rank, url, tv, tvUrl});
         layoutRecords.addView(row, 0);
     }
 
     void showRecordMenu(final View anchor, final String url, final LinearLayout row) {
+        final String curUrl = row.getTag() instanceof String ? (String) row.getTag() : url;
         android.widget.PopupMenu pm = new android.widget.PopupMenu(this, anchor);
         pm.getMenu().add("下载");
         pm.getMenu().add("播放");
@@ -941,13 +980,14 @@ public class SniffActivity extends Activity {
             @Override
             public boolean onMenuItemClick(android.view.MenuItem item) {
                 String t = item.getTitle().toString();
-                if (t.equals("下载")) downloadUrl(url);
-                else if (t.equals("播放")) playUrl(url);
+                if (t.equals("下载")) downloadUrl(curUrl);
+                else if (t.equals("播放")) playUrl(curUrl);
                 else if (t.equals("直播录制")) {
+                    final String url = curUrl;
                     finish(); // 先退出资源嗅探
                     try {
                         android.content.ClipboardManager cm = (android.content.ClipboardManager) getSystemService(Context.CLIPBOARD_SERVICE);
-                        cm.setPrimaryClip(android.content.ClipData.newPlainText("stream", url));
+                        cm.setPrimaryClip(android.content.ClipData.newPlainText("stream", curUrl));
                     } catch (Throwable e) { }
                     RecManager.init(getApplicationContext());
                     RecManager.startRecJob(url); // 自动开始录制
@@ -961,6 +1001,9 @@ public class SniffActivity extends Activity {
                 else if (t.equals("删除")) {
                     ViewGroup p = (ViewGroup) row.getParent();
                     if (p != null) p.removeView(row);
+                    for (java.util.Iterator<java.util.Map.Entry<String, Object[]>> it2 = recByBase.entrySet().iterator(); it2.hasNext(); ) {
+                        if (it2.next().getValue()[3] == row.getChildAt(1)) it2.remove();
+                    }
                     recordKeys.remove(url);
                     foundUrls.remove(url);
                     Toast.makeText(SniffActivity.this, "已删除", Toast.LENGTH_SHORT).show();
