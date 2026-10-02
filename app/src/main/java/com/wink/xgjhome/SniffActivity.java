@@ -239,14 +239,12 @@ public class SniffActivity extends Activity {
                                 return null;  // 失败放行让 WebView 自己拉
                             }
                         }
-                        // 只收带清晰度的子列表(_240p.m3u8等)；_auto主列表/心跳单拉无数据，不进记录
-                        if (lu2.matches(".*_\\d+p\\.m3u8\\?.*") || lu2.matches(".*_\\d+p\\.m3u8")) {
-                            dumpFc2Debug("SC-LIVE: " + url);
-                        }
-                        else if (lu2.contains(".m3u8")) {
+                        // 排除：心跳(ping)、主列表(/master/、_auto)——单拉无数据；其余媒体列表都收
+                        if (lu2.contains("ping.m3u8") || lu2.contains("/master/") || lu2.contains("_auto.m3u8")) {
                             dumpFc2Debug("SC-SKIP: " + url);
                             return null;
                         }
+                        dumpFc2Debug("SC-LIVE: " + url);
                         if (lu2.contains(".m3u8") && !lu2.contains("ping")) {  // ping.m3u8 是保活心跳，不是流
                             // LL-HLS 参数剥掉，转成标准 HLS（播放器/ffmpeg 才能循环加载）
                             String liveUrl = url;
@@ -278,9 +276,13 @@ public class SniffActivity extends Activity {
                                         String proxied3;
                                         try { proxied3 = "http://127.0.0.1:8123/relay?u=" + java.net.URLEncoder.encode(fUrl3f, "UTF-8"); }
                                         catch (Throwable e3) { proxied3 = fUrl3f; }
-                                        java.util.regex.Matcher mq = java.util.regex.Pattern.compile("_(\\d{3,4})p\\.m3u8").matcher(fUrl3f);
                                         String qLabel2 = "直播";
-                                        if (mq.find()) qLabel2 = mq.group(1) + "p";
+                                        try {
+                                            byte[] plb = StripRec.httpGetBytes(proxied3);
+                                            java.util.regex.Matcher mr = java.util.regex.Pattern.compile("RESOLUTION=(\\d+)x(\\d+)").matcher(new String(plb, "UTF-8"));
+                                            if (mr.find()) qLabel2 = mr.group(2) + "p";
+                                            StripRec.lastPlaylist = fUrl3f;
+                                        } catch (Throwable ignored) {}
                                         addRecord(proxied3, "Stripchat·" + qLabel2);
                                         if (!isRecordsVisible) toggleRecords();
                                     }
