@@ -100,7 +100,8 @@ public class Fc2Relay {
 
         byte[] hdr = new byte[2];
         java.io.ByteArrayOutputStream txtAcc = new java.io.ByteArrayOutputStream();
-        boolean hlsRequested = false;
+        boolean ready = false;
+        boolean gotPlaylists = false;
         long lastHb = System.currentTimeMillis();
         long lastHeartbeatRecv = System.currentTimeMillis();
 
@@ -128,12 +129,14 @@ public class Fc2Relay {
                 if (!fin) continue;
                 String msg = txtAcc.toString("UTF-8");
                 txtAcc.reset();
-                handleMessage(msg, out);
+                boolean[] gp = {gotPlaylists};
+                handleMessage(msg, out, gp);
+                gotPlaylists = gp[0];
 
-                // connect_complete 后请求 HLS（只发一次，必要时重发）
-                if (!hlsRequested && (msg.contains("connect_complete") || msg.contains("initial_connect"))) {
+                // 就绪后每5秒重发 get_hls_information，直到拿到列表（官方实现同款重试）
+                if ((msg.contains("connect_complete") || msg.contains("initial_connect"))) ready = true;
+                if (ready && !gotPlaylists && System.currentTimeMillis() - lastHb > 5000) {
                     sendText(out, msg("get_hls_information"));
-                    hlsRequested = true;
                     lastHb = System.currentTimeMillis();
                 }
             }
@@ -151,9 +154,10 @@ public class Fc2Relay {
         sk.close();
     }
 
-    private static void handleMessage(String msg, OutputStream out) {
+    private static void handleMessage(String msg, OutputStream out, boolean[] gotFlag) {
         try {
-            if (msg.contains("\"playlists\"") && msg.contains("url")) {
+            if (msg.contains("playlists") && msg.contains("url")) {
+                gotFlag[0] = true;
                 // _response_ 携带 HLS 信息：挑 mode 最高（>=90 减 90 比较）
                 String best = null; int bestMode = -1;
                 java.util.regex.Matcher mu = java.util.regex.Pattern.compile("\"url\"\\s*:\\s*\"([^\"]+)\"").matcher(msg);
