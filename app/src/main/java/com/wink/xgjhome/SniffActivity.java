@@ -127,7 +127,14 @@ public class SniffActivity extends Activity {
             }
             @android.webkit.JavascriptInterface
             public void onWsUrl(String u) {
-                if (u == null || !u.contains("ws.php")) return;
+                if (u == null) return;
+                final boolean fc2Ws = u.startsWith("ws://") || u.startsWith("wss://");
+                if (!fc2Ws) return;
+                final boolean isFc2 = u.contains("ws.php") || u.toLowerCase().contains("fc2");
+                main.post(new Runnable() { public void run() {
+                    try { Toast.makeText(SniffActivity.this, "捕获WS: " + u.substring(0, Math.min(48, u.length())), Toast.LENGTH_LONG).show(); } catch (Throwable ignored) {}
+                }});
+                if (!isFc2) return;
                 Fc2Relay.start(u);
                 if (!fc2Added.getAndSet(true)) {
                     main.post(new Runnable() { public void run() {
@@ -168,7 +175,11 @@ public class SniffActivity extends Activity {
                     if (!"http".equals(u.getScheme()) && !"https".equals(u.getScheme())) return null;
                     String url = u.toString();
                     if (url.contains("/log/")) return null;
-                    if (request.isForMainFrame() && (url.contains("live.fc2.com") || url.contains("guangdongvideo.com"))) {
+                    boolean fc2Doc = (url.contains("live.fc2.com") || url.contains("guangdongvideo.com"))
+                        && !url.contains(".js") && !url.contains(".css") && !url.contains(".png")
+                        && !url.contains(".jpg") && !url.contains(".gif") && !url.contains(".ico");
+                    if (fc2Doc && (request.isForMainFrame() || url.contains(".php") || url.endsWith("/")
+                        || url.toLowerCase().contains("embed") || url.toLowerCase().contains("player"))) {
                         // FC2 系主文档：提前装 WebSocket 钩子
                         try {
                             java.net.HttpURLConnection hc = (java.net.HttpURLConnection) new java.net.URL(url).openConnection();
