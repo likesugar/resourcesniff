@@ -33,20 +33,6 @@ public class DlManager {
 
     public static java.util.Collection<DlJob> jobs() { return JOBS.values(); }
 
-    /** stripchat 录制卡片：控制 StripRec */
-    public static void startStripCard() {
-        DlJob j = new DlJob();
-        j.id = SEQ.incrementAndGet();
-        j.url = "stripchat://card";
-        j.title = "Stripchat·录制";
-        j.hls = true;
-        j.file = new java.io.File(sCtx.getExternalFilesDir(null), "下载/stripchat" + j.id);
-        j.file.mkdirs();
-        j.active = true;
-        j.state = "录制中";
-        JOBS.put(j.id, j);
-    }
-
     public static void start(String url) {
         String lu = url.toLowerCase();
         if (lu.contains("127.0.0.1:8123/relay") || lu.contains(".m3u8") || lu.contains("playlist")) startHls(url);
@@ -112,9 +98,6 @@ public class DlManager {
     public static void pauseHls(int id) {
         DlJob j = JOBS.get(id);
         if (j == null || !j.hls) return;
-        if (j.url.startsWith("stripchat://")) {
-            StripRec.pause(); j.paused = true; j.active = false; j.state = "已暂停"; return;
-        }
         com.arthenica.ffmpegkit.FFmpegSession st = HLS_SESS.remove(id);
         if (st != null) { try { com.arthenica.ffmpegkit.FFmpegKit.cancel(st.getSessionId()); } catch (Throwable ignored) {} }
         j.paused = true;
@@ -126,9 +109,6 @@ public class DlManager {
     public static void resumeHls(int id) {
         DlJob j = JOBS.get(id);
         if (j == null || !j.hls) return;
-        if (j.url.startsWith("stripchat://")) {
-            StripRec.resume(); j.paused = false; j.active = true; j.state = "录制中"; return;
-        }
         launchSegmentFfmpeg(j);
     }
 
@@ -136,21 +116,6 @@ public class DlManager {
     public static void finishHls(final int id) {
         final DlJob j = JOBS.get(id);
         if (j == null || !j.hls) return;
-        if (j.url.startsWith("stripchat://")) {
-            j.state = "合并MP4中…";
-            new Thread(new Runnable() { public void run() {
-                String p = StripRec.stopAndMerge(new StripRec.Context0());
-                if (p != null) {
-                    j.done = true; j.paused = false; j.active = false;
-                    j.state = "已完成(视频栏)";
-                    java.io.File f2 = new java.io.File(p);
-                    j.doneBytes = f2.exists() ? f2.length() : 0;
-                } else {
-                    j.failed = true; j.active = false; j.state = "无数据";
-                }
-            } }).start();
-            return;
-        }
         com.arthenica.ffmpegkit.FFmpegSession st = HLS_SESS.remove(id);
         if (st != null) { try { com.arthenica.ffmpegkit.FFmpegKit.cancel(st.getSessionId()); } catch (Throwable ignored) {} }
         j.state = "合并MP4中…";
@@ -202,15 +167,6 @@ public class DlManager {
                 j.state = "合并失败: " + t.getClass().getSimpleName();
             }
         } }).start();
-    }
-
-    static void refreshStripCard() {
-        for (DlJob j : JOBS.values()) {
-            if (j.url != null && j.url.startsWith("stripchat://")) {
-                j.doneBytes = StripRec.getBytes();
-                j.state = StripRec.isPaused() ? "已暂停" : (StripRec.isRunning() ? "录制中" : j.state);
-            }
-        }
     }
 
     private static void refreshBytes(DlJob j) {

@@ -479,20 +479,12 @@ public class RecManager {
             java.io.File[] fs = job.file.listFiles();
             if (fs != null) for (java.io.File f : fs) if (f.getName().startsWith("seg")) segN++;
         } catch (Throwable ignored) {}
-        boolean isDy = job.url.contains("douyin");
-        java.util.ArrayList<String> al = new java.util.ArrayList<String>();
-        al.add("-y");
-        al.add("-user_agent"); al.add(BG_UA);
-        if (isDy) {  // 抖音才带抖音头；其他站(如本地relay)由relay自己加头
-            al.add("-headers"); al.add("Referer: https://live.douyin.com/\r\n");
-        }
-        al.add("-i"); al.add(job.url);
-        al.add("-c"); al.add("copy");
-        al.add("-f"); al.add("segment"); al.add("-segment_time"); al.add("30");
-        al.add("-reset_timestamps"); al.add("1");
-        al.add("-segment_start_number"); al.add(String.valueOf(segN));
-        al.add(new java.io.File(job.file, "seg%03d.ts").getAbsolutePath());
-        String[] args = al.toArray(new String[0]);
+        String[] args = { "-y", "-user_agent", BG_UA,
+            "-headers", "Referer: https://live.douyin.com/\r\n",
+            "-i", job.url, "-c", "copy",
+            "-f", "segment", "-segment_time", "30", "-reset_timestamps", "1",
+            "-segment_start_number", String.valueOf(segN),
+            new java.io.File(job.file, "seg%03d.ts").getAbsolutePath() };
         bgSession = com.arthenica.ffmpegkit.FFmpegKit.executeWithArgumentsAsync(args,
             new com.arthenica.ffmpegkit.FFmpegSessionCompleteCallback() {
                 public void apply(com.arthenica.ffmpegkit.FFmpegSession st) {
@@ -510,8 +502,8 @@ public class RecManager {
         try {
             tv.danmaku.ijk.media.player.IjkMediaPlayer m = new tv.danmaku.ijk.media.player.IjkMediaPlayer();
             java.util.Map<String, String> h = new java.util.HashMap<String, String>();
+            h.put("Referer", "https://live.douyin.com/");
             h.put("User-Agent", BG_UA);
-            if (job.url.contains("douyin")) h.put("Referer", "https://live.douyin.com/");
             m.setDataSource(job.url, h);
             m.setVolume(0f, 0f);
             m.prepareAsync();

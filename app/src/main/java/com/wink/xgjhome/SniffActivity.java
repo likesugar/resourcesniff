@@ -78,7 +78,6 @@ public class SniffActivity extends Activity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        StripRec.Context0.set(this);
         sDumpCtx = this;
         try { LiveProxy.start(); } catch (Throwable ignored) {}   // 本地中转必须常驻，FC2/B站记录才能播/录/下
         DlManager.init(this);
@@ -195,113 +194,6 @@ public class SniffActivity extends Activity {
                     if (!"http".equals(u.getScheme()) && !"https".equals(u.getScheme())) return null;
                     String url = u.toString();
                     if (url.contains("/log/")) return null;
-                    if (url.contains("stripchat") || url.contains("doppiocdn")) {
-                        String lu2 = url.toLowerCase();
-                        if (lu2.contains(".m3u8") || lu2.contains(".ts") || lu2.contains(".mp4")) {
-                            dumpFc2Debug("SC-REQ: " + url);
-                        }
-                        // 旁路录制（零接触版）：页面请求原样放行，后台自己另拉一份写文件，
-                        // 避免触碰页面分片被反广告拦截检测识别
-                        // 分片改为经 /scseg 中转（见列表改写），这里不再双取
-                        // 排除：心跳(ping)、主列表(/master/、_auto)——单拉无数据；其余媒体列表都收
-                        if (lu2.contains("ping.m3u8") || lu2.contains("/master/") || lu2.contains("_auto.m3u8")) {
-                            dumpFc2Debug("SC-SKIP: " + url);
-                            return null;
-                        }
-                        dumpFc2Debug("SC-LIVE: " + url);
-                        if (lu2.contains(".m3u8") && !lu2.contains("ping")) {
-                            // 拉列表 → 分片地址改写为 /scseg(中转tee) → 返回页面；页面无感知
-                            try {
-                                byte[] plb = StripRec.httpGetBytes(url);
-                                String body = new String(plb, "UTF-8");
-                                java.net.URL pb2 = new java.net.URL(url);
-                                String dirBase = pb2.getProtocol() + "://" + pb2.getHost() + pb2.getPath().substring(0, pb2.getPath().lastIndexOf('/') + 1);
-                                StripRec.lastPlaylist = url;
-                                StringBuilder sb2 = new StringBuilder();
-                                for (String ln : body.split("\n")) {
-                                    String t2 = ln.trim();
-                                    if (!t2.isEmpty() && !t2.startsWith("#")) {
-                                        String abs = t2.startsWith("http") ? t2 : (t2.startsWith("/") ? pb2.getProtocol() + "://" + pb2.getHost() + t2 : dirBase + t2);
-                                        ln = "http://127.0.0.1:8123/scseg?u=" + java.net.URLEncoder.encode(abs, "UTF-8");
-                                    } else if (t2.startsWith("#EXT-X-MAP")) {
-                                        // init 分段也改写，让录制拿到 init
-                                        java.util.regex.Matcher mu = java.util.regex.Pattern.compile("URI=\"([^\"]+)\"").matcher(t2);
-                                        if (mu.find()) {
-                                            String iu = mu.group(1);
-                                            String abs = iu.startsWith("http") ? iu : (iu.startsWith("/") ? pb2.getProtocol() + "://" + pb2.getHost() + iu : dirBase + iu);
-                                            ln = ln.replace(mu.group(1), "http://127.0.0.1:8123/scseg?u=" + java.net.URLEncoder.encode(abs, "UTF-8"));
-                                        }
-                                    }
-                                    sb2.append(ln).append("\n");
-                                }
-                                byte[] out2 = sb2.toString().getBytes("UTF-8");
-                                // 进记录（一次）
-                                final String chKey3 = url.substring(0, url.indexOf('?') > 0 ? url.indexOf('?') : url.length());
-                                if (fc2HlsSeen.add(chKey3)) {
-                                    java.util.regex.Matcher mr2 = java.util.regex.Pattern.compile("RESOLUTION=(\\d+)x(\\d+)").matcher(body);
-                                    String qLabel3 = mr2.find() ? mr2.group(2) + "p" : "直播";
-                                    final String recUrl = url;
-                                    final String recTitle = "Stripchat·" + qLabel3;
-                                    main.post(new Runnable() { public void run() {
-                                        try {
-                                            addRecord(recUrl, recTitle);
-                                            if (!isRecordsVisible) toggleRecords();
-                                        } catch (Throwable ignored) {}
-                                    }});
-                                }
-                                return new android.webkit.WebResourceResponse("application/vnd.apple.mpegurl", null,
-                                    new java.io.ByteArrayInputStream(out2));
-                            } catch (Throwable e3) {
-                                try { SniffActivity.dumpFc2Debug("SC-RW-ERR " + e3.getClass().getSimpleName()); } catch (Throwable ignored) {}
-                                return null;
-                            }
-                        }
-                        if (false) {  // 旧逻辑保留位
-                            // LL-HLS 参数剥掉，转成标准 HLS（播放器/ffmpeg 才能循环加载）
-                            String liveUrl = url;
-                            try {
-                                java.net.URL pu = new java.net.URL(url);
-                                java.util.ArrayList<String[]> keep = new java.util.ArrayList<String[]>();
-                                String[] parts = pu.getQuery() == null ? new String[0] : pu.getQuery().split("&");
-                                for (String kv : parts) {
-                                    if (kv.startsWith("_HLS_msn=") || kv.startsWith("_HLS_part=")) continue;
-                                    if (kv.startsWith("playlistType=")) { keep.add(new String[]{"playlistType=standard"}); continue; }
-                                    keep.add(new String[]{kv});
-                                }
-                                StringBuilder qb = new StringBuilder(pu.getProtocol() + "://" + pu.getHost() + pu.getPath());
-                                for (int qi2 = 0; qi2 < keep.size(); qi2++) {
-                                    qb.append(qi2 == 0 ? '?' : '&').append(keep.get(qi2)[0]);
-                                }
-                                liveUrl = qb.toString();
-                            } catch (Throwable ignored) {}
-                            String fUrl3 = liveUrl;
-                            if (!probeHls("http://127.0.0.1:8123/relay?u=" + java.net.URLEncoder.encode(liveUrl, "UTF-8"))) {
-                                fUrl3 = url;  // 剥参数版不可用，回退原始LL-HLS地址
-                            }
-                            StripRec.lastPlaylist = fUrl3;
-                            final String fUrl3f = fUrl3;
-                            final String chKey2 = liveUrl.substring(0, liveUrl.indexOf('?') > 0 ? liveUrl.indexOf('?') : liveUrl.length());
-                            main.post(new Runnable() { public void run() {
-                                try {
-                                    if (fc2HlsSeen.add(chKey2)) {
-                                        String proxied3;
-                                        try { proxied3 = "http://127.0.0.1:8123/relay?u=" + java.net.URLEncoder.encode(fUrl3f, "UTF-8"); }
-                                        catch (Throwable e3) { proxied3 = fUrl3f; }
-                                        String qLabel2 = "直播";
-                                        try {
-                                            byte[] plb = StripRec.httpGetBytes(proxied3);
-                                            java.util.regex.Matcher mr = java.util.regex.Pattern.compile("RESOLUTION=(\\d+)x(\\d+)").matcher(new String(plb, "UTF-8"));
-                                            if (mr.find()) qLabel2 = mr.group(2) + "p";
-                                            StripRec.lastPlaylist = fUrl3f;
-                                        } catch (Throwable ignored) {}
-                                        addRecord(proxied3, "Stripchat·" + qLabel2);
-                                        if (!isRecordsVisible) toggleRecords();
-                                    }
-                                } catch (Throwable ignored) {}
-                            }});
-                        }
-                        return null;
-                    }
                     if (url.contains("guangdongvideo.com") || url.contains("live.fc2.com")) {
                         String lu = url.toLowerCase();
                         boolean isMaster = lu.contains("master_playlist");
@@ -393,9 +285,7 @@ public class SniffActivity extends Activity {
                         } catch (Throwable e) { }
                     }
                     maybeRecordDouyin(url);
-                    // stripchat 系由专属分支套中转处理，通用嗅探跳过，避免出现裸地址记录
-                    boolean stripchatRaw = url.contains("stripchat") || url.contains("doppiocdn");  // 全类型跳过，由专属分支处理
-                    if (isMediaUrl(url) && !stripchatRaw && recordKeys.add(url)) {
+                    if (isMediaUrl(url) && recordKeys.add(url)) {
                         foundUrls.add(url);
                         final String page = webView.getTitle();
                         runOnUiThread(new Runnable() {
@@ -694,8 +584,6 @@ public class SniffActivity extends Activity {
         String l = url.toLowerCase();
         if (url.contains("/log/")) return;
         if (l.contains("bilivideo") || l.contains("upos-")) return;
-        // stripchat 系（含 doppiocdn）有专属中转分支，不进抖音择优流程；ping.m3u8 是心跳
-        if (l.contains("stripchat") || l.contains("doppiocdn") || l.contains("ping.m3u8")) return;
         // 抖音直播：无参数裸地址 .../stage/xxxxx（不带 .flv?e= 签名参数，签名地址每次都变会死循环）
         String base = url;
         int qi = base.indexOf('?');
@@ -852,7 +740,7 @@ public class SniffActivity extends Activity {
 
     private static android.content.Context sDumpCtx;
 
-    public static void dumpFc2Debug(String st) {
+    private static void dumpFc2Debug(String st) {
         try {
             java.io.File dir = sDumpCtx.getExternalFilesDir(null).getParentFile();
             java.io.FileWriter fw = new java.io.FileWriter(new java.io.File(dir, "fc2_debug.txt"), true);
@@ -1229,21 +1117,8 @@ public class SniffActivity extends Activity {
 
     /** 内置 jessibuca 播放器：player.html 通过 AndroidPlayer 桥取地址 */
     void playUrl(String url) {
-        // stripchat：流是会话绑定的，直接打开直播间页面
-        if (url != null && (url.contains("doppiocdn") || url.contains("stripchat"))) {
-            try {
-                String page = StripRec.getPageUrl();
-                android.content.Intent i = new android.content.Intent(Intent.ACTION_VIEW);
-                i.setData(android.net.Uri.parse(page != null ? page : url));
-                i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-                startActivity(i);
-                return;
-            } catch (Throwable e) {
-                Toast.makeText(this, "无法唤起浏览器", Toast.LENGTH_SHORT).show();
-            }
-        }
         // FC2 中转流：按 http 链接直接唤起浏览器播放
-        if (url != null && url.contains("127.0.0.1:8123/relay") && url.contains("guangdongvideo")) {
+        if (url != null && url.contains("127.0.0.1:8123/relay")) {
             try {
                 android.content.Intent i = new android.content.Intent(Intent.ACTION_VIEW);
                 i.setData(android.net.Uri.parse(url));
@@ -1388,7 +1263,7 @@ public class SniffActivity extends Activity {
         android.widget.PopupMenu pm = new android.widget.PopupMenu(this, anchor);
         pm.getMenu().add("下载");
         pm.getMenu().add("播放");
-        final String label = (recThreads.containsKey(url) || StripRec.isRunning()) ? "停止录制" : "直播录制";
+        final String label = recThreads.containsKey(url) ? "停止录制" : "直播录制";
         pm.getMenu().add(label);
         pm.getMenu().add("删除");
         pm.setOnMenuItemClickListener(new android.widget.PopupMenu.OnMenuItemClickListener() {
@@ -1397,23 +1272,6 @@ public class SniffActivity extends Activity {
                 String t = item.getTitle().toString();
                 if (t.equals("下载")) downloadUrl(curUrl);
                 else if (t.equals("播放")) playUrl(curUrl);
-                else if (t.equals("直播录制") && (curUrl.contains("doppiocdn") || curUrl.contains("stripchat"))) {
-                    // stripchat 旁路录制：页面静音后台继续拉流，控制走下载卡片
-                    try {
-                        String page = webView.getUrl();
-                        StripRec.start(page);
-                        try { webView.evaluateJavascript(
-                            "document.querySelectorAll('video').forEach(function(v){v.muted=true;v.volume=0;});", null); } catch (Throwable ignored) {}
-                        DlManager.startStripCard();
-                        Toast.makeText(SniffActivity.this, "已开始录制(页面已静音)，下载卡片控制", Toast.LENGTH_LONG).show();
-                    } catch (Throwable e) { Toast.makeText(SniffActivity.this, "启动失败", Toast.LENGTH_SHORT).show(); }
-                    return true;
-                }
-                else if (t.equals("停止录制") && StripRec.isRunning()) {
-                    String p = StripRec.stopAndMerge(new StripRec.Context0());
-                    Toast.makeText(SniffActivity.this, p != null ? "已保存相册+视频栏" : "无数据", Toast.LENGTH_LONG).show();
-                    return true;
-                }
                 else if (t.equals("直播录制")) {
                     final String url = curUrl;
                     finish(); // 先退出资源嗅探

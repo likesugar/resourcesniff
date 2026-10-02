@@ -120,19 +120,7 @@ public class LiveProxy {
             c.setConnectTimeout(6000);
             c.setReadTimeout(6000);
             c.setRequestProperty("User-Agent", "Mozilla/5.0 (Linux; Android 13) Chrome/120 Mobile");
-            if (url.contains("guangdongvideo.com")) {
-                c.setRequestProperty("Referer", "https://guangdongvideo.com/");
-            } else if (url.contains("doppiocdn") || url.contains("stripchat")) {
-                // stripchat 系 CDN：必须带站点 Referer
-                c.setRequestProperty("Referer", "https://zh.stripchat.cam/");
-                c.setRequestProperty("Origin", "https://zh.stripchat.cam");
-            } else {
-                // 其他站：Referer 用目标自己域名
-                try {
-                    java.net.URL hu = new java.net.URL(url);
-                    c.setRequestProperty("Referer", "https://" + hu.getHost() + "/");
-                } catch (Throwable ignored) {}
-            }
+            c.setRequestProperty("Referer", "https://guangdongvideo.com/");
             if (c.getResponseCode() != 200) { c.disconnect(); return null; }
             InputStream in = c.getInputStream();
             ByteArrayOutputStream bo = new ByteArrayOutputStream();
@@ -163,24 +151,13 @@ public class LiveProxy {
 
             if (path.startsWith("/relay")) {
                 // 通用中转：u=原始地址（m3u8 内容递归改写；分片流式转发）
-                String raw = null;
                 try {
-                    raw = URLDecoder.decode(queryParam(path, "u"), "UTF-8");
+                    String raw = URLDecoder.decode(queryParam(path, "u"), "UTF-8");
                     HttpURLConnection oc = (HttpURLConnection) new URL(raw).openConnection();
                     oc.setConnectTimeout(8000);
                     oc.setReadTimeout(8000);
                     oc.setRequestProperty("User-Agent", "Mozilla/5.0 (Linux; Android 13) Chrome/120 Mobile");
-                    if (raw.contains("guangdongvideo.com")) {
-                        oc.setRequestProperty("Referer", "https://guangdongvideo.com/");
-                    } else if (raw.contains("doppiocdn") || raw.contains("stripchat")) {
-                        oc.setRequestProperty("Referer", "https://zh.stripchat.cam/");
-                        oc.setRequestProperty("Origin", "https://zh.stripchat.cam");
-                    } else {
-                        try {
-                            java.net.URL hu = new URL(raw);
-                            oc.setRequestProperty("Referer", "https://" + hu.getHost() + "/");
-                        } catch (Throwable ignored) {}
-                    }
+                    oc.setRequestProperty("Referer", "https://guangdongvideo.com/");
                     int code = oc.getResponseCode();
                     if (code == 200) {
                         InputStream in = oc.getInputStream();
@@ -210,24 +187,9 @@ public class LiveProxy {
                         return;
                     }
                     oc.disconnect();
-                    try { SniffActivity.dumpFc2Debug("RELAY-ERR code=" + code + " " + raw); } catch (Throwable ignored) {}
                     writeResp(s, "404 Not Found", "text/plain", "upstream err".getBytes());
                 } catch (Throwable e) {
-                    try { SniffActivity.dumpFc2Debug("RELAY-EXC " + e.getClass().getSimpleName() + " " + raw); } catch (Throwable ignored) {}
                     writeResp(s, "404 Not Found", "text/plain", "relay err".getBytes());
-                }
-                return;
-            }
-
-            if (path.startsWith("/scseg")) {
-                // stripchat 分片中转：带站点头取上游，录制开启时 tee 一份写文件
-                try {
-                    String raw2 = URLDecoder.decode(queryParam(path, "u"), "UTF-8");
-                    byte[] body2 = StripRec.httpGetBytes(raw2);
-                    try { StripRec.feed(raw2, body2); } catch (Throwable ignored) {}
-                    writeResp(s, "200 OK", "video/iso.segment", body2);
-                } catch (Throwable e2) {
-                    writeResp(s, "404 Not Found", "text/plain", "scseg err".getBytes());
                 }
                 return;
             }
