@@ -204,10 +204,36 @@ public class SniffActivity extends Activity {
                         if (lu2.endsWith(".mp4") && (lu2.contains("_part") || lu2.contains("init"))) {
                             try {
                                 if (url.contains(".m3u8")) StripRec.lastPlaylist = url;
-                                byte[] body = StripRec.httpGetBytes(url);
-                                try { StripRec.feed(url, body); } catch (Throwable ignored) {}
-                                return new android.webkit.WebResourceResponse("video/iso.segment", null,
-                                    new java.io.ByteArrayInputStream(body));
+                                // 流式直通：管道边下边喂页面，同步 tee 录制（不整段缓冲，避免卡顿掉帧）
+                                java.net.HttpURLConnection hc = (java.net.HttpURLConnection) new java.net.URL(url).openConnection();
+                                hc.setConnectTimeout(8000); hc.setReadTimeout(8000);
+                                hc.setRequestProperty("User-Agent", "Mozilla/5.0 (Linux; Android 13) Chrome/120 Mobile");
+                                if (url.contains("doppiocdn") || url.contains("stripchat")) {
+                                    hc.setRequestProperty("Referer", "https://zh.stripchat.cam/");
+                                    hc.setRequestProperty("Origin", "https://zh.stripchat.cam");
+                                }
+                                java.io.InputStream up = hc.getInputStream();
+                                java.io.PipedOutputStream po = new java.io.PipedOutputStream();
+                                java.io.PipedInputStream pi = new java.io.PipedInputStream(po, 512 * 1024);
+                                final java.io.InputStream fup = up;
+                                final String fUrl4 = url;
+                                new Thread(new Runnable() { public void run() {
+                                    byte[] b = new byte[16 * 1024]; int n;
+                                    try {
+                                        while ((n = fup.read(b)) > 0) {
+                                            po.write(b, 0, n);
+                                            byte[] chunk = new byte[n];
+                                            System.arraycopy(b, 0, chunk, 0, n);
+                                            StripRec.feed(fUrl4, chunk);
+                                        }
+                                        po.flush();
+                                    } catch (Throwable ignored) {
+                                    } finally {
+                                        try { po.close(); } catch (Throwable ignored) {}
+                                        try { fup.close(); } catch (Throwable ignored) {}
+                                    }
+                                } }).start();
+                                return new android.webkit.WebResourceResponse("video/iso.segment", null, pi);
                             } catch (Throwable e2) {
                                 try { SniffActivity.dumpFc2Debug("SC-TAP-ERR " + e2.getClass().getSimpleName()); } catch (Throwable ignored) {}
                                 return null;  // 失败放行让 WebView 自己拉
@@ -244,7 +270,10 @@ public class SniffActivity extends Activity {
                                         String proxied3;
                                         try { proxied3 = "http://127.0.0.1:8123/relay?u=" + java.net.URLEncoder.encode(fUrl3f, "UTF-8"); }
                                         catch (Throwable e3) { proxied3 = fUrl3f; }
-                                        addRecord(proxied3, "Stripchat·直播");
+                                        java.util.regex.Matcher mq = java.util.regex.Pattern.compile("_(\\d{3,4})p\\.m3u8").matcher(fUrl3f);
+                                        String qLabel2 = "直播";
+                                        if (mq.find()) qLabel2 = mq.group(1) + "p";
+                                        addRecord(proxied3, "Stripchat·" + qLabel2);
                                         if (!isRecordsVisible) toggleRecords();
                                     }
                                 } catch (Throwable ignored) {}
