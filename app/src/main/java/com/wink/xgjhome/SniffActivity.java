@@ -911,6 +911,12 @@ public class SniffActivity extends Activity {
             ((TextView) prev[3]).setText(url);
             return;
         }
+        boolean isDy = (title != null && title.contains("抖音")) || url.contains("douyin");
+        // 兜底直链（无画质后缀）与带后缀的流并存时，只留带后缀的
+        if (isDy && rank == 0 && hasHigherRank()) return;
+        if (isDy && rank > 0 && genericBase != null && recByBase.containsKey(genericBase)) {
+            dropRecord(genericBase);  // 高画质到了，删掉兜底那条
+        }
         LinearLayout row = new LinearLayout(this);
         row.setOrientation(LinearLayout.VERTICAL);
         row.setPadding(16, 12, 16, 12);
@@ -965,7 +971,25 @@ public class SniffActivity extends Activity {
         });
 
         recByBase.put(bk, new Object[]{rank, url, tv, tvUrl});
+        if (isDy && rank == 0) genericBase = bk;  // 记住兜底那条，便于高画质到达时移除
         layoutRecords.addView(row, 0);
+    }
+
+    private String genericBase = null;
+
+    private boolean hasHigherRank() {
+        for (Object[] v : recByBase.values()) if ((Integer) v[0] > 0) return true;
+        return false;
+    }
+
+    private void dropRecord(String bk) {
+        Object[] v = recByBase.remove(bk);
+        if (v != null && v[3] != null) {
+            TextView tvU = (TextView) v[3];
+            Object p = tvU.getParent();
+            if (p instanceof ViewGroup) ((ViewGroup) p).removeView(tvU); // tvUrl的父即整行
+        }
+        genericBase = null;
     }
 
     void showRecordMenu(final View anchor, final String url, final LinearLayout row) {
