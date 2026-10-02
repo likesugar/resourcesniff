@@ -112,8 +112,11 @@ public class HomeActivity extends Activity {
                     stopService(new Intent(HomeActivity.this, LanShareService.class));
                     android.widget.Toast.makeText(HomeActivity.this, "局域网共享已关闭", android.widget.Toast.LENGTH_SHORT).show();
                 } else {
-                    if (android.os.Build.VERSION.SDK_INT >= 33 &&
-                        checkSelfPermission("android.permission.POST_NOTIFICATIONS") != android.content.pm.PackageManager.PERMISSION_GRANTED) {
+                    // 权限只在第一次点时申请一次，之后开关直接起/停，不再弹窗
+                    if (android.os.Build.VERSION.SDK_INT >= 33
+                        && !getSharedPreferences("settings", MODE_PRIVATE).getBoolean("permAsked", false)
+                        && checkSelfPermission("android.permission.POST_NOTIFICATIONS") != android.content.pm.PackageManager.PERMISSION_GRANTED) {
+                        getSharedPreferences("settings", MODE_PRIVATE).edit().putBoolean("permAsked", true).apply();
                         requestPermissions(new String[]{"android.permission.POST_NOTIFICATIONS"}, 900);
                     }
                     try { LiveProxy.start(); } catch (Throwable ignored) {}  // 中转8123同步拉起

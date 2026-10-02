@@ -1148,6 +1148,22 @@ public class SniffActivity extends Activity {
         synchronized (LAN_LINKS) { return new java.util.LinkedHashMap<String, String>(LAN_LINKS); }
     }
 
+    /** 供录制器注册任务链接（如 抖音·原画） */
+    public static void registerLanLink(String url, String title) {
+        try {
+            String real = url;
+            if (real.startsWith("http://127.0.0.1:8123/relay?u=")) {
+                real = java.net.URLDecoder.decode(real.substring("http://127.0.0.1:8123/relay?u=".length()), "UTF-8");
+            }
+            synchronized (LAN_LINKS) {
+                if (!LAN_LINKS.containsKey(real)) {
+                    LAN_LINKS.put(real, title == null ? real : title);
+                    if (LAN_LINKS.size() > 500) LAN_LINKS.remove(LAN_LINKS.keySet().iterator().next());
+                }
+            }
+        } catch (Throwable ignored) {}
+    }
+
     void addRecord(final String url, String title) {
         // 流畅/极速不显示
         if (title != null && title.contains("抖音") && (url.contains("_ld.") || url.contains("_md."))) return;

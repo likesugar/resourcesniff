@@ -421,6 +421,7 @@ public class RecManager {
             job.url = url;
             String ct = cleanTitle(title);
             job.name = (ct != null ? ct : "直播·原画_" + System.currentTimeMillis() / 1000) + ".ts";
+            try { SniffActivity.registerLanLink(url, "抖音·原画 " + job.name.replace(".ts", "")); } catch (Throwable ignored) {}
             job.startTs = System.currentTimeMillis();
             String title2 = job.name.endsWith(".ts") ? job.name.substring(0, job.name.length() - 3) : job.name;
             final java.io.File dir = new java.io.File(sCtx.getExternalFilesDir(null), "录制合并/" + title);
