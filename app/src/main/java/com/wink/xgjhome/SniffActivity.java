@@ -144,13 +144,25 @@ public class SniffActivity extends Activity {
                         if (!isRecordsVisible) toggleRecords();
                     }});
                 }
-                // 6秒后报告诊断
-                main.postDelayed(new Runnable() { public void run() {
-                    String st = Fc2Relay.isConnected()
-                        ? ("已连 " + Fc2Relay.bytesTotal() + "B 首帧: " + Fc2Relay.debugHex())
-                        : "未连接(重试中)";
-                    try { Toast.makeText(SniffActivity.this, "FC2诊断: " + st, Toast.LENGTH_LONG).show(); } catch (Throwable ignored) {}
-                }}, 6000);
+                // 诊断写文件 + toast
+                final String fUrl = u;
+                Runnable dump = new Runnable() { public void run() {
+                    String st = "url: " + fUrl
+                        + "\n时间: " + new java.text.SimpleDateFormat("HH:mm:ss", java.util.Locale.US).format(new java.util.Date())
+                        + "\n状态: " + (Fc2Relay.isConnected()
+                            ? "已连 " + Fc2Relay.bytesTotal() + "B 首帧: " + Fc2Relay.debugHex()
+                            : "未连接(重试" + 8 + "次内)");
+                    try { Toast.makeText(SniffActivity.this, "FC2诊断已写入", Toast.LENGTH_SHORT).show(); } catch (Throwable ignored) {}
+                    try {
+                        java.io.File dir = getExternalFilesDir(null).getParentFile();
+                        java.io.FileWriter fw = new java.io.FileWriter(new java.io.File(dir, "fc2_debug.txt"), true);
+                        fw.write(st + "\n----------------\n");
+                        fw.close();
+                    } catch (Throwable ignored) {}
+                }};
+                main.postDelayed(dump, 6000);
+                main.postDelayed(dump, 20000);
+                main.postDelayed(dump, 40000);
             }
         }, "AndroidPlayer");
 
