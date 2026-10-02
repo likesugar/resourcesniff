@@ -68,7 +68,7 @@ public class ShortcutEditActivity extends Activity {
             bt.setTextColor(0xFFE8ECF2);
             bt.setTextSize(14);
             bt.setGravity(Gravity.CENTER);
-            bt.setBackgroundResource(i == 3 ? 0xFF245C8D : 0xFF242B34);
+            bt.setBackgroundColor(i == 3 ? 0xFF245C8D : 0xFF242B34);
             LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(0, dp(38), 1f);
             lp.rightMargin = dp(8);
             bt.setLayoutParams(lp);
