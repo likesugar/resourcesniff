@@ -45,6 +45,7 @@ public class SniffActivity extends Activity {
     private LinearLayout layoutRecords;
     private View fab;
     private Button btnSwitchUa;
+    private Button btnRefresh;
 
     private boolean isMobileUa = false;
     private boolean isRecordsVisible = false;
@@ -92,7 +93,7 @@ public class SniffActivity extends Activity {
         btnRefresh.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                try { webView.reload(); } catch (Throwable e) { }
+                toggleAutoRefresh();
             }
         });
 
@@ -521,19 +522,21 @@ public class SniffActivity extends Activity {
     private final Runnable douyinWatchdog = new Runnable() {
         public void run() {
             if (!douyinParsing) return;
-            boolean hasCands;
-            synchronized (douyinCands) { hasCands = !douyinCands.isEmpty(); }
-            if (!hasCands && douyinLiveUrl != null) {
+            boolean hasQuality = false;
+            synchronized (douyinCands) {
+                for (String u : douyinCands) if (u.contains("_or4") || u.contains("_uhd") || u.contains("_hd")) { hasQuality = true; break; }
+            }
+            if (!hasQuality && douyinLiveUrl != null) {
                 douyinLiveExtract(douyinLiveUrl, CookieManager.getInstance().getCookie("https://live.douyin.com"));
             }
-            if (hasCands && douyinPickScheduled) return;  // 已进入择优流程，停止看门狗
-            main.postDelayed(this, 8000);
+            if (hasQuality && douyinPickScheduled) return;  // 已拿到画质流，停止看门狗
+            main.postDelayed(this, 1000);
         }
     };
 
     void startDouyinWatchdog() {
         main.removeCallbacks(douyinWatchdog);
-        main.postDelayed(douyinWatchdog, 8000);
+        main.postDelayed(douyinWatchdog, 1000);
     }
 
     /** 候选全部入记录（带画质标签），不再只挑一条 */
@@ -679,7 +682,7 @@ public class SniffActivity extends Activity {
                         final String fu = u;
                         main.post(new Runnable() { public void run() {
                             if (recordKeys.add("dy#" + fu)) {
-                                addRecord(fu, "抖音·直播(1088×1920)");
+                                addRecord(fu, "抖音·直播(兜底)");
                                 if (!isRecordsVisible) toggleRecords();
                             }
                             douyinParsing = false;
@@ -976,6 +979,24 @@ public class SniffActivity extends Activity {
     }
 
     private String genericBase = null;
+
+    // ↻ 连续刷新：1秒一次，直到刷出带画质后缀(原画/蓝光/高清)的流；按钮变"停"，再点停止
+    private boolean autoRefreshing = false;
+    private final Runnable autoRefreshRun = new Runnable() {
+        public void run() {
+            if (!autoRefreshing) return;
+            if (hasHigherRank()) { toggleAutoRefresh(); return; }  // 刷到原画等，自动停
+            try { webView.reload(); } catch (Throwable e) { }
+            main.postDelayed(this, 1000);
+        }
+    };
+
+    void toggleAutoRefresh() {
+        autoRefreshing = !autoRefreshing;
+        btnRefresh.setText(autoRefreshing ? "停" : "↻");
+        if (autoRefreshing) autoRefreshRun.run();
+        else main.removeCallbacks(autoRefreshRun);
+    }
 
     private boolean hasHigherRank() {
         for (Object[] v : recByBase.values()) if ((Integer) v[0] > 0) return true;
