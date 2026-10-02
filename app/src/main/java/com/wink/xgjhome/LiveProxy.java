@@ -212,7 +212,8 @@ public class LiveProxy {
                         if (eq > 0) q.put(kv.substring(0, eq), kv.substring(eq + 1));
                     }
                     String act = q.get("act");
-                    java.io.File base = new java.io.File(sSCCtx != null ? sSCCtx.getExternalFilesDir(null) : null, "sc_mp4");
+                    // 中间 webm 放内部缓存，用户只看得到最终 MP4（相册/视频栏）
+                    java.io.File base = new java.io.File(sSCCtx != null ? sSCCtx.getCacheDir() : null, "sc_webm");
                     base.mkdirs();
                     if ("start".equals(act)) {
                         scFile = new java.io.File(base, "rec" + System.currentTimeMillis() / 1000 + ".webm");
@@ -237,10 +238,21 @@ public class LiveProxy {
                             new Thread(new Runnable() { public void run() {
                                 try {
                                     java.io.File fin = new java.io.File(wf.getParentFile(), wf.getName().replace(".webm", ".mp4"));
+                                    // 先试免转码拷流（h264源）；VP8 源 MP4 容器不吃，自动转码 H264
                                     com.arthenica.ffmpegkit.FFmpegSession cs = com.arthenica.ffmpegkit.FFmpegKit.executeWithArguments(
                                         new String[]{"-y", "-i", wf.getAbsolutePath(), "-c", "copy",
                                             "-movflags", "+faststart", fin.getAbsolutePath()});
-                                    if (cs.getState().equals(com.arthenica.ffmpegkit.SessionState.COMPLETED) && fin.length() > 0) {
+                                    boolean ok = cs.getState().equals(com.arthenica.ffmpegkit.SessionState.COMPLETED) && fin.length() > 0;
+                                    if (!ok) {
+                                        try { fin.delete(); } catch (Throwable ignored) {}
+                                        cs = com.arthenica.ffmpegkit.FFmpegKit.executeWithArguments(
+                                            new String[]{"-y", "-i", wf.getAbsolutePath(),
+                                                "-c:v", "libx264", "-preset", "ultrafast", "-crf", "23",
+                                                "-c:a", "aac", "-b:a", "128k",
+                                                "-movflags", "+faststart", fin.getAbsolutePath()});
+                                        ok = cs.getState().equals(com.arthenica.ffmpegkit.SessionState.COMPLETED) && fin.length() > 0;
+                                    }
+                                    if (ok) {
                                         android.content.ContentValues cv = new android.content.ContentValues();
                                         cv.put(android.provider.MediaStore.Video.Media.DISPLAY_NAME, fin.getName());
                                         cv.put(android.provider.MediaStore.Video.Media.MIME_TYPE, "video/mp4");
