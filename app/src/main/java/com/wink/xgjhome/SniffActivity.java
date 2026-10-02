@@ -78,6 +78,7 @@ public class SniffActivity extends Activity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        StripRec.Context0.set(this);
         sDumpCtx = this;
         try { LiveProxy.start(); } catch (Throwable ignored) {}   // 本地中转必须常驻，FC2/B站记录才能播/录/下
         DlManager.init(this);
@@ -199,6 +200,19 @@ public class SniffActivity extends Activity {
                         if (lu2.contains(".m3u8") || lu2.contains(".ts") || lu2.contains(".mp4")) {
                             dumpFc2Debug("SC-REQ: " + url);
                         }
+                        // 旁路录制：init/part 分片自取并 tee（route A）
+                        if (lu2.endsWith(".mp4") && (lu2.contains("_part") || lu2.contains("init"))) {
+                            try {
+                                if (url.contains(".m3u8")) StripRec.lastPlaylist = url;
+                                byte[] body = StripRec.httpGetBytes(url);
+                                try { StripRec.feed(url, body); } catch (Throwable ignored) {}
+                                return new android.webkit.WebResourceResponse("video/iso.segment", null,
+                                    new java.io.ByteArrayInputStream(body));
+                            } catch (Throwable e2) {
+                                try { SniffActivity.dumpFc2Debug("SC-TAP-ERR " + e2.getClass().getSimpleName()); } catch (Throwable ignored) {}
+                                return null;  // 失败放行让 WebView 自己拉
+                            }
+                        }
                         if (lu2.contains(".m3u8") && !lu2.contains("ping")) {  // ping.m3u8 是保活心跳，不是流
                             // LL-HLS 参数剥掉，转成标准 HLS（播放器/ffmpeg 才能循环加载）
                             String liveUrl = url;
@@ -221,6 +235,7 @@ public class SniffActivity extends Activity {
                             if (!probeHls("http://127.0.0.1:8123/relay?u=" + java.net.URLEncoder.encode(liveUrl, "UTF-8"))) {
                                 fUrl3 = url;  // 剥参数版不可用，回退原始LL-HLS地址
                             }
+                            StripRec.lastPlaylist = fUrl3;
                             final String fUrl3f = fUrl3;
                             final String chKey2 = liveUrl.substring(0, liveUrl.indexOf('?') > 0 ? liveUrl.indexOf('?') : liveUrl.length());
                             main.post(new Runnable() { public void run() {
@@ -1310,7 +1325,7 @@ public class SniffActivity extends Activity {
         android.widget.PopupMenu pm = new android.widget.PopupMenu(this, anchor);
         pm.getMenu().add("下载");
         pm.getMenu().add("播放");
-        final String label = recThreads.containsKey(url) ? "停止录制" : "直播录制";
+        final String label = (recThreads.containsKey(url) || StripRec.isRunning()) ? "停止录制" : "直播录制";
         pm.getMenu().add(label);
         pm.getMenu().add("删除");
         pm.setOnMenuItemClickListener(new android.widget.PopupMenu.OnMenuItemClickListener() {
@@ -1319,6 +1334,20 @@ public class SniffActivity extends Activity {
                 String t = item.getTitle().toString();
                 if (t.equals("下载")) downloadUrl(curUrl);
                 else if (t.equals("播放")) playUrl(curUrl);
+                else if (t.equals("直播录制") && (curUrl.contains("doppiocdn") || curUrl.contains("stripchat"))) {
+                    // stripchat 旁路录制：页面保持打开，分片 tee
+                    try {
+                        String page = webView.getUrl();
+                        StripRec.start(page);
+                        Toast.makeText(SniffActivity.this, "已开始录制（请保持本页播放）", Toast.LENGTH_LONG).show();
+                    } catch (Throwable e) { Toast.makeText(SniffActivity.this, "启动失败", Toast.LENGTH_SHORT).show(); }
+                    return true;
+                }
+                else if (t.equals("停止录制") && StripRec.isRunning()) {
+                    String p = StripRec.stopAndMerge(new StripRec.Context0());
+                    Toast.makeText(SniffActivity.this, p != null ? "已保存相册+视频栏" : "无数据", Toast.LENGTH_LONG).show();
+                    return true;
+                }
                 else if (t.equals("直播录制")) {
                     final String url = curUrl;
                     finish(); // 先退出资源嗅探
