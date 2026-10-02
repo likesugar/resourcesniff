@@ -133,13 +133,24 @@ public class SniffActivity extends Activity {
                 main.post(new Runnable() { public void run() {
                     try { Toast.makeText(SniffActivity.this, "捕获WS: " + u.substring(0, Math.min(48, u.length())), Toast.LENGTH_LONG).show(); } catch (Throwable ignored) {}
                 }});
-                Fc2Relay.start(u);
+                try {
+                    java.net.URL wu = new java.net.URL(u.replaceFirst("^ws", "http"));
+                    String ck = CookieManager.getInstance().getCookie("https://" + wu.getHost());
+                    Fc2Relay.start(u, ck);
+                } catch (Throwable e) { Fc2Relay.start(u); }
                 if (!fc2Added.getAndSet(true)) {
                     main.post(new Runnable() { public void run() {
                         addRecord("http://127.0.0.1:8123/fc2.flv", "FC2·直播");
                         if (!isRecordsVisible) toggleRecords();
                     }});
                 }
+                // 6秒后报告诊断
+                main.postDelayed(new Runnable() { public void run() {
+                    String st = Fc2Relay.isConnected()
+                        ? ("已连 " + Fc2Relay.bytesTotal() + "B 首帧: " + Fc2Relay.debugHex())
+                        : "未连接(重试中)";
+                    try { Toast.makeText(SniffActivity.this, "FC2诊断: " + st, Toast.LENGTH_LONG).show(); } catch (Throwable ignored) {}
+                }}, 6000);
             }
         }, "AndroidPlayer");
 
