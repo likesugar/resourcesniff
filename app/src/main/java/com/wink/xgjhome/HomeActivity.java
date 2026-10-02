@@ -14,16 +14,6 @@ import android.widget.TextView;
 public class HomeActivity extends Activity {
 
     // ---------- 主题（纯黑 / 冰蓝） ----------
-    @Override
-    protected void onDestroy() {
-        if (isFinishing()) {   // 应用退出：局域网共享随进程结束
-            LanShareServer.stop();
-            android.app.NotificationManager nm = (android.app.NotificationManager) getSystemService(NOTIFICATION_SERVICE);
-            nm.cancel(1001);
-        }
-        super.onDestroy();
-    }
-
     private void applyTheme() {
         boolean dark = getSharedPreferences("settings", MODE_PRIVATE).getBoolean("dark", false);
         findViewById(R.id.toolRoot).setBackgroundColor(dark ? 0xFF000000 : 0xFFEEF4FF);
@@ -119,31 +109,15 @@ public class HomeActivity extends Activity {
         findViewById(R.id.lanToggle).setOnClickListener(new View.OnClickListener() {
             public void onClick(View v) {
                 if (LanShareServer.isRunning()) {
-                    LanShareServer.stop();
-                    android.app.NotificationManager nm = (android.app.NotificationManager) getSystemService(NOTIFICATION_SERVICE);
-                    nm.cancel(1001);
+                    stopService(new Intent(HomeActivity.this, LanShareService.class));
                     android.widget.Toast.makeText(HomeActivity.this, "局域网共享已关闭", android.widget.Toast.LENGTH_SHORT).show();
                 } else {
                     if (android.os.Build.VERSION.SDK_INT >= 33 &&
                         checkSelfPermission("android.permission.POST_NOTIFICATIONS") != android.content.pm.PackageManager.PERMISSION_GRANTED) {
                         requestPermissions(new String[]{"android.permission.POST_NOTIFICATIONS"}, 900);
                     }
-                    LanShareServer.start();
                     try { LiveProxy.start(); } catch (Throwable ignored) {}  // 中转8123同步拉起
-                    String url = "http://" + LanShareServer.localIp() + ":" + LanShareServer.getPort();
-                    android.app.NotificationManager nm = (android.app.NotificationManager) getSystemService(NOTIFICATION_SERVICE);
-                    if (android.os.Build.VERSION.SDK_INT >= 26) {
-                        nm.createNotificationChannel(new android.app.NotificationChannel("lan", "局域网共享", android.app.NotificationManager.IMPORTANCE_LOW));
-                    }
-                    android.app.Notification.Builder nb = android.os.Build.VERSION.SDK_INT >= 26
-                        ? new android.app.Notification.Builder(HomeActivity.this, "lan")
-                        : new android.app.Notification.Builder(HomeActivity.this);
-                    nb.setSmallIcon(android.R.drawable.ic_menu_share)
-                      .setContentTitle("局域网共享已开启")
-                      .setContentText("电脑打开 " + url)
-                      .setStyle(new android.app.Notification.BigTextStyle().bigText("电脑浏览器打开 " + url + " 可查看并打开记录中的链接"))
-                      .setOngoing(true);
-                    nm.notify(1001, nb.build());
+                    startService(new Intent(HomeActivity.this, LanShareService.class));
                 }
             }
         });
