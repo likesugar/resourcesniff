@@ -205,7 +205,7 @@ public class SniffActivity extends Activity {
                             final String chKey = url.substring(0, url.indexOf('?') > 0 ? url.indexOf('?') : url.length());
                             new Thread(new Runnable() { public void run() {
                                 String pick = pickFc2Quality(fUrl);
-                                String qLabel = "直播";
+                                String qLabel = bestFc2Name != null && bestFc2Name.length() > 0 ? bestFc2Name : "直播";
                                 if (pick != null && pick.contains("/90/")) qLabel = "原画";
                                 else if (pick != null && pick.contains("/40/")) qLabel = "高清";
                                 final String titleQ = "FC2·" + qLabel;
@@ -661,19 +661,63 @@ public class SniffActivity extends Activity {
         main.postDelayed(new Runnable() { public void run() { pollFc2Hls(ws, round + 1); } }, 2000);
     }
 
-    /** FC2 画质选择：90(原画)优先，其次 40(高清)，探测子列表可用性；都不可用返回 null 用 master */
+    /** FC2 画质选择：解析 master_playlist，按 BANDWIDTH 从高到低挑子列表（90原画>40高清自然包含在内） */
     private static String pickFc2Quality(String masterUrl) {
         try {
-            String base = masterUrl.substring(0, masterUrl.indexOf("/master_playlist"));
-            String q = masterUrl.substring(masterUrl.indexOf("/master_playlist") + "/master_playlist".length()); // ?c=..&d=..
-            String[] prefs = {"/90/playlist", "/40/playlist"};
-            for (String pf : prefs) {
-                String cand = base + pf + q;
-                if (probeHls(cand)) return cand;
+            String proxied = "http://127.0.0.1:8123/relay?u=" + java.net.URLEncoder.encode(masterUrl, "UTF-8");
+            java.net.HttpURLConnection c = (java.net.HttpURLConnection) new java.net.URL(proxied).openConnection();
+            c.setConnectTimeout(6000); c.setReadTimeout(6000);
+            java.io.ByteArrayOutputStream bo = new java.io.ByteArrayOutputStream();
+            java.io.InputStream in = c.getInputStream();
+            byte[] b = new byte[8192]; int n;
+            while ((n = in.read(b)) > 0) bo.write(b, 0, n);
+            in.close(); c.disconnect();
+            String body = bo.toString("UTF-8");
+            if (!body.contains("#EXTM3U")) return null;
+            // 解析 #EXT-X-STREAM-INF(BANDWIDTH) + 下一行 URL
+            java.util.ArrayList<long[]> bws = new java.util.ArrayList<long[]>();
+            java.util.ArrayList<String> urls = new java.util.ArrayList<String>();
+            java.util.ArrayList<String> names = new java.util.ArrayList<String>();
+            String[] lines = body.split("\n");
+            String base = masterUrl.substring(0, masterUrl.lastIndexOf('/') + 1);
+            for (int i = 0; i < lines.length; i++) {
+                String ln = lines[i].trim();
+                if (ln.startsWith("#EXT-X-STREAM-INF")) {
+                    java.util.regex.Matcher mb = java.util.regex.Pattern.compile("BANDWIDTH=(\\d+)").matcher(ln);
+                    long bw = mb.find() ? Long.parseLong(mb.group(1)) : 0;
+                    java.util.regex.Matcher mn = java.util.regex.Pattern.compile("NAME=\"([^\"]*)\"").matcher(ln);
+                    String nm = mn.find() ? mn.group(1) : "";
+                    // 下一行是子列表地址
+                    for (int j2 = i + 1; j2 < lines.length; j2++) {
+                        String u2 = lines[j2].trim();
+                        if (u2.isEmpty() || u2.startsWith("#")) continue;
+                        if (!u2.startsWith("http")) u2 = base + u2.replaceFirst("^/", "");
+                        bws.add(new long[]{bw});
+                        urls.add(u2);
+                        names.add(nm);
+                        break;
+                    }
+                }
+            }
+            // 按带宽降序，逐个探测
+            Integer[] idx = new Integer[urls.size()];
+            for (int i = 0; i < idx.length; i++) idx[i] = i;
+            java.util.Arrays.sort(idx, new java.util.Comparator<Integer>() {
+                public int compare(Integer a, Integer b2) { return Long.compare(bws.get(b2)[0], bws.get(a)[0]); }
+            });
+            for (int i = 0; i < idx.length; i++) {
+                String cand = urls.get(idx[i]);
+                if (probeHls(cand)) {
+                    bestFc2Name = names.get(idx[i]);
+                    return cand;
+                }
             }
         } catch (Throwable ignored) {}
+        bestFc2Name = null;
         return null;
     }
+
+    private static volatile String bestFc2Name = null;
 
     private static boolean probeHls(String url) {
         try {
