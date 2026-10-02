@@ -62,13 +62,20 @@ public class LanShareServer {
             String[] parts = req.split(" ");
             if (parts.length >= 2) path = parts[1];
         }
-        String body;
         if (path.startsWith("/open?u=")) {
             String u = java.net.URLDecoder.decode(path.substring(8), "UTF-8");
-            body = "<html><meta charset='utf-8'><body style='background:#111;color:#eee;font-family:monospace'>"
-                + "<p>目标链接：</p><p><a style='color:#8ab4f8' href='" + u + "'>" + u + "</a></p>"
-                + "<p>（复制到电脑播放器/浏览器打开）</p></body></html>";
-        } else {
+            // 302 到手机中转：由手机代拉流（带正确 Referer），电脑直接播
+            String host = s.getInetAddress().getHostAddress();  // 访问者IP不用；用本机
+            String me = localIp();
+            byte[] empty = new byte[0];
+            OutputStream os2 = s.getOutputStream();
+            os2.write(("HTTP/1.1 302 Found\r\nLocation: http://" + me + ":8123/relay?u="
+                + java.net.URLEncoder.encode(u, "UTF-8") + "\r\nConnection: close\r\nContent-Length: 0\r\n\r\n").getBytes());
+            os2.flush();
+            return;
+        }
+        String body = "";
+        if (false) {
             StringBuilder sb = new StringBuilder();
             sb.append("<html><meta charset='utf-8'><meta name='viewport' content='width=device-width'>")
               .append("<body style='background:#111;color:#eee;font-family:monospace'>")

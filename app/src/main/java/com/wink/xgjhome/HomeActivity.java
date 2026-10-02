@@ -129,6 +129,7 @@ public class HomeActivity extends Activity {
                         requestPermissions(new String[]{"android.permission.POST_NOTIFICATIONS"}, 900);
                     }
                     LanShareServer.start();
+                    try { LiveProxy.start(); } catch (Throwable ignored) {}  // 中转8123同步拉起
                     String url = "http://" + LanShareServer.localIp() + ":" + LanShareServer.getPort();
                     android.app.NotificationManager nm = (android.app.NotificationManager) getSystemService(NOTIFICATION_SERVICE);
                     if (android.os.Build.VERSION.SDK_INT >= 26) {

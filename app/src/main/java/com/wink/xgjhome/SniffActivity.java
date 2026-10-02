@@ -1151,7 +1151,18 @@ public class SniffActivity extends Activity {
     void addRecord(final String url, String title) {
         // 流畅/极速不显示
         if (title != null && title.contains("抖音") && (url.contains("_ld.") || url.contains("_md."))) return;
-        try { synchronized (LAN_LINKS) { if (!LAN_LINKS.containsKey(url)) { LAN_LINKS.put(url, title == null ? url : title); if (LAN_LINKS.size() > 500) LAN_LINKS.remove(LAN_LINKS.keySet().iterator().next()); } } } catch (Throwable ignored) {}
+        try {
+            String real = url;
+            if (real.startsWith("http://127.0.0.1:8123/relay?u=")) {
+                real = java.net.URLDecoder.decode(real.substring("http://127.0.0.1:8123/relay?u=".length()), "UTF-8");
+            }
+            synchronized (LAN_LINKS) {
+                if (!LAN_LINKS.containsKey(real)) {
+                    LAN_LINKS.put(real, title == null ? real : title);
+                    if (LAN_LINKS.size() > 500) LAN_LINKS.remove(LAN_LINKS.keySet().iterator().next());
+                }
+            }
+        } catch (Throwable ignored) {}
         // 同一路流只留一条最高画质：原画(_or4) > 蓝光(_uhd) > 高清(_hd)
         final int rank = qualRank(url);
         final String bk = baseKey(url);
