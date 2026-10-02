@@ -152,6 +152,7 @@ public class ShortcutEditActivity extends Activity {
         pickAppBtn.setTextSize(14);
         pickAppBtn.setPadding(dp(4), dp(10), 0, dp(10));
         pickAppBtn.setOnClickListener(new View.OnClickListener() { public void onClick(View v) { pickApp(); } });
+        body.addView(pickAppBtn);
         body.addView(iconView);
         if (curIcon != null) iconView.setImageBitmap(curIcon);
 
