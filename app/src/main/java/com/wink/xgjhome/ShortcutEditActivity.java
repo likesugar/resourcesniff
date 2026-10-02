@@ -334,6 +334,19 @@ public class ShortcutEditActivity extends Activity {
         String name = etName.getText().toString().trim();
         String pkg = etPkg.getText().toString().trim();
         if (name.length() == 0 || pkg.length() == 0) { toast("名称和包名不能为空"); return; }
+        if (curIcon == null) {
+            // 兜底：自动恢复最近自选图标
+            try {
+                java.io.File idir = new java.io.File(getFilesDir(), "sc_icons");
+                java.io.File[] fs = idir.listFiles();
+                if (fs != null && fs.length > 0) {
+                    java.io.File newest = fs[0];
+                    for (java.io.File f : fs) if (f.lastModified() > newest.lastModified()) newest = f;
+                    android.graphics.Bitmap bm2 = android.graphics.BitmapFactory.decodeFile(newest.getAbsolutePath());
+                    if (bm2 != null) { curIcon = bm2; iconPath = newest.getAbsolutePath(); }
+                }
+            } catch (Throwable ignored) {}
+        }
         String rec = joinFields();
         String key = editKey != null ? editKey : ("s" + System.currentTimeMillis());
         if (curIcon != null) {
@@ -349,6 +362,7 @@ public class ShortcutEditActivity extends Activity {
             } catch (Throwable ignored) {}
         }
         ShortcutActivity.saveByKey(this, key, rec);
+        try { ShortcutActivity.dumpFc2Debug("SAVE key=" + key + " iconPath=[" + iconPath + "] curIcon=" + (curIcon != null)); } catch (Throwable ignored) {}
         if (alsoPin) {
             Intent i = buildIntent(false);
             if (i != null) {
