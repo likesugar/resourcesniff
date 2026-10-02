@@ -51,11 +51,14 @@ public class RecManager {
         } catch (Throwable ignored) {}
     }
 
-    static void startRecJob(final String url) {
+    static void startRecJob(final String url) { startRecJob(url, null); }
+
+    /** title: 页面标题/分享文案，作为录制名 */
+    static void startRecJob(final String url, final String title) {
         String u = url == null ? "" : url.trim();
         while (u.endsWith("\\") || u.endsWith("\"") || u.endsWith("'") || u.endsWith(",")) u = u.substring(0, u.length() - 1).trim();
         if (u.isEmpty() || !u.startsWith("http")) return;
-        startBgRec(u); return;
+        startBgRec(u, title); return;
         /*
 */
     }
@@ -397,15 +400,29 @@ public class RecManager {
     private static volatile boolean bgCancel = false;
     private static final String BG_UA = "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36";
 
-    static void startBgRec(final String url) {
+    static String cleanTitle(String t) {
+        if (t == null) return null;
+        t = t.replace("\r", " ").replace("\n", " ").trim();
+        // 分享文案：取第二组 #...# 之后、正在直播之前的主体
+        java.util.regex.Matcher m = java.util.regex.Pattern.compile("#[^#]+#(.+?)正在直播").matcher(t);
+        if (m.find()) t = m.group(1).trim();
+        t = t.replace("[", "").replace("]", "").replace("/", "-").replace("\\", "-").replace(":", "-")
+             .replace("*", "").replace("?", "").replace("\"", "").replace("<", "").replace(">", "").replace("|", "-");
+        return t.length() == 0 ? null : (t.length() > 40 ? t.substring(0, 40) : t);
+    }
+
+    static void startBgRec(final String url) { startBgRec(url, null); }
+
+    static void startBgRec(final String url, final String title) {
         try {
             final RecJob job = new RecJob();
             job.id = ++recSeq;
             job.notifId = 9000 + job.id;
             job.url = url;
-            job.name = "直播·原画_" + System.currentTimeMillis() / 1000 + ".ts";
+            String ct = cleanTitle(title);
+            job.name = (ct != null ? ct : "直播·原画_" + System.currentTimeMillis() / 1000) + ".ts";
             job.startTs = System.currentTimeMillis();
-            String title = job.name.endsWith(".ts") ? job.name.substring(0, job.name.length() - 3) : job.name;
+            String title2 = job.name.endsWith(".ts") ? job.name.substring(0, job.name.length() - 3) : job.name;
             final java.io.File dir = new java.io.File(sCtx.getExternalFilesDir(null), "录制合并/" + title);
             dir.mkdirs();
             job.file = dir;

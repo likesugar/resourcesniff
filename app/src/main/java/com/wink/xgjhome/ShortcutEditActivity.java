@@ -153,14 +153,9 @@ public class ShortcutEditActivity extends Activity {
         // 编辑模式回填（直传数据优先，其次镜像）
         String key = getIntent().getStringExtra("key");
         String[] it = null;
-        if (getIntent().hasExtra("e_name")) {
-            it = new String[]{
-                getIntent().getStringExtra("e_name"), getIntent().getStringExtra("e_pkg"),
-                getIntent().getStringExtra("e_cls"), getIntent().getStringExtra("e_data"),
-                getIntent().getStringExtra("e_extra"), getIntent().getStringExtra("e_am"),
-                getIntent().getStringExtra("e_custom"), getIntent().getStringExtra("e_newtask"),
-                getIntent().getStringExtra("e_root"), "",
-                getIntent().hasExtra("e_icon") ? getIntent().getStringExtra("e_icon") : ""};
+        if (getIntent().hasExtra("e0")) {
+            it = new String[11];
+            for (int j = 0; j < 11; j++) it[j] = getIntent().getStringExtra("e" + j) == null ? "" : getIntent().getStringExtra("e" + j);
         } else if (key != null) {
             String raw = getSharedPreferences("home_shortcuts", MODE_PRIVATE).getString("k_" + key, null);
             if (raw != null) it = raw.split("\\\\u0001");
@@ -430,7 +425,7 @@ public class ShortcutEditActivity extends Activity {
         } catch (Throwable e) { return ""; }
     }
 
-    static final String SEP = "\\u0001";
+    static final String SEP = ShortcutActivity.S1;
 
     private void toast(String s2) { Toast.makeText(this, s2, Toast.LENGTH_SHORT).show(); }
 

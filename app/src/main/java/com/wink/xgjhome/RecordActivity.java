@@ -91,7 +91,7 @@ public class RecordActivity extends Activity {
                     Toast.makeText(RecordActivity.this, "剪贴板里没有有效链接", Toast.LENGTH_SHORT).show();
                     return;
                 }
-                RecManager.startRecJob(u);
+                RecManager.startRecJob(u, u);
                 rebuild();
                 Toast.makeText(RecordActivity.this, "已开始录制", Toast.LENGTH_SHORT).show();
             }

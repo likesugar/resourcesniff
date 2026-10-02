@@ -1274,13 +1274,15 @@ public class SniffActivity extends Activity {
                 else if (t.equals("播放")) playUrl(curUrl);
                 else if (t.equals("直播录制")) {
                     final String url = curUrl;
+                    String pgTitle2 = "";
+                    try { pgTitle2 = webView.getTitle(); } catch (Throwable ignored) {}  // 页面标题作为录制名
                     finish(); // 先退出资源嗅探
                     try {
                         android.content.ClipboardManager cm = (android.content.ClipboardManager) getSystemService(Context.CLIPBOARD_SERVICE);
                         cm.setPrimaryClip(android.content.ClipData.newPlainText("stream", curUrl));
                     } catch (Throwable e) { }
                     RecManager.init(getApplicationContext());
-                    RecManager.startRecJob(url); // 自动开始录制
+                    RecManager.startRecJob(url, pgTitle2); // 自动开始录制
                     startActivity(new Intent(SniffActivity.this, RecordActivity.class));
                     Toast.makeText(SniffActivity.this, "已开始录制，可在下载页管理", Toast.LENGTH_LONG).show();
                 }
