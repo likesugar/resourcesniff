@@ -68,7 +68,71 @@ public class ShortcutActivity extends Activity {
     @Override
     protected void onResume() {
         super.onResume();
+        migrateShortcuts();
         renderGrid();
+    }
+
+    /** 一次性迁移：兼容 真0x01 / 字面\u0001 两种历史分隔符，按名称去重，补发干净key */
+    private void migrateShortcuts() {
+        try {
+            android.content.SharedPreferences sp = getSharedPreferences("home_shortcuts", MODE_PRIVATE);
+            int n = sp.getInt("count", 0);
+            java.util.ArrayList<String> raws = new java.util.ArrayList<String>();
+            for (int i = 0; i < n; i++) {
+                String r = sp.getString("s" + i, null);
+                if (r != null) raws.add(r);
+            }
+            java.util.LinkedHashMap<String, String> byName = new java.util.LinkedHashMap<String, String>();
+            java.util.LinkedHashMap<String, String> keyByName = new java.util.LinkedHashMap<String, String>();
+            String REAL = String.valueOf((char) 1);
+            for (String raw : raws) {
+                String[] p3 = raw.contains(REAL)
+                    ? raw.split(java.util.regex.Pattern.quote(REAL))
+                    : raw.split("\\u0001");
+                String[] f = new String[11];
+                for (int j = 0; j < 11; j++) f[j] = j < p3.length ? p3[j] : (j == 7 ? "1" : "");
+                if (f[0].trim().length() == 0) continue;
+                // 历史条目字段错位：若 f[9] 像路径且 f[10] 像 key，则重排
+                if (f[9].startsWith("/data") && f[10].length() > 0) {
+                    String k = f[10];
+                    byName.put(f[0], joinNorm(f));
+                    keyByName.put(f[0], k);
+                } else {
+                    String k = f[9].startsWith("n_") || f[9].startsWith("s") && f[9].indexOf('/') < 0
+                        ? f[9] : ("n_" + Integer.toHexString(f[0].hashCode()));
+                    byName.put(f[0], joinNorm(f));
+                    keyByName.put(f[0], k);
+                }
+            }
+            // 写回归一化数据
+            if (byName.size() != n || rawsContainBad(raws)) {
+                android.content.SharedPreferences.Editor e = sp.edit();
+                for (int i = 0; i < n; i++) e.remove("s" + i);
+                int i = 0;
+                for (java.util.Map.Entry<String, String> en : byName.entrySet()) {
+                    String key = keyByName.get(en.getKey());
+                    e.putString("s" + i, en.getValue() + "\\u0001" + key);
+                    e.putString("k_" + key, en.getValue());
+                    i++;
+                }
+                e.putInt("count", i);
+                e.apply();
+            }
+        } catch (Throwable ignored) {}
+    }
+
+    private static boolean rawsContainBad(java.util.ArrayList<String> raws) {
+        for (String r : raws) {
+            String[] p3 = r.split("\\u0001");
+            if (p3.length < 11 || p3[0].contains(String.valueOf((char) 1))) return true;
+        }
+        return false;
+    }
+
+    private static String joinNorm(String[] f) {
+        StringBuilder sb = new StringBuilder();
+        for (int j = 0; j < 11; j++) { if (j > 0) sb.append("\\u0001"); sb.append(f[j]); }
+        return sb.toString();
     }
 
     private void renderGrid() {

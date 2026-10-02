@@ -146,6 +146,18 @@ public class ShortcutEditActivity extends Activity {
         iconView.setLayoutParams(ivp);
         iconView.setOnClickListener(new View.OnClickListener() { public void onClick(View v) { pickSystemIcon(); } });
         body.addView(iconView);
+        TextView pickAppBtn = new TextView(this);
+        pickAppBtn.setText("选择应用");
+        pickAppBtn.setTextColor(0xFF3D7BFF);
+        pickAppBtn.setTextSize(14);
+        pickAppBtn.setGravity(Gravity.CENTER);
+        pickAppBtn.setBackgroundColor(0xFF1B222B);
+        pickAppBtn.setPadding(0, dp(8), 0, dp(8));
+        LinearLayout.LayoutParams pap = new LinearLayout.LayoutParams(-1, -2);
+        pap.topMargin = dp(8);
+        pickAppBtn.setLayoutParams(pap);
+        pickAppBtn.setOnClickListener(new View.OnClickListener() { public void onClick(View v) { pickApp(); } });
+        body.addView(pickAppBtn);
         if (curIcon != null) iconView.setImageBitmap(curIcon);
 
         etName = field(body, "名称");
