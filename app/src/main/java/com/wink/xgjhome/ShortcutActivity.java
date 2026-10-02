@@ -112,7 +112,7 @@ public class ShortcutActivity extends Activity {
         ic.setTextSize(20);
         ic.setGravity(Gravity.CENTER);
         ic.setTextColor(Color0.text());
-        ic.setBackgroundResource(Color0.btnBg());
+        ic.setBackgroundColor(Color0.btnBg());
         LinearLayout.LayoutParams ilp = new LinearLayout.LayoutParams(dp(40), dp(40));
         card.addView(ic, ilp);
         TextView tv = new TextView(this);
