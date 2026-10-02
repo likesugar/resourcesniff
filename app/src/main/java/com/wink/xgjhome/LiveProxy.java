@@ -169,7 +169,17 @@ public class LiveProxy {
                     oc.setConnectTimeout(8000);
                     oc.setReadTimeout(8000);
                     oc.setRequestProperty("User-Agent", "Mozilla/5.0 (Linux; Android 13) Chrome/120 Mobile");
-                    oc.setRequestProperty("Referer", "https://guangdongvideo.com/");
+                    if (raw.contains("guangdongvideo.com")) {
+                        oc.setRequestProperty("Referer", "https://guangdongvideo.com/");
+                    } else if (raw.contains("doppiocdn") || raw.contains("stripchat")) {
+                        oc.setRequestProperty("Referer", "https://zh.stripchat.cam/");
+                        oc.setRequestProperty("Origin", "https://zh.stripchat.cam");
+                    } else {
+                        try {
+                            java.net.URL hu = new URL(raw);
+                            oc.setRequestProperty("Referer", "https://" + hu.getHost() + "/");
+                        } catch (Throwable ignored) {}
+                    }
                     int code = oc.getResponseCode();
                     if (code == 200) {
                         InputStream in = oc.getInputStream();
