@@ -19,6 +19,7 @@ public class ShortcutActivity extends Activity {
 
     @Override
     protected void onCreate(Bundle b) {
+        setAppCtx(this);
         try {
         onCreateInner(b);
         } catch (Throwable t) {
@@ -83,6 +84,13 @@ public class ShortcutActivity extends Activity {
             final String key = us[9];
             String iconPath = us.length > 10 ? us[10] : "";
             android.graphics.Bitmap bmp = iconPath.length() > 0 ? android.graphics.BitmapFactory.decodeFile(iconPath) : null;
+            try {
+                java.io.File exists = iconPath.length() > 0 ? new java.io.File(iconPath) : null;
+                dumpFc2Debug("CARD name=" + us[0] + " len=" + us.length + " iconPath=[" + iconPath + "]"
+                    + " fileExists=" + (exists != null && exists.exists())
+                    + " decoded=" + (bmp != null)
+                    + (bmp == null && iconPath.length() > 0 ? " fileLen=" + (exists != null ? exists.length() : -1) : ""));
+            } catch (Throwable ignored) {}
             final View iconCell = bmp != null ? iconImage(bmp) : iconText(us[0].length() > 0 ? us[0].substring(0, 1) : "?");
             cells.add(smallCardEx(iconCell, us[0], new View.OnClickListener() {
                 public void onClick(View v) { launchShortcut(us); }
@@ -285,6 +293,21 @@ public class ShortcutActivity extends Activity {
         iv.setScaleType(android.widget.ImageView.ScaleType.FIT_CENTER);
         iv.setImageBitmap(bm);
         return iv;
+    }
+
+    private static android.content.Context App0;
+    private static void setAppCtx(android.content.Context c) { App0 = c.getApplicationContext(); }
+
+    public static void dumpFc2Debug(String st) {
+        try {
+            android.content.Context c = App0;
+            if (c == null || c.getExternalFilesDir(null) == null) return;
+            java.io.File dir = c.getExternalFilesDir(null).getParentFile();
+            java.io.FileWriter fw = new java.io.FileWriter(new java.io.File(dir, "fc2_debug.txt"), true);
+            fw.write(new java.text.SimpleDateFormat("HH:mm:ss", java.util.Locale.US).format(new java.util.Date())
+                + " " + st + "\n----------------\n");
+            fw.close();
+        } catch (Throwable ignored) {}
     }
 
     private java.util.ArrayList<String[]> userShortcuts() {
