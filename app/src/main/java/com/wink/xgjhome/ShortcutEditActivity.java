@@ -102,7 +102,6 @@ public class ShortcutEditActivity extends Activity {
         iconView.setLayoutParams(ivp);
         iconView.setOnClickListener(new View.OnClickListener() { public void onClick(View v) { pickSystemIcon(); } });
         body.addView(iconView);
-        body.addView(flatButton("选择应用", new View.OnClickListener() { public void onClick(View v) { pickApp(); } }));
         body.addView(flatButton("从已装应用选择 ›", new View.OnClickListener() { public void onClick(View v) { pickApp(); } }));
 
         // 字段

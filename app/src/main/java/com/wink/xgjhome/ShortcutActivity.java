@@ -75,6 +75,7 @@ public class ShortcutActivity extends Activity {
     /** 一次性迁移：兼容 真0x01 / 字面\u0001 两种历史分隔符，按名称去重，补发干净key */
     private void migrateShortcuts() {
         try {
+            dumpFc2Debug("MIGRATE 开始 count=" + getSharedPreferences("home_shortcuts", MODE_PRIVATE).getInt("count", -1));
             android.content.SharedPreferences sp = getSharedPreferences("home_shortcuts", MODE_PRIVATE);
             int n = sp.getInt("count", 0);
             java.util.ArrayList<String> raws = new java.util.ArrayList<String>();
@@ -105,6 +106,7 @@ public class ShortcutActivity extends Activity {
                 }
             }
             // 写回归一化数据
+            dumpFc2Debug("MIGRATE 解析=" + byName.size() + "/" + n + " bad=" + rawsContainBad(raws));
             if (byName.size() != n || rawsContainBad(raws)) {
                 android.content.SharedPreferences.Editor e = sp.edit();
                 for (int i = 0; i < n; i++) e.remove("s" + i);
@@ -366,7 +368,7 @@ public class ShortcutActivity extends Activity {
         try {
             android.content.Context c = App0;
             if (c == null || c.getExternalFilesDir(null) == null) return;
-            java.io.File dir = c.getExternalFilesDir(null).getParentFile();
+            java.io.File dir = c.getExternalFilesDir(null);
             java.io.FileWriter fw = new java.io.FileWriter(new java.io.File(dir, "fc2_debug.txt"), true);
             fw.write(new java.text.SimpleDateFormat("HH:mm:ss", java.util.Locale.US).format(new java.util.Date())
                 + " " + st + "\n----------------\n");

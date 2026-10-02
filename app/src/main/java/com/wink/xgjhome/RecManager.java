@@ -448,8 +448,9 @@ public class RecManager {
                         job.state = null;
                         startBgPlayer(job);
                         startBgSession(job);
-                    } else {           // 连续3轮都没流量 → 彻底暂停
-                        pauseBg(job, "无流量暂停");
+                    } else {           // 连续3轮重试都拉不到 → 非手动暂停场景自动结束并合并MP4
+                        job.state = "拉取不到，自动合并";
+                        recFinish(job.id);
                         break;
                     }
                 } else { idle = 0; }
