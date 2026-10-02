@@ -39,12 +39,8 @@ public class RecordActivity extends Activity {
     }
 
     private static String dlInfo(DlManager.DlJob j) {
-        if (j.active && !j.failed) {
-            String sz = fmtSize(j.doneBytes) + (j.total > 0 ? " / " + fmtSize(j.total) : "");
-            return "下载大小: " + sz + "\n状态: 下载中";
-        }
-        if (j.failed) return "下载大小: " + fmtSize(j.doneBytes) + "\n状态: " + j.state;
-        return "下载大小: " + fmtSize(j.doneBytes) + "\n状态: " + j.state;
+        String sz = fmtSize(j.doneBytes) + (j.total > 0 && j.total > j.doneBytes ? " / " + fmtSize(j.total) : "");
+        return "下载大小: " + sz + "\n状态: " + j.state;
     }
 
     @Override
@@ -192,8 +188,12 @@ public class RecordActivity extends Activity {
             int type = (Integer) e.getValue()[0];
             boolean live = (Boolean) e.getValue()[2];
             if (type == 2) { cat.put(e.getKey(), ((HistoryStore.Item) e.getValue()[1]).type); continue; }
-            cat.put(e.getKey(), type == 1 ? (((DlManager.DlJob) e.getValue()[1]).active ? "下载" : "视频")
-                                          : (live ? "下载" : "录制"));
+            if (type == 1) {
+                DlManager.DlJob dj = (DlManager.DlJob) e.getValue()[1];
+                cat.put(e.getKey(), (dj.active || dj.paused) ? "下载" : "视频");
+            } else {
+                cat.put(e.getKey(), live ? "下载" : "录制");
+            }
         }
         String want = new String[]{"全部", "视频", "录制", "下载"}[curTab];
 
@@ -378,15 +378,36 @@ public class RecordActivity extends Activity {
 
     private void showDlMenu(View anchor, final DlManager.DlJob j) {
         PopupMenu pm = new PopupMenu(this, anchor);
-        if (j.active) pm.getMenu().add("取消");
-        if (j.done) pm.getMenu().add("播放");
+        if (j.hls) {
+            if (j.active) {
+                pm.getMenu().add("暂停");
+                pm.getMenu().add("结束(合并MP4)");
+            } else if (j.paused) {
+                pm.getMenu().add("开始");
+                pm.getMenu().add("结束(合并MP4)");
+            } else if (j.done) {
+                pm.getMenu().add("播放");
+            }
+        } else {
+            if (j.active) pm.getMenu().add("取消");
+            if (j.done) pm.getMenu().add("播放");
+        }
         pm.getMenu().add("删除");
         pm.setOnMenuItemClickListener(new PopupMenu.OnMenuItemClickListener() {
             public boolean onMenuItemClick(android.view.MenuItem it) {
                 String t = it.getTitle().toString();
-                if (t.equals("取消")) DlManager.cancel(j.id);
+                if (t.equals("暂停")) DlManager.pauseHls(j.id);
+                else if (t.equals("开始")) DlManager.resumeHls(j.id);
+                else if (t.equals("结束(合并MP4)")) DlManager.finishHls(j.id);
+                else if (t.equals("取消")) DlManager.cancel(j.id);
                 else if (t.equals("播放")) {
-                    try { playInApp("file://" + j.file.getAbsolutePath(), j.title); } catch (Throwable e) { Toast.makeText(RecordActivity.this, "打不开", Toast.LENGTH_SHORT).show(); }
+                    String pth = "file://" + j.file.getAbsolutePath();
+                    if (j.hls && j.done) {
+                        // done HLS 实体在相册，取历史最新一条播放
+                        java.util.ArrayList<HistoryStore.Item> hh = HistoryStore.load(RecordActivity.this);
+                        if (!hh.isEmpty()) pth = hh.get(0).path;
+                    }
+                    try { playInApp(pth, j.title); } catch (Throwable e) { Toast.makeText(RecordActivity.this, "打不开", Toast.LENGTH_SHORT).show(); }
                 } else if (t.equals("删除")) { DlManager.cancel(j.id); }
                 rebuild();
                 return true;

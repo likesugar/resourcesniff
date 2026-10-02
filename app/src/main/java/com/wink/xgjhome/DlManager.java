@@ -5,7 +5,7 @@ import android.content.Context;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
 
-/** 轻量下载管理：资源嗅探"下载"入口 → 卡片显示进度，完成后归到"视频"栏（入相册 Movies/资源嗅探） */
+/** 轻量下载管理：嗅探"下载"入口 → 下载页卡片。HLS 走 ffmpeg 分段下载，支持 开始/暂停/结束(合并MP4) */
 public class DlManager {
 
     public static class DlJob {
@@ -13,15 +13,19 @@ public class DlManager {
         public String url;
         public String title;
         public volatile boolean active = true;
+        public volatile boolean paused = false;
         public volatile boolean done = false;
         public volatile boolean failed = false;
-        public volatile long total = -1;   // -1 未知
+        public volatile boolean hls = false;   // HLS 分段下载模式
+        public volatile long total = -1;
         public volatile long doneBytes = 0;
         public volatile String state = "连接中…";
-        public java.io.File file;
+        public java.io.File file;   // 直连模式=目标文件；HLS模式=分段目录
     }
 
     private static final ConcurrentHashMap<Integer, DlJob> JOBS = new ConcurrentHashMap<Integer, DlJob>();
+    private static final ConcurrentHashMap<Integer, com.arthenica.ffmpegkit.FFmpegSession> HLS_SESS =
+        new java.util.concurrent.ConcurrentHashMap<Integer, com.arthenica.ffmpegkit.FFmpegSession>();
     private static final AtomicInteger SEQ = new AtomicInteger(0);
     private static Context sCtx;
 
@@ -29,42 +33,14 @@ public class DlManager {
 
     public static java.util.Collection<DlJob> jobs() { return JOBS.values(); }
 
-    private static final java.util.concurrent.ConcurrentHashMap<Integer, com.arthenica.ffmpegkit.FFmpegSession> HLS_SESS =
-        new java.util.concurrent.ConcurrentHashMap<Integer, com.arthenica.ffmpegkit.FFmpegSession>();
-
-    /** HLS(m3u8) 下载：ffmpeg 合流拷贝到本地 ts，完成后入相册+历史 */
-    public static void startHls(final String url) {
-        final DlJob j = new DlJob();
-        j.id = SEQ.incrementAndGet();
-        j.url = url;
-        j.title = "HLS_" + System.currentTimeMillis() / 1000;
-        j.file = new java.io.File(sCtx.getExternalFilesDir(null), "下载/hls" + j.id + ".ts");
-        try { j.file.getParentFile().mkdirs(); } catch (Throwable ignored) {}
-        JOBS.put(j.id, j);
-        j.state = "下载中";
-        String[] args = { "-y", "-i", url, "-c", "copy", "-f", "mpegts", j.file.getAbsolutePath() };
-        com.arthenica.ffmpegkit.FFmpegSession st = com.arthenica.ffmpegkit.FFmpegKit.executeWithArgumentsAsync(args,
-            new com.arthenica.ffmpegkit.FFmpegSessionCompleteCallback() {
-                public void apply(com.arthenica.ffmpegkit.FFmpegSession st2) {
-                    boolean ok = st2.getState().equals(com.arthenica.ffmpegkit.SessionState.COMPLETED)
-                        && j.file.exists() && j.file.length() > 0;
-                    if (ok) {
-                        j.doneBytes = j.file.length();
-                        j.state = insertGallery(j) ? "已完成" : "完成(未入相册)";
-                        HistoryStore.add(sCtx, "视频", j.title, "file://" + j.file.getAbsolutePath());
-                        j.done = true; j.active = false;
-                    } else {
-                        j.failed = true; j.active = false;
-                        j.state = "下载失败(" + st2.getState() + ")";
-                        try { j.file.delete(); } catch (Throwable ignored) {}
-                    }
-                    HLS_SESS.remove(j.id);
-                }
-            });
-        HLS_SESS.put(j.id, st);
+    public static void start(String url) {
+        String lu = url.toLowerCase();
+        if (lu.contains("127.0.0.1:8123/relay") || lu.contains(".m3u8") || lu.contains("playlist")) startHls(url);
+        else startDirect(url);
     }
 
-    public static void start(String url) {
+    /** 直连单文件下载 */
+    public static void startDirect(String url) {
         final DlJob j = new DlJob();
         j.id = SEQ.incrementAndGet();
         j.url = url;
@@ -76,6 +52,130 @@ public class DlManager {
         try { j.file.getParentFile().mkdirs(); } catch (Throwable ignored) {}
         JOBS.put(j.id, j);
         new Thread(new Runnable() { public void run() { download(j); } }).start();
+    }
+
+    /** HLS 分段下载：开始即启动，支持暂停/继续/结束合并 */
+    public static void startHls(String url) {
+        final DlJob j = new DlJob();
+        j.id = SEQ.incrementAndGet();
+        j.url = url;
+        j.title = "HLS_" + System.currentTimeMillis() / 1000;
+        j.hls = true;
+        j.file = new java.io.File(sCtx.getExternalFilesDir(null), "下载/hls" + j.id);
+        j.file.mkdirs();
+        JOBS.put(j.id, j);
+        launchSegmentFfmpeg(j);
+    }
+
+    private static void launchSegmentFfmpeg(final DlJob j) {
+        j.active = true;
+        j.paused = false;
+        j.failed = false;
+        j.state = "下载中";
+        int segN = 0;
+        try {
+            java.io.File[] fs = j.file.listFiles();
+            if (fs != null) for (java.io.File f : fs) if (f.getName().endsWith(".ts")) segN++;
+        } catch (Throwable ignored) {}
+        String[] args = { "-y", "-i", j.url, "-c", "copy",
+            "-f", "segment", "-segment_time", "10", "-reset_timestamps", "1",
+            "-segment_start_number", String.valueOf(segN),
+            new java.io.File(j.file, "seg%05d.ts").getAbsolutePath() };
+        com.arthenica.ffmpegkit.FFmpegSession st = com.arthenica.ffmpegkit.FFmpegKit.executeWithArgumentsAsync(args,
+            new com.arthenica.ffmpegkit.FFmpegSessionCompleteCallback() {
+                public void apply(com.arthenica.ffmpegkit.FFmpegSession st2) {
+                    HLS_SESS.remove(j.id);
+                    if (j.active && !j.paused) {
+                        // 自己断流：标失败
+                        if (!j.done) { j.failed = true; j.active = false; j.state = "下载中断(点开始续传)"; }
+                    }
+                    refreshBytes(j);
+                }
+            });
+        HLS_SESS.put(j.id, st);
+    }
+
+    public static void pauseHls(int id) {
+        DlJob j = JOBS.get(id);
+        if (j == null || !j.hls) return;
+        com.arthenica.ffmpegkit.FFmpegSession st = HLS_SESS.remove(id);
+        if (st != null) { try { com.arthenica.ffmpegkit.FFmpegKit.cancel(st.getSessionId()); } catch (Throwable ignored) {} }
+        j.paused = true;
+        j.active = false;
+        j.state = "已暂停";
+        refreshBytes(j);
+    }
+
+    public static void resumeHls(int id) {
+        DlJob j = JOBS.get(id);
+        if (j == null || !j.hls) return;
+        launchSegmentFfmpeg(j);
+    }
+
+    /** 结束：停采集 + 合并成 MP4 入相册/历史，卡片转入"视频" */
+    public static void finishHls(final int id) {
+        final DlJob j = JOBS.get(id);
+        if (j == null || !j.hls) return;
+        com.arthenica.ffmpegkit.FFmpegSession st = HLS_SESS.remove(id);
+        if (st != null) { try { com.arthenica.ffmpegkit.FFmpegKit.cancel(st.getSessionId()); } catch (Throwable ignored) {} }
+        j.state = "合并MP4中…";
+        new Thread(new Runnable() { public void run() {
+            try {
+                java.io.File[] segs = j.file.listFiles();
+                java.util.Arrays.sort(segs);
+                java.util.ArrayList<java.io.File> list = new java.util.ArrayList<java.io.File>();
+                for (java.io.File f : segs) if (f.getName().endsWith(".ts") && f.length() > 0) list.add(f);
+                if (list.isEmpty()) { j.failed = true; j.active = false; j.state = "无数据"; return; }
+                java.io.File listFile = new java.io.File(j.file, "list.txt");
+                java.io.PrintWriter pw = new java.io.PrintWriter(listFile, "UTF-8");
+                for (java.io.File f : list) pw.println("file '" + f.getAbsolutePath().replace("'", "'\\''") + "'");
+                pw.close();
+                java.io.File mp4 = new java.io.File(sCtx.getExternalFilesDir(null), "下载/hls" + j.id + ".mp4");
+                com.arthenica.ffmpegkit.FFmpegSession cs = com.arthenica.ffmpegkit.FFmpegKit.executeWithArguments(
+                    new String[]{"-y", "-f", "concat", "-safe", "0", "-i", listFile.getAbsolutePath(),
+                        "-c", "copy", "-fflags", "+genpts", "-movflags", "+faststart", mp4.getAbsolutePath()});
+                if (cs.getState().equals(com.arthenica.ffmpegkit.SessionState.COMPLETED) && mp4.length() > 0) {
+                    // mp4 入相册
+                    try {
+                        android.content.ContentValues cv = new android.content.ContentValues();
+                        cv.put(android.provider.MediaStore.Video.Media.DISPLAY_NAME, j.title + ".mp4");
+                        cv.put(android.provider.MediaStore.Video.Media.MIME_TYPE, "video/mp4");
+                        if (android.os.Build.VERSION.SDK_INT >= 29)
+                            cv.put(android.provider.MediaStore.Video.Media.RELATIVE_PATH, "Movies/资源嗅探");
+                        android.net.Uri uri = sCtx.getContentResolver().insert(android.provider.MediaStore.Video.Media.EXTERNAL_CONTENT_URI, cv);
+                        if (uri != null) {
+                            java.io.InputStream in = new java.io.FileInputStream(mp4);
+                            java.io.OutputStream os = sCtx.getContentResolver().openOutputStream(uri);
+                            byte[] b = new byte[64 * 1024]; int n;
+                            while ((n = in.read(b)) > 0) os.write(b, 0, n);
+                            os.close(); in.close();
+                        }
+                    } catch (Throwable ignored) {}
+                    HistoryStore.add(sCtx, "视频", j.title, "file://" + mp4.getAbsolutePath());
+                    for (java.io.File f : j.file.listFiles()) f.delete();
+                    j.file.delete();
+                    mp4.delete();  // 相册已有副本
+                    j.done = true; j.paused = false; j.active = false;
+                    j.doneBytes = mp4.length();
+                    j.state = "已完成(视频栏)";
+                } else {
+                    j.failed = true; j.active = false;
+                    j.state = "合并失败(分段保留)";
+                }
+            } catch (Throwable t) {
+                j.failed = true; j.active = false;
+                j.state = "合并失败: " + t.getClass().getSimpleName();
+            }
+        } }).start();
+    }
+
+    private static void refreshBytes(DlJob j) {
+        try {
+            long t = 0;
+            java.io.File[] fs = j.file.listFiles();
+            if (fs != null) for (java.io.File f : fs) t += f.length();
+            j.doneBytes = t;
+        } catch (Throwable ignored) {}
     }
 
     private static void download(final DlJob j) {
@@ -95,7 +195,7 @@ public class DlManager {
             byte[] buf = new byte[32 * 1024];
             int n;
             while ((n = in.read(buf)) > 0) {
-                if (!j.active) return;  // 已取消
+                if (!j.active) return;
                 out.write(buf, 0, n);
                 j.doneBytes += n;
                 j.state = "下载中";
@@ -139,6 +239,9 @@ public class DlManager {
         JOBS.remove(id);
         com.arthenica.ffmpegkit.FFmpegSession hs = HLS_SESS.remove(id);
         if (hs != null) { try { com.arthenica.ffmpegkit.FFmpegKit.cancel(hs.getSessionId()); } catch (Throwable ignored) {} }
-        try { if (j.file != null) j.file.delete(); } catch (Throwable ignored) {}
+        try { if (j.file != null) {
+            if (j.file.isDirectory()) { for (java.io.File f : j.file.listFiles()) f.delete(); }
+            j.file.delete();
+        } } catch (Throwable ignored) {}
     }
 }

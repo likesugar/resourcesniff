@@ -200,20 +200,27 @@ public class SniffActivity extends Activity {
                             dumpFc2Debug("REQ: " + url);
                         }
                         if (isMaster) {
-                            // 主播放列表直接进记录（按频道去重，token 刷新不重复加）
+                            // 画质优先 90 其次 40：从 master 推导对应子列表，探测可用后进记录
                             final String fUrl = url;
                             final String chKey = url.substring(0, url.indexOf('?') > 0 ? url.indexOf('?') : url.length());
-                            main.post(new Runnable() { public void run() {
-                                try {
-                                    if (fc2HlsSeen.add(chKey)) {
-                                        String proxied = "http://127.0.0.1:8123/relay?u="
-                                            + java.net.URLEncoder.encode(fUrl, "UTF-8");
-                                        addRecord(proxied, "FC2·直播");
-                                        if (!isRecordsVisible) toggleRecords();
-                                        dumpFc2Debug("记录已添加: " + proxied);
-                                    }
-                                } catch (Throwable e) { dumpFc2Debug("记录添加失败: " + e.getClass().getSimpleName()); }
-                            }});
+                            new Thread(new Runnable() { public void run() {
+                                String pick = pickFc2Quality(fUrl);
+                                if (pick == null) pick = fUrl;
+                                final String pickUrl = pick;
+                                String proxied;
+                                try { proxied = "http://127.0.0.1:8123/relay?u=" + java.net.URLEncoder.encode(pickUrl, "UTF-8"); }
+                                catch (Throwable e2) { proxied = pickUrl; }
+                                final String proxiedF = proxied;
+                                main.post(new Runnable() { public void run() {
+                                    try {
+                                        if (fc2HlsSeen.add(chKey)) {
+                                            addRecord(proxiedF, "FC2·直播");
+                                            if (!isRecordsVisible) toggleRecords();
+                                            dumpFc2Debug("记录已添加: " + proxiedF);
+                                        }
+                                    } catch (Throwable e) { dumpFc2Debug("记录添加失败: " + e.getClass().getSimpleName()); }
+                                }});
+                            } }).start();
                         }
                     }
                     boolean fc2Doc = (url.contains("live.fc2.com") || url.contains("guangdongvideo.com"))
@@ -648,6 +655,35 @@ public class SniffActivity extends Activity {
             return;
         }
         main.postDelayed(new Runnable() { public void run() { pollFc2Hls(ws, round + 1); } }, 2000);
+    }
+
+    /** FC2 画质选择：90(原画)优先，其次 40(高清)，探测子列表可用性；都不可用返回 null 用 master */
+    private static String pickFc2Quality(String masterUrl) {
+        try {
+            String base = masterUrl.substring(0, masterUrl.indexOf("/master_playlist"));
+            String q = masterUrl.substring(masterUrl.indexOf("/master_playlist") + "/master_playlist".length()); // ?c=..&d=..
+            String[] prefs = {"/90/playlist", "/40/playlist"};
+            for (String pf : prefs) {
+                String cand = base + pf + q;
+                if (probeHls(cand)) return cand;
+            }
+        } catch (Throwable ignored) {}
+        return null;
+    }
+
+    private static boolean probeHls(String url) {
+        try {
+            String proxied = "http://127.0.0.1:8123/relay?u=" + java.net.URLEncoder.encode(url, "UTF-8");
+            java.net.HttpURLConnection c = (java.net.HttpURLConnection) new java.net.URL(proxied).openConnection();
+            c.setConnectTimeout(5000); c.setReadTimeout(5000);
+            java.io.InputStream in = c.getInputStream();
+            byte[] b = new byte[256];
+            int n = in.read(b);
+            in.close(); c.disconnect();
+            if (n <= 0) return false;
+            String head = new String(b, 0, n, "UTF-8");
+            return head.contains("#EXTM3U");
+        } catch (Throwable e) { return false; }
     }
 
     private void dumpFc2Debug(String st) {
