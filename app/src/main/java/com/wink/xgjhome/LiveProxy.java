@@ -49,6 +49,9 @@ public class LiveProxy {
     private static volatile FileOutputStream scOut = null;
     private static android.content.Context sSCCtx = null;
     public static void setSCCtx(android.content.Context c) { sSCCtx = c.getApplicationContext(); }
+    public static long scBytes() {
+        try { return (scFile != null && scFile.exists()) ? scFile.length() : 0; } catch (Throwable e) { return 0; }
+    }
 
     public static void start() {
         if (running) return;

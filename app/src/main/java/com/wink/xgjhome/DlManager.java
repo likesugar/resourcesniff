@@ -51,9 +51,13 @@ public class DlManager {
         for (DlJob j : JOBS.values()) {
             if (j.url != null && j.url.startsWith("stripchat://")) {
                 String st = SniffActivity.stripRecState();
+                j.doneBytes = LiveProxy.scBytes();  // 实时文件大小
                 if ("rec".equals(st)) { j.active = true; j.paused = false; j.state = "录制中"; }
                 else if ("pause".equals(st)) { j.active = false; j.paused = true; j.state = "已暂停"; }
-                else if ("idle".equals(st) && !j.done) { j.done = true; j.active = false; j.paused = false; j.state = "已完成(视频栏)"; }
+                else if ("idle".equals(st) && !j.done) {
+                    j.done = true; j.active = false; j.paused = false;
+                    j.state = LiveProxy.scBytes() > 0 ? "已完成(视频栏)" : "无数据";
+                }
             }
         }
     }
