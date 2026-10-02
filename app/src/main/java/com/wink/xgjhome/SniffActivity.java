@@ -1119,31 +1119,21 @@ public class SniffActivity extends Activity {
     void playUrl(String url) {
         // FC2 中转流：IJK 播不了，走系统播放器
         if (url != null && url.contains("127.0.0.1:8123/relay")) {
-            // 1) 优先 Via 浏览器（实测能播这路流）
-            for (String pkg : new String[]{"mark.via.gp", "mark.via"}) {
+            try {
+                android.content.Intent i = new android.content.Intent(Intent.ACTION_VIEW);
+                i.setDataAndType(android.net.Uri.parse(url), "application/x-mpegURL");
+                i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                startActivity(i);
+                return;
+            } catch (Throwable e) {
                 try {
-                    android.content.Intent vi = new android.content.Intent(Intent.ACTION_VIEW);
-                    vi.setPackage(pkg);
-                    vi.setDataAndType(android.net.Uri.parse(url), "application/x-mpegURL");
-                    vi.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-                    if (vi.resolveActivity(getPackageManager()) != null) { startActivity(vi); return; }
+                    android.content.Intent i2 = new android.content.Intent(Intent.ACTION_VIEW);
+                    i2.setDataAndType(android.net.Uri.parse(url), "video/*");
+                    i2.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                    startActivity(i2);
+                    return;
                 } catch (Throwable ignored) {}
             }
-            // 2) 系统播放器
-            String[] types = {"application/x-mpegURL", "video/*"};
-            for (String tp : types) {
-                try {
-                    android.content.Intent i = new android.content.Intent(Intent.ACTION_VIEW);
-                    i.setDataAndType(android.net.Uri.parse(url), tp);
-                    i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-                    if (i.resolveActivity(getPackageManager()) != null) {
-                        startActivity(i);
-                        return;
-                    }
-                } catch (Throwable ignored) {}
-            }
-            // 系统播放器唤不起 → 回退内置 IJK
-            Toast.makeText(this, "无系统播放器，用内置播放", Toast.LENGTH_SHORT).show();
         }
         try {
             finish(); // 播放前先退出资源嗅探
