@@ -482,6 +482,9 @@ public class RecordActivity extends Activity {
                 public boolean onMenuItemClick(android.view.MenuItem it) { RecManager.recStop(j.id); rebuild(); return true; }
             });
         } else {
+            pm.getMenu().add("打开").setOnMenuItemClickListener(new android.view.MenuItem.OnMenuItemClickListener() {
+                public boolean onMenuItemClick(android.view.MenuItem it) { play(j); return true; }
+            });
             pm.getMenu().add("开始").setOnMenuItemClickListener(new android.view.MenuItem.OnMenuItemClickListener() {
                 public boolean onMenuItemClick(android.view.MenuItem it) { RecManager.recContinue(j.id); rebuild(); return true; }
             });
@@ -492,9 +495,6 @@ public class RecordActivity extends Activity {
                 rebuild();
                 return true;
             }
-        });
-        pm.getMenu().add("在VLC播放").setOnMenuItemClickListener(new android.view.MenuItem.OnMenuItemClickListener() {
-            public boolean onMenuItemClick(android.view.MenuItem it) { play(j); return true; }
         });
         pm.getMenu().add("复制下载地址").setOnMenuItemClickListener(new android.view.MenuItem.OnMenuItemClickListener() {
             public boolean onMenuItemClick(android.view.MenuItem it) {

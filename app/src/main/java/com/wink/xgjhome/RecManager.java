@@ -319,6 +319,7 @@ public class RecManager {
             acquireWake();
             startBgPlayer(job);
             startBgSession(job);
+            startWatchdog(job);  // 续录重启看门狗，大小才会刷新
             return;
         }
         startPull(job, true);
@@ -412,36 +413,7 @@ public class RecManager {
             acquireWake();
             startBgPlayer(job);
             startBgSession(job);
-            new Thread(new Runnable() { public void run() {  // 流量看门狗：1s刷大小，5s查流量
-                long last = -1;
-                int idle = 0;
-                int c = 0;
-                while (job.active) {
-                    try { Thread.sleep(1000); } catch (Throwable e) { break; }
-                    if (!job.active) break;
-                    job.bytes = dirTotal(job);
-                    c++;
-                    if (c % 5 != 0) continue;
-                    long total = job.bytes;
-                    if (total == last) {
-                        idle++;
-                        if (idle <= 3) {   // 无流量 → 自动重试抓流
-                            job.state = "无流量，重试抓流 " + idle + "/3…";
-                            stopBgSession();
-                            stopBgPlayer();
-                            try { Thread.sleep(5000); } catch (Throwable e) { break; }
-                            if (!job.active) break;
-                            job.state = null;
-                            startBgPlayer(job);
-                            startBgSession(job);
-                        } else {           // 连续3轮都没流量 → 彻底暂停
-                            pauseBg(job, "无流量暂停");
-                            break;
-                        }
-                    } else { idle = 0; }
-                    last = total;
-                }
-            } }).start();
+            startWatchdog(job);
         } catch (Throwable e) {
             try {
                 RecJob jb = new RecJob();
@@ -451,6 +423,39 @@ public class RecManager {
                 stoppedJobs.put(jb.id, jb);
             } catch (Throwable ignored) {}
         }
+    }
+
+    static void startWatchdog(final RecJob job) {
+        new Thread(new Runnable() { public void run() {  // 流量看门狗：1s刷大小，5s查流量
+            long last = -1;
+            int idle = 0;
+            int c = 0;
+            while (job.active) {
+                try { Thread.sleep(1000); } catch (Throwable e) { break; }
+                if (!job.active) break;
+                job.bytes = dirTotal(job);
+                c++;
+                if (c % 5 != 0) continue;
+                long total = job.bytes;
+                if (total == last) {
+                    idle++;
+                    if (idle <= 3) {   // 无流量 → 自动重试抓流
+                        job.state = "无流量，重试抓流 " + idle + "/3…";
+                        stopBgSession();
+                        stopBgPlayer();
+                        try { Thread.sleep(5000); } catch (Throwable e) { break; }
+                        if (!job.active) break;
+                        job.state = null;
+                        startBgPlayer(job);
+                        startBgSession(job);
+                    } else {           // 连续3轮都没流量 → 彻底暂停
+                        pauseBg(job, "无流量暂停");
+                        break;
+                    }
+                } else { idle = 0; }
+                last = total;
+            }
+        } }).start();
     }
 
     static long dirTotal(RecJob job) {
