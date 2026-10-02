@@ -200,8 +200,14 @@ public class SniffActivity extends Activity {
                             dumpFc2Debug("SC-REQ: " + url);
                         }
                         if (lu2.contains(".m3u8") && !lu2.contains("ping")) {  // ping.m3u8 是保活心跳，不是流
-                            final String fUrl3 = url;
-                            final String chKey2 = url.substring(0, url.indexOf('?') > 0 ? url.indexOf('?') : url.length());
+                            // LL-HLS 参数剥掉，转成标准 HLS（播放器/ffmpeg 才能循环加载）
+                            String liveUrl = url
+                                .replaceAll("([?&])playlistType=[^&]*", "$1")
+                                .replaceAll("([?&])_HLS_msn=[^&]*", "$1")
+                                .replaceAll("([?&])_HLS_part=[^&]*", "$1")
+                                .replaceAll("[?&]$", "");
+                            final String fUrl3 = liveUrl;
+                            final String chKey2 = liveUrl.substring(0, liveUrl.indexOf('?') > 0 ? liveUrl.indexOf('?') : liveUrl.length());
                             main.post(new Runnable() { public void run() {
                                 try {
                                     if (fc2HlsSeen.add(chKey2)) {
@@ -308,7 +314,7 @@ public class SniffActivity extends Activity {
                     }
                     maybeRecordDouyin(url);
                     // stripchat 系由专属分支套中转处理，通用嗅探跳过，避免出现裸地址记录
-                    boolean stripchatRaw = (url.contains("stripchat") || url.contains("doppiocdn")) && url.toLowerCase().contains(".m3u8");
+                    boolean stripchatRaw = url.contains("stripchat") || url.contains("doppiocdn");  // 全类型跳过，由专属分支处理
                     if (isMediaUrl(url) && !stripchatRaw && recordKeys.add(url)) {
                         foundUrls.add(url);
                         final String page = webView.getTitle();
