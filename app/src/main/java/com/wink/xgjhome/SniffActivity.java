@@ -130,11 +130,9 @@ public class SniffActivity extends Activity {
                 if (u == null) return;
                 final boolean fc2Ws = u.startsWith("ws://") || u.startsWith("wss://");
                 if (!fc2Ws) return;
-                final boolean isFc2 = u.contains("ws.php") || u.toLowerCase().contains("fc2");
                 main.post(new Runnable() { public void run() {
                     try { Toast.makeText(SniffActivity.this, "捕获WS: " + u.substring(0, Math.min(48, u.length())), Toast.LENGTH_LONG).show(); } catch (Throwable ignored) {}
                 }});
-                if (!isFc2) return;
                 Fc2Relay.start(u);
                 if (!fc2Added.getAndSet(true)) {
                     main.post(new Runnable() { public void run() {

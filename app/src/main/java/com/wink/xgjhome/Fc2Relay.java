@@ -7,8 +7,8 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * FC2 WebSocket-FLV 中转：连接 wss 直播流，把 FLV 字节广播给本地 HTTP 客户端
- * （LiveProxy /fc2.flv 路由）。不碰哔哩哔哩/抖音的任何逻辑。
+ * 通用 WebSocket-FLV 中转：连接 wss/ws 直播流，把二进制帧广播给本地 HTTP 客户端
+ * （LiveProxy /fc2.flv 路由）。FC2 系与 guangdongvideo 等镜像站通用。
  */
 public class Fc2Relay {
 
@@ -16,181 +16,182 @@ public class Fc2Relay {
     private static volatile boolean running = false;
     private static volatile boolean connected = false;
     private static final List<OutputStream> taps = new ArrayList<OutputStream>();
-    private static volatile byte[] flvHead = null;  // 开头 FLV 头，后进消费者先补
+    private static volatile byte[] flvHead = null;
     private static volatile long lastData = 0;
+    private static volatile int retry = 0;
 
     public static boolean isRunning() { return running; }
     public static boolean isConnected() { return connected; }
+    public static long lastDataAt() { return lastData; }
 
     public static synchronized void start(String url) {
         if (url == null || (!url.startsWith("ws://") && !url.startsWith("wss://"))) return;
         if (running && url.equals(wsUrl)) return;
         stop();
         wsUrl = url;
+        retry = 0;
         running = true;
         new Thread(new Runnable() { public void run() { loop(); } }).start();
     }
 
-    public static void stop() {
+    public static synchronized void stop() {
         running = false;
         connected = false;
-        flvHead = null;
-        synchronized (taps) { taps.clear(); }
+        try { synchronized (taps) { taps.clear(); } } catch (Throwable ignored) {}
     }
 
-    /** 注册本地 HTTP 消费者，返回是否成功（先补 FLV 头） */
+    private static void loop() {
+        while (running && retry < 6) {
+            try { wsRun(wsUrl); } catch (Throwable ignored) {}
+            if (!running) break;
+            connected = false;
+            retry++;
+            try { Thread.sleep(2000); } catch (Throwable e) { break; }
+        }
+        connected = false;
+    }
+
+    private static void wsRun(String url) throws Exception {
+        boolean ssl = url.startsWith("wss://");
+        String rest = url.substring(ssl ? 6 : 5);
+        int pi = rest.indexOf('/');
+        String host = rest;
+        String path = "/";
+        if (pi >= 0) { host = rest.substring(0, pi); path = rest.substring(pi); }
+        String hostOnly = host;
+        int port = ssl ? 443 : 80;
+        int hi = host.indexOf(':');
+        if (hi >= 0) { port = Integer.parseInt(host.substring(hi + 1)); hostOnly = host.substring(0, hi); }
+
+        Socket sk = ssl ? trustAll().createSocket(hostOnly, port) : new Socket(hostOnly, port);
+        sk.setSoTimeout(0);
+        java.io.InputStream in = sk.getInputStream();
+        OutputStream out = sk.getOutputStream();
+
+        String key = java.util.Base64.getEncoder().encodeToString(rand16());
+        String req = "GET " + path + " HTTP/1.1\r\n"
+            + "Host: " + host + "\r\n"
+            + "Upgrade: websocket\r\n"
+            + "Connection: Upgrade\r\n"
+            + "Sec-WebSocket-Key: " + key + "\r\n"
+            + "Sec-WebSocket-Version: 13\r\n"
+            + "Origin: https://" + hostOnly + "\r\n"
+            + "User-Agent: Mozilla/5.0 (Linux; Android 13) Chrome/120 Mobile\r\n"
+            + "\r\n";
+        out.write(req.getBytes());
+        out.flush();
+
+        // 读 HTTP 响应头
+        String line;
+        boolean ok = false;
+        java.io.ByteArrayOutputStream hb = new java.io.ByteArrayOutputStream();
+        while ((line = readLine(in)) != null) {
+            if (line.startsWith("HTTP/1.1 101") || line.startsWith("HTTP/1.0 101")) ok = true;
+            if (line.isEmpty()) break;
+            hb.write((line + "\n").getBytes());
+        }
+        if (!ok) { sk.close(); throw new Exception("handshake fail"); }
+
+        connected = true;
+        retry = 0;
+        lastData = System.currentTimeMillis();
+
+        byte[] hdr = new byte[2];
+        java.io.ByteArrayOutputStream frame = new java.io.ByteArrayOutputStream();
+        while (running) {
+            readFull(in, hdr, 0, 2);
+            boolean fin = (hdr[0] & 0x80) != 0;
+            int op = hdr[0] & 0x0F;
+            boolean masked = (hdr[1] & 0x80) != 0;
+            long len = hdr[1] & 0x7F;
+            byte[] ext = null;
+            if (len == 126) { ext = new byte[2]; readFull(in, ext, 0, 2); len = ((ext[0] & 0xFF) << 8) | (ext[1] & 0xFF); }
+            else if (len == 127) { ext = new byte[8]; readFull(in, ext, 0, 8); len = 0;
+                for (int i = 0; i < 8; i++) len = (len << 8) | (ext[i] & 0xFF); }
+            byte[] mask = masked ? new byte[4] : null;
+            if (masked) readFull(in, mask, 0, 4);
+            byte[] payload = new byte[(int) len];
+            if (len > 0) readFull(in, payload, 0, (int) len);
+            if (masked) for (int i = 0; i < payload.length; i++) payload[i] ^= mask[i % 4];
+
+            if (op == 0x9) { // ping → pong
+                out.write(pong(mask == null ? payload : payload));
+                out.flush();
+                continue;
+            }
+            if (op == 0x8) { sk.close(); throw new Exception("close frame"); }
+            if (op == 0x2 || op == 0x0 || op == 0x1) {
+                broadcast(payload);
+                lastData = System.currentTimeMillis();
+            }
+            if (fin) frame.reset();
+        }
+        sk.close();
+    }
+
+    private static byte[] pong(byte[] payload) {
+        int pl = Math.min(payload.length, 125);
+        byte[] r = new byte[2 + pl];
+        r[0] = (byte) 0x8A;
+        r[1] = (byte) (0x80 | pl);  // 服务端要求客户端帧必须带掩码
+        byte[] mask = rand16();
+        System.arraycopy(mask, 0, r, 2, 4 > pl ? pl : 0); // 占位，下面重排
+        // 重新构造
+        byte[] out = new byte[2 + 4 + pl];
+        out[0] = (byte) 0x8A;
+        out[1] = (byte) (0x80 | pl);
+        System.arraycopy(mask, 0, out, 2, 4);
+        for (int i = 0; i < pl; i++) out[6 + i] = (byte) (payload[i] ^ mask[i % 4]);
+        return out;
+    }
+
+    private static void broadcast(byte[] data) {
+        if (flvHead == null && data.length >= 3 && data[0] == 'F' && data[1] == 'L' && data[2] == 'V') {
+            flvHead = data;
+        }
+        synchronized (taps) {
+            for (OutputStream t : new ArrayList<OutputStream>(taps)) {
+                try {
+                    t.write(data);
+                    t.flush();
+                } catch (Throwable e) {
+                    try { taps.remove(t); } catch (Throwable ignored) {}
+                }
+            }
+        }
+    }
+
+    /** 消费者接入：返回 false 表示当前未连接 */
     public static boolean tap(OutputStream os) {
-        if (!connected) return false;
-        try {
-            if (flvHead != null) os.write(flvHead);
-            os.flush();
-        } catch (Throwable e) { return false; }
-        synchronized (taps) { taps.add(os); }
-        return true;
+        synchronized (taps) {
+            if (!connected) return false;
+            try {
+                if (flvHead != null) { os.write(flvHead); os.flush(); }
+            } catch (Throwable e) { return false; }
+            taps.add(os);
+            return true;
+        }
     }
 
     public static void untap(OutputStream os) {
         synchronized (taps) { taps.remove(os); }
     }
 
-    private static void broadcast(byte[] data) {
-        synchronized (taps) {
-            for (int i = taps.size() - 1; i >= 0; i--) {
-                try { taps.get(i).write(data); } catch (Throwable e) { taps.remove(i); }
-            }
+    private static byte[] rand16() {
+        byte[] b = new byte[16];
+        new java.security.SecureRandom().nextBytes(b);
+        return b;
+    }
+
+    private static String readLine(java.io.InputStream in) throws Exception {
+        java.io.ByteArrayOutputStream b = new java.io.ByteArrayOutputStream();
+        int c;
+        while ((c = in.read()) >= 0) {
+            if (c == '\n') break;
+            if (c != '\r') b.write(c);
         }
-    }
-
-    private static void loop() {
-        while (running) {
-            Socket sk = null;
-            try {
-                boolean ssl = wsUrl.startsWith("wss");
-                String rest = wsUrl.substring(ssl ? 6 : 5);
-                String path = "/";
-                String host = rest;
-                int pi = rest.indexOf('/');
-                if (pi >= 0) { host = rest.substring(0, pi); path = rest.substring(pi); }
-                String hostOnly = host;
-                int port = ssl ? 443 : 80;
-                int hi = host.indexOf(':');
-                if (hi >= 0) { port = Integer.parseInt(host.substring(hi + 1)); hostOnly = host.substring(0, hi); }
-
-                if (ssl) {
-                    javax.net.ssl.SSLSocketFactory f = trustAll();
-                    sk = f.createSocket(hostOnly, port);
-                } else {
-                    sk = new Socket(hostOnly, port);
-                }
-                OutputStream os = sk.getOutputStream();
-                String key = java.util.Base64.getEncoder().encodeToString(
-                    java.security.SecureRandom.getInstanceStrong().generateSeed(16));
-                String req = "GET " + path + " HTTP/1.1\r\n"
-                    + "Host: " + host + "\r\n"
-                    + "Upgrade: websocket\r\nConnection: Upgrade\r\n"
-                    + "Sec-WebSocket-Key: " + key + "\r\n"
-                    + "Sec-WebSocket-Version: 13\r\n"
-                    + "Origin: https://live.fc2.com\r\n"
-                    + "User-Agent: Mozilla/5.0 (Linux; Android 13) Chrome/120 Mobile\r\n\r\n";
-                os.write(req.getBytes());
-                os.flush();
-
-                java.io.InputStream in = sk.getInputStream();
-                if (!waitHandshake(in)) throw new Exception("handshake fail");
-                connected = true;
-                flvHead = null;
-                lastData = System.currentTimeMillis();
-
-                byte[] acc = new byte[65536];
-                int accLen = 0;
-                byte[] hdr = new byte[16];
-                while (running) {
-                    readFull(in, hdr, 0, 2);
-                    boolean fin = (hdr[0] & 0x80) != 0;
-                    int op = hdr[0] & 0x0F;
-                    boolean masked = (hdr[1] & 0x80) != 0;
-                    long len = hdr[1] & 0x7F;
-                    if (len == 126) { readFull(in, hdr, 2, 2); len = ((hdr[2] & 0xFF) << 8) | (hdr[3] & 0xFF); }
-                    else if (len == 127) { readFull(in, hdr, 2, 8); len = 0; for (int i = 2; i < 10; i++) len = (len << 8) | (hdr[i] & 0xFF); }
-                    byte[] mask = new byte[4];
-                    if (masked) readFull(in, mask, 0, 4);
-
-                    byte[] payload = new byte[(int) len];
-                    readFull(in, payload, 0, (int) len);
-                    if (masked) for (int i = 0; i < (int) len; i++) payload[i] ^= mask[i % 4];
-
-                    lastData = System.currentTimeMillis();
-                    if (op == 0x8) break;  // close
-                    if (op == 0x9) {       // ping → pong
-                        sendFrame(os, 0xA, payload);
-                        continue;
-                    }
-                    if (op == 0xA) continue;  // pong
-                    if (op == 0x2 || op == 0x0 || op == 0x1) {  // binary/cont/text
-                        if (accLen + payload.length > acc.length) {
-                            byte[] nb = new byte[(accLen + payload.length) * 2];
-                            System.arraycopy(acc, 0, nb, 0, accLen);
-                            acc = nb;
-                        }
-                        System.arraycopy(payload, 0, acc, accLen, payload.length);
-                        accLen += payload.length;
-                        if (fin) {
-                            byte[] msg = new byte[accLen];
-                            System.arraycopy(acc, 0, msg, 0, accLen);
-                            accLen = 0;
-                            if (msg.length > 4 && msg[0] == 'F' && msg[1] == 'L' && msg[2] == 'V') {
-                                if (flvHead == null) {
-                                    int hl = Math.min(msg.length, 4096);
-                                    flvHead = new byte[hl];
-                                    System.arraycopy(msg, 0, flvHead, 0, hl);
-                                }
-                                broadcast(msg);
-                            } else if (flvHead != null) {
-                                broadcast(msg);
-                            }
-                        }
-                    }
-                    if (System.currentTimeMillis() - lastData > 30000) break;  // 30s 无数据重连
-                }
-            } catch (Throwable ignored) {
-            } finally {
-                connected = false;
-                try { if (sk != null) sk.close(); } catch (Throwable ignored) {}
-            }
-            if (running) { try { Thread.sleep(3000); } catch (Throwable e) { break; } }
-        }
-    }
-
-    private static void sendFrame(OutputStream os, int op, byte[] payload) throws Exception {
-        java.io.ByteArrayOutputStream bo = new java.io.ByteArrayOutputStream();
-        bo.write((byte) (0x80 | op));
-        if (payload.length < 126) bo.write((byte) payload.length);
-        else if (payload.length < 65536) { bo.write((byte) 126); bo.write((byte) (payload.length >> 8)); bo.write((byte) payload.length); }
-        else { bo.write((byte) 127); for (int i = 7; i >= 0; i--) bo.write((byte) (payload.length >> (8 * i))); }
-        byte[] mask = java.security.SecureRandom.getInstanceStrong().generateSeed(4);
-        bo.write(mask);
-        for (int i = 0; i < payload.length; i++) bo.write((byte) (payload[i] ^ mask[i % 4]));
-        os.write(bo.toByteArray());
-        os.flush();
-    }
-
-    private static boolean waitHandshake(java.io.InputStream in) throws Exception {
-        java.io.ByteArrayOutputStream bo = new java.io.ByteArrayOutputStream();
-        int prev = 0;
-        while (true) {
-            int b = in.read();
-            if (b < 0) return false;
-            bo.write(b);
-            if (prev == '\r' && b == '\n' && endsWithDD(bo)) return true;
-            prev = b;
-            if (bo.size() > 16384) return false;
-        }
-    }
-
-    private static boolean endsWithDD(java.io.ByteArrayOutputStream bo) {
-        byte[] a = bo.toByteArray();
-        int n = a.length;
-        return n >= 4 && a[n - 4] == '\r' && a[n - 3] == '\n' && a[n - 2] == '\r' && a[n - 1] == '\n';
+        if (b.size() == 0 && c < 0) return null;
+        return b.toString();
     }
 
     private static void readFull(java.io.InputStream in, byte[] b, int off, int len) throws Exception {
