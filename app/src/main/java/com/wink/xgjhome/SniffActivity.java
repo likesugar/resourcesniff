@@ -193,8 +193,23 @@ public class SniffActivity extends Activity {
                     if (url.contains("/log/")) return null;
                     if (url.contains("guangdongvideo.com") || url.contains("live.fc2.com")) {
                         String lu = url.toLowerCase();
+                        boolean isMaster = lu.contains("master_playlist");
                         if (lu.contains(".m3u8") || lu.contains("playlist") || lu.contains("hls") || lu.contains(".ts")) {
                             dumpFc2Debug("REQ: " + url);
+                        }
+                        if (isMaster) {
+                            // 主播放列表直接进记录（按频道去重，token 刷新不重复加）
+                            final String fUrl = url;
+                            final String chKey = url.substring(0, url.indexOf('?') > 0 ? url.indexOf('?') : url.length());
+                            main.post(new Runnable() { public void run() {
+                                try {
+                                    if (fc2HlsSeen.add(chKey)) {
+                                        addRecord(fUrl, "FC2·直播");
+                                        if (!isRecordsVisible) toggleRecords();
+                                        dumpFc2Debug("记录已添加: " + fUrl);
+                                    }
+                                } catch (Throwable e) { dumpFc2Debug("记录添加失败: " + e.getClass().getSimpleName()); }
+                            }});
                         }
                     }
                     boolean fc2Doc = (url.contains("live.fc2.com") || url.contains("guangdongvideo.com"))
