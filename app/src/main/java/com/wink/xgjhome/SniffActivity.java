@@ -138,20 +138,16 @@ public class SniffActivity extends Activity {
                     String ck = CookieManager.getInstance().getCookie("https://" + wu.getHost());
                     Fc2Relay.start(u, ck);
                 } catch (Throwable e) { Fc2Relay.start(u); }
-                if (!fc2Added.getAndSet(true)) {
-                    main.post(new Runnable() { public void run() {
-                        addRecord("http://127.0.0.1:8123/fc2.flv", "FC2·直播");
-                        if (!isRecordsVisible) toggleRecords();
-                    }});
-                }
+                // 轮询等 HLS 地址出来
+                final String fUrl2 = u;
+                main.post(new Runnable() { public void run() { pollFc2Hls(fUrl2, 0); } });
                 // 诊断写文件 + toast
                 final String fUrl = u;
                 Runnable dump = new Runnable() { public void run() {
                     String st = "url: " + fUrl
                         + "\n时间: " + new java.text.SimpleDateFormat("HH:mm:ss", java.util.Locale.US).format(new java.util.Date())
-                        + "\n状态: " + (Fc2Relay.isConnected()
-                            ? "已连 " + Fc2Relay.bytesTotal() + "B 首帧: " + Fc2Relay.debugHex()
-                            : "未连接(重试" + 8 + "次内)");
+                        + "\n状态: " + (Fc2Relay.getHls() != null ? "HLS=" + Fc2Relay.getHls()
+                            : (Fc2Relay.isConnected() ? "已连,信令: " + Fc2Relay.debugInfo() : "未连接"));
                     try { Toast.makeText(SniffActivity.this, "FC2诊断已写入", Toast.LENGTH_SHORT).show(); } catch (Throwable ignored) {}
                     try {
                         java.io.File dir = getExternalFilesDir(null).getParentFile();
@@ -608,6 +604,20 @@ public class SniffActivity extends Activity {
     };
 
     private final java.util.concurrent.atomic.AtomicBoolean fc2Added = new java.util.concurrent.atomic.AtomicBoolean(false);
+
+    private void pollFc2Hls(final String ws, final int round) {
+        if (round > 30) return;  // ~60s 放弃
+        String hls = Fc2Relay.getHls();
+        if (hls != null && !hls.isEmpty()) {
+            if (fc2Added.compareAndSet(false, true)) {
+                addRecord(hls, "FC2·直播");
+                if (!isRecordsVisible) toggleRecords();
+            }
+            return;
+        }
+        main.postDelayed(new Runnable() { public void run() { pollFc2Hls(ws, round + 1); } }, 2000);
+    }
+
 
     /** FC2：钩住页面 WebSocket 拿 ws-flv 地址 */
     void injectFc2Hook() {

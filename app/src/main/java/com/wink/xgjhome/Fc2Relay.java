@@ -3,31 +3,27 @@ package com.wink.xgjhome;
 import java.io.OutputStream;
 import java.net.Socket;
 import java.security.cert.X509Certificate;
-import java.util.ArrayList;
-import java.util.List;
 
 /**
- * 通用 WebSocket-FLV 中转：连接 wss/ws 直播流，把二进制帧广播给本地 HTTP 客户端。
- * 带诊断：debugHex 记录首个二进制帧前 24 字节，判断协议形态。
+ * FC2 系直播控制信令客户端：连 wss 控制通道，
+ * connect_complete 后发 get_hls_information 拿 HLS m3u8 地址（挑 mode 最高的画质）。
+ * HLS 地址交给嗅探/播放/录制现有管线。心跳 25s 保活。
  */
 public class Fc2Relay {
 
     private static volatile String wsUrl = null;
     private static volatile boolean running = false;
     private static volatile boolean connected = false;
-    private static final List<OutputStream> taps = new ArrayList<OutputStream>();
-    private static volatile byte[] flvHead = null;
-    private static volatile long lastData = 0;
+    private static volatile String hlsUrl = null;
+    private static volatile String debugInfo = "";
     private static volatile int retry = 0;
     private static volatile String cookie = null;
-    private static volatile String debugHex = "";
-    private static volatile long bytesTotal = 0;
+    private static int msgId = 0;
+    private static volatile long lastRecv = 0;
 
-    public static boolean isRunning() { return running; }
     public static boolean isConnected() { return connected; }
-    public static long lastDataAt() { return lastData; }
-    public static long bytesTotal() { return bytesTotal; }
-    public static String debugHex() { return debugHex; }
+    public static String getHls() { return hlsUrl; }
+    public static String debugInfo() { return debugInfo; }
 
     public static synchronized void start(String url) { start(url, null); }
 
@@ -38,8 +34,8 @@ public class Fc2Relay {
         wsUrl = url;
         cookie = ck;
         retry = 0;
-        debugHex = "";
-        bytesTotal = 0;
+        hlsUrl = null;
+        debugInfo = "";
         running = true;
         new Thread(new Runnable() { public void run() { loop(); } }).start();
     }
@@ -47,7 +43,6 @@ public class Fc2Relay {
     public static synchronized void stop() {
         running = false;
         connected = false;
-        try { synchronized (taps) { taps.clear(); } } catch (Throwable ignored) {}
     }
 
     private static void loop() {
@@ -101,11 +96,18 @@ public class Fc2Relay {
 
         connected = true;
         retry = 0;
-        lastData = System.currentTimeMillis();
+        lastRecv = System.currentTimeMillis();
 
         byte[] hdr = new byte[2];
+        java.io.ByteArrayOutputStream txtAcc = new java.io.ByteArrayOutputStream();
+        boolean hlsRequested = false;
+        long lastHb = System.currentTimeMillis();
+        long lastHeartbeatRecv = System.currentTimeMillis();
+
         while (running) {
+            // 读一帧
             readFull(in, hdr, 0, 2);
+            boolean fin = (hdr[0] & 0x80) != 0;
             int op = hdr[0] & 0x0F;
             boolean masked = (hdr[1] & 0x80) != 0;
             long len = hdr[1] & 0x7F;
@@ -117,26 +119,85 @@ public class Fc2Relay {
             byte[] payload = new byte[(int) len];
             if (len > 0) readFull(in, payload, 0, (int) len);
             if (masked) for (int i = 0; i < payload.length; i++) payload[i] ^= mask[i % 4];
+            lastRecv = System.currentTimeMillis();
 
             if (op == 0x9) { out.write(pong(payload)); out.flush(); continue; }
             if (op == 0x8) { sk.close(); throw new Exception("close frame"); }
-            if (op == 0x2 || op == 0x0 || op == 0x1) {
-                if (debugHex.length() == 0 && payload.length > 0) {
-                    StringBuilder sb = new StringBuilder();
-                    for (int i = 0; i < Math.min(24, payload.length); i++)
-                        sb.append(String.format("%02X", payload[i])).append(' ');
-                    sb.append("(").append(payload.length).append("B op").append(op).append(")");
-                    debugHex = sb.toString();
+            if (op == 0x1 || op == 0x0) {
+                txtAcc.write(payload, 0, payload.length);
+                if (!fin) continue;
+                String msg = txtAcc.toString("UTF-8");
+                txtAcc.reset();
+                handleMessage(msg, out);
+
+                // connect_complete 后请求 HLS（只发一次，必要时重发）
+                if (!hlsRequested && (msg.contains("connect_complete") || msg.contains("initial_connect"))) {
+                    sendText(out, msg("get_hls_information"));
+                    hlsRequested = true;
+                    lastHb = System.currentTimeMillis();
                 }
-                if (flvHead == null && payload.length >= 3 && payload[0] == 'F' && payload[1] == 'L' && payload[2] == 'V') {
-                    flvHead = payload;
-                }
-                broadcast(payload);
-                bytesTotal += payload.length;
-                lastData = System.currentTimeMillis();
+            }
+
+            // 心跳：25s 没发就发 heartbeat
+            if (System.currentTimeMillis() - lastHb > 25000) {
+                sendText(out, msg("heartbeat"));
+                lastHb = System.currentTimeMillis();
+            }
+            // 90s 无任何数据则断开重连
+            if (System.currentTimeMillis() - lastRecv > 90000 && System.currentTimeMillis() - lastHeartbeatRecv > 90000) {
+                sk.close(); throw new Exception("stale");
             }
         }
         sk.close();
+    }
+
+    private static void handleMessage(String msg, OutputStream out) {
+        try {
+            if (msg.contains("\"playlists\"") && msg.contains("url")) {
+                // _response_ 携带 HLS 信息：挑 mode 最高（>=90 减 90 比较）
+                String best = null; int bestMode = -1;
+                java.util.regex.Matcher mu = java.util.regex.Pattern.compile("\"url\"\\s*:\\s*\"([^\"]+)\"").matcher(msg);
+                java.util.regex.Matcher mm = java.util.regex.Pattern.compile("\"mode\"\\s*:\\s*(\\d+)").matcher(msg);
+                java.util.ArrayList<String> urls = new java.util.ArrayList<String>();
+                java.util.ArrayList<Integer> modes = new java.util.ArrayList<Integer>();
+                while (mu.find()) urls.add(mu.group(1).replace("\\/", "/"));
+                while (mm.find()) modes.add(Integer.parseInt(mm.group(1)));
+                for (int i = 0; i < urls.size() && i < modes.size(); i++) {
+                    int m = modes.get(i);
+                    int cmp = m >= 90 ? m - 90 : m;
+                    if (cmp > bestMode) { bestMode = cmp; best = urls.get(i); }
+                }
+                if (best != null) hlsUrl = best;
+                debugInfo = "playlists=" + urls.size();
+            } else if (msg.contains("\"name\"")) {
+                debugInfo = msg.length() > 90 ? msg.substring(0, 90) : msg;
+            }
+        } catch (Throwable ignored) {}
+    }
+
+    private static String msg(String name) {
+        return "{\"name\":\"" + name + "\",\"arguments\":{},\"id\":" + (++msgId) + "}";
+    }
+
+    private static void sendText(OutputStream out, String text) throws Exception {
+        byte[] pl = text.getBytes("UTF-8");
+        byte[] mask = rand16();
+        java.io.ByteArrayOutputStream f = new java.io.ByteArrayOutputStream();
+        f.write(0x81);
+        if (pl.length < 126) {
+            f.write(0x80 | pl.length);
+        } else if (pl.length < 65536) {
+            f.write(0x80 | 126);
+            f.write((pl.length >> 8) & 0xFF); f.write(pl.length & 0xFF);
+        } else {
+            f.write(0x80 | 127);
+            long l = pl.length;
+            for (int i = 7; i >= 0; i--) f.write((int) ((l >> (8 * i)) & 0xFF));
+        }
+        f.write(mask);
+        for (int i = 0; i < pl.length; i++) f.write(pl[i] ^ mask[i % 4]);
+        out.write(f.toByteArray());
+        out.flush();
     }
 
     private static byte[] pong(byte[] payload) {
@@ -148,30 +209,6 @@ public class Fc2Relay {
         System.arraycopy(mask, 0, out, 2, 4);
         for (int i = 0; i < pl; i++) out[6 + i] = (byte) (payload[i] ^ mask[i % 4]);
         return out;
-    }
-
-    private static void broadcast(byte[] data) {
-        synchronized (taps) {
-            for (OutputStream t : new ArrayList<OutputStream>(taps)) {
-                try { t.write(data); t.flush(); }
-                catch (Throwable e) { try { taps.remove(t); } catch (Throwable ignored) {} }
-            }
-        }
-    }
-
-    public static boolean tap(OutputStream os) {
-        synchronized (taps) {
-            if (!connected) return false;
-            try {
-                if (flvHead != null) { os.write(flvHead); os.flush(); }
-            } catch (Throwable e) { return false; }
-            taps.add(os);
-            return true;
-        }
-    }
-
-    public static void untap(OutputStream os) {
-        synchronized (taps) { taps.remove(os); }
     }
 
     private static byte[] rand16() {
