@@ -27,6 +27,7 @@ public class RecordActivity extends Activity {
     private TextView[] tabBtns;
     private View[] tabLines;
     private int curTab = 0;  // 0全部 1视频 2录制 3下载
+    private java.util.ArrayList<HistoryStore.Item> hist;
 
     private void restyleTabs() {
         for (int i = 0; i < tabBtns.length; i++) {
@@ -50,6 +51,8 @@ public class RecordActivity extends Activity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         DlManager.init(this);
+        try { getWindow().getDecorView().setSystemUiVisibility(View.SYSTEM_UI_FLAG_HIDE_NAVIGATION); } catch (Throwable ignored) {}
+        hist = HistoryStore.load(this);
         FrameLayout root = new FrameLayout(this);
         root.setBackgroundColor(Color.BLACK);
 
@@ -181,12 +184,14 @@ public class RecordActivity extends Activity {
         for (RecManager.RecJob j : RecManager.recJobs.values()) meta.put("R" + j.id, new Object[]{0, j, (Boolean) j.active});
         for (RecManager.RecJob j : RecManager.stoppedJobs.values()) if (!meta.containsKey("R" + j.id)) meta.put("R" + j.id, new Object[]{0, j, Boolean.FALSE});
         for (DlManager.DlJob j : DlManager.jobs()) meta.put("D" + j.id, new Object[]{1, j, Boolean.FALSE});
+        if (hist != null) for (int i = 0; i < hist.size(); i++) meta.put("H" + i, new Object[]{2, hist.get(i), Boolean.FALSE});
 
         // 分类：录制中/下载中 → 下载；录制完成/暂停 → 录制；下载完成 → 视频
         java.util.HashMap<String, String> cat = new java.util.HashMap<String, String>();
         for (java.util.Map.Entry<String, Object[]> e : meta.entrySet()) {
             int type = (Integer) e.getValue()[0];
             boolean live = (Boolean) e.getValue()[2];
+            if (type == 2) { cat.put(e.getKey(), ((HistoryStore.Item) e.getValue()[1]).type); continue; }
             cat.put(e.getKey(), type == 1 ? (((DlManager.DlJob) e.getValue()[1]).active ? "下载" : "视频")
                                           : (live ? "下载" : "录制"));
         }
@@ -229,9 +234,14 @@ public class RecordActivity extends Activity {
                 row = (LinearLayout) list.getChildAt(list.getChildCount() - 1);
                 final RecManager.RecJob fj = j;
                 rowUpdaters.put(key, new Runnable() { public void run() { if (infoRef.get() != null) infoRef.get().setText(buildInfo(fj, live)); } });
-            } else {
+            } else if ((Integer) m[0] == 1) {
                 final DlManager.DlJob j = (DlManager.DlJob) m[1];
                 addDlRow(list, j, infoRef);
+                row = (LinearLayout) list.getChildAt(list.getChildCount() - 1);
+            } else {
+                final HistoryStore.Item it = (HistoryStore.Item) m[1];
+                final int hidx = Integer.parseInt(key.substring(1));
+                addHistRow(list, it, hidx, infoRef);
                 row = (LinearLayout) list.getChildAt(list.getChildCount() - 1);
             }
             row.setTag(key);
@@ -283,6 +293,79 @@ public class RecordActivity extends Activity {
         more.setPadding(24, 24, 24, 24);
         more.setOnClickListener(new View.OnClickListener() {
             public void onClick(View v) { showDlMenu(v, j); }
+        });
+        row.addView(more);
+        parent.addView(row);
+        infoRef.set(tvInfo);
+    }
+
+    private void addHistRow(LinearLayout parent, final HistoryStore.Item it, final int idx, final java.util.concurrent.atomic.AtomicReference<TextView> infoRef) {
+        LinearLayout row = new LinearLayout(this);
+        row.setOrientation(LinearLayout.HORIZONTAL);
+        row.setGravity(Gravity.CENTER_VERTICAL);
+        row.setPadding(0, 24, 0, 24);
+        FrameLayout thumb = new FrameLayout(this);
+        LinearLayout.LayoutParams tp = new LinearLayout.LayoutParams(140, 90);
+        tp.rightMargin = 24;
+        thumb.setLayoutParams(tp);
+        thumb.setBackgroundColor(0xFF1E242E);
+        TextView play = new TextView(this);
+        play.setText("▶");
+        play.setTextColor(0xFF8A919E);
+        play.setGravity(Gravity.CENTER);
+        thumb.addView(play, new FrameLayout.LayoutParams(-1, -1));
+        row.addView(thumb);
+        LinearLayout mid = new LinearLayout(this);
+        mid.setOrientation(LinearLayout.VERTICAL);
+        LinearLayout.LayoutParams mp = new LinearLayout.LayoutParams(0, -2);
+        mp.weight = 1;
+        mid.setLayoutParams(mp);
+        TextView tvName = new TextView(this);
+        tvName.setText(it.title);
+        tvName.setTextColor(Color.WHITE);
+        tvName.setTextSize(16);
+        tvName.setTypeface(Typeface.DEFAULT_BOLD);
+        tvName.setSingleLine(true);
+        mid.addView(tvName);
+        TextView tvInfo = new TextView(this);
+        tvInfo.setText("类型: " + it.type + "\n状态: 已完成");
+        tvInfo.setTextColor(0xFF8A919E);
+        tvInfo.setTextSize(13);
+        tvInfo.setLineSpacing(4, 1);
+        mid.addView(tvInfo);
+        row.addView(mid);
+        TextView more = new TextView(this);
+        more.setText("⋮");
+        more.setTextColor(Color.WHITE);
+        more.setTextSize(22);
+        more.setGravity(Gravity.CENTER);
+        more.setPadding(24, 24, 24, 24);
+        more.setOnClickListener(new View.OnClickListener() {
+            public void onClick(View v) {
+                PopupMenu pm = new PopupMenu(RecordActivity.this, v);
+                pm.getMenu().add("播放");
+                pm.getMenu().add("删除");
+                pm.setOnMenuItemClickListener(new PopupMenu.OnMenuItemClickListener() {
+                    public boolean onMenuItemClick(android.view.MenuItem m2) {
+                        String t = m2.getTitle().toString();
+                        if (t.equals("播放")) {
+                            try {
+                                Intent i = new Intent(Intent.ACTION_VIEW);
+                                i.setDataAndType(android.net.Uri.parse(it.path), "video/*");
+                                i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_GRANT_READ_URI_PERMISSION);
+                                startActivity(i);
+                            } catch (Throwable e) { Toast.makeText(RecordActivity.this, "打不开", Toast.LENGTH_SHORT).show(); }
+                        } else if (t.equals("删除")) {
+                            HistoryStore.removeAt(RecordActivity.this, idx);
+                            hist = HistoryStore.load(RecordActivity.this);
+                            rowOrder.clear();
+                            rebuild();
+                        }
+                        return true;
+                    }
+                });
+                pm.show();
+            }
         });
         row.addView(more);
         parent.addView(row);

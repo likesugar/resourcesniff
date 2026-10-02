@@ -987,7 +987,7 @@ public class SniffActivity extends Activity {
             if (!autoRefreshing) return;
             if (hasHigherRank()) { toggleAutoRefresh(); return; }  // 刷到原画等，自动停
             try { webView.reload(); } catch (Throwable e) { }
-            main.postDelayed(this, 1000);
+            main.postDelayed(this, 2000);
         }
     };
 

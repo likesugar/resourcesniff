@@ -33,44 +33,43 @@ public class DlManager {
         final DlJob j = new DlJob();
         j.id = SEQ.incrementAndGet();
         j.url = url;
-        j.title = "下载_" + System.currentTimeMillis() / 1000 + ".ts";
-        java.io.File dir = new java.io.File(sCtx.getExternalFilesDir(null), "下载");
-        dir.mkdirs();
-        j.file = new java.io.File(dir, "dl" + j.id + ".ts");
+        String t = url.substring(url.lastIndexOf('/') + 1);
+        if (t.contains("?")) t = t.substring(0, t.indexOf('?'));
+        if (t.length() == 0) t = "资源嗅探_" + System.currentTimeMillis() / 1000;
+        j.title = t;
+        j.file = new java.io.File(sCtx.getExternalFilesDir(null), "下载/dl" + j.id + ".ts");
+        try { j.file.getParentFile().mkdirs(); } catch (Throwable ignored) {}
         JOBS.put(j.id, j);
-        new Thread(new Runnable() { public void run() { runDl(j); } }).start();
+        new Thread(new Runnable() { public void run() { download(j); } }).start();
     }
 
-    private static void runDl(final DlJob j) {
+    private static void download(final DlJob j) {
         java.io.InputStream in = null;
         java.io.OutputStream out = null;
         try {
             java.net.URL u = new java.net.URL(j.url);
             java.net.HttpURLConnection c = (java.net.HttpURLConnection) u.openConnection();
-            c.setConnectTimeout(8000);
+            c.setConnectTimeout(10000);
             c.setReadTimeout(15000);
-            c.setRequestProperty("User-Agent", "Mozilla/5.0 (Linux; Android 13) AppleWebKit/537.36");
             if (j.url.contains("bilibili") || j.url.contains("bilivideo"))
                 c.setRequestProperty("Referer", "https://www.bilibili.com/");
-            else if (j.url.contains("douyin"))
-                c.setRequestProperty("Referer", "https://live.douyin.com/");
-            c.connect();
+            c.setRequestProperty("User-Agent", "Mozilla/5.0 (Linux; Android 13) AppleWebKit/537.36");
             j.total = c.getContentLength();
             in = c.getInputStream();
             out = new java.io.FileOutputStream(j.file);
-            byte[] buf = new byte[64 * 1024];
+            byte[] buf = new byte[32 * 1024];
             int n;
-            while (j.active && (n = in.read(buf)) > 0) {
+            while ((n = in.read(buf)) > 0) {
+                if (!j.active) return;  // 已取消
                 out.write(buf, 0, n);
                 j.doneBytes += n;
                 j.state = "下载中";
             }
             out.close(); out = null;
-            in.close(); in = null;
-            if (!j.active) return;  // 已取消
+            j.state = insertGallery(j) ? "已完成" : "完成(未入相册)";
+            HistoryStore.add(sCtx, "视频", j.title, "file://" + j.file.getAbsolutePath());
             j.done = true;
             j.active = false;
-            j.state = insertGallery(j) ? "已完成" : "完成(未入相册)";
         } catch (Throwable t) {
             if (j.active) { j.failed = true; j.active = false; j.state = "下载失败: " + t.getClass().getSimpleName(); }
         } finally {
@@ -82,7 +81,7 @@ public class DlManager {
     private static boolean insertGallery(DlJob j) {
         try {
             android.content.ContentValues cv = new android.content.ContentValues();
-            cv.put(android.provider.MediaStore.Video.Media.DISPLAY_NAME, j.title);
+            cv.put(android.provider.MediaStore.Video.Media.DISPLAY_NAME, j.title.endsWith(".ts") ? j.title : j.title + ".ts");
             cv.put(android.provider.MediaStore.Video.Media.MIME_TYPE, "video/mp2t");
             if (android.os.Build.VERSION.SDK_INT >= 29)
                 cv.put(android.provider.MediaStore.Video.Media.RELATIVE_PATH, "Movies/资源嗅探");
