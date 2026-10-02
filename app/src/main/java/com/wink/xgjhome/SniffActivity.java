@@ -204,14 +204,17 @@ public class SniffActivity extends Activity {
                         // 避免触碰页面分片被反广告拦截检测识别
                         if (lu2.endsWith(".mp4") && (lu2.contains("_part") || lu2.contains("init")) && StripRec.isRunning()) {
                             final String fUrl4 = url;
-                            new Thread(new Runnable() { public void run() {
-                                try {
-                                    byte[] body = StripRec.httpGetBytes(fUrl4);
-                                    StripRec.feed(fUrl4, body);
-                                } catch (Throwable e2) {
-                                    try { SniffActivity.dumpFc2Debug("SC-DUAL-ERR " + fUrl4.substring(0, Math.min(90, fUrl4.length()))); } catch (Throwable ignored) {}
-                                }
-                            } }).start();
+                            if (StripRec.submit(fUrl4)) {   // 单线程排队+去重，延迟让页面优先
+                                new Thread(new Runnable() { public void run() {
+                                    try { Thread.sleep(500); } catch (Throwable ignored) {}
+                                    try {
+                                        byte[] body = StripRec.httpGetBytes(fUrl4);
+                                        StripRec.feed(fUrl4, body);
+                                    } catch (Throwable e2) {
+                                        try { SniffActivity.dumpFc2Debug("SC-DUAL-ERR " + fUrl4.substring(0, Math.min(90, fUrl4.length()))); } catch (Throwable ignored) {}
+                                    }
+                                } }).start();
+                            }
                         }
                         // 排除：心跳(ping)、主列表(/master/、_auto)——单拉无数据；其余媒体列表都收
                         if (lu2.contains("ping.m3u8") || lu2.contains("/master/") || lu2.contains("_auto.m3u8")) {

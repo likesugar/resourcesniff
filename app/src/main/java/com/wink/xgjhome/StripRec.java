@@ -171,6 +171,12 @@ public class StripRec {
         return bo.toByteArray();
     }
 
+    private static final java.util.Set<String> seenParts =
+        java.util.Collections.newSetFromMap(new java.util.concurrent.ConcurrentHashMap<String, Boolean>());
+
+    /** 同一分片只排一次队；返回 false 表示重复忽略 */
+    public static boolean submit(String url) { return seenParts.add(url); }
+
     /** 简易上下文持有，避免改动现有初始化 */
     public static class Context0 {
         private static android.content.Context c;
