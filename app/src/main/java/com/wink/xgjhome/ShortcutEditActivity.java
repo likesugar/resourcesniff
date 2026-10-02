@@ -224,6 +224,19 @@ public class ShortcutEditActivity extends Activity {
             if (it.length > 8) cbRoot.setChecked(it[8].equals("1"));
             if (it.length > 10 && it[10].length() > 0) {
                 iconPath = it[10];
+            } else {
+                // 老条目兜底：取最近保存的自选图标文件
+                try {
+                    java.io.File idir = new java.io.File(getFilesDir(), "sc_icons");
+                    java.io.File[] fs = idir.listFiles();
+                    if (fs != null && fs.length > 0) {
+                        java.io.File newest = fs[0];
+                        for (java.io.File f : fs) if (f.lastModified() > newest.lastModified()) newest = f;
+                        iconPath = newest.getAbsolutePath();
+                    }
+                } catch (Throwable ignored) {}
+            }
+            if (iconPath.length() > 0) {
                 try {
                     android.graphics.Bitmap bm2 = android.graphics.BitmapFactory.decodeFile(iconPath);
                     if (bm2 != null) { curIcon = bm2; iconView.setImageBitmap(bm2); iconHint.setText("已使用自选图标"); }
