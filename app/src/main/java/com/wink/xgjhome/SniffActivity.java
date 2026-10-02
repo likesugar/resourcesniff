@@ -1335,11 +1335,14 @@ public class SniffActivity extends Activity {
                 if (t.equals("下载")) downloadUrl(curUrl);
                 else if (t.equals("播放")) playUrl(curUrl);
                 else if (t.equals("直播录制") && (curUrl.contains("doppiocdn") || curUrl.contains("stripchat"))) {
-                    // stripchat 旁路录制：页面保持打开，分片 tee
+                    // stripchat 旁路录制：页面静音后台继续拉流，控制走下载卡片
                     try {
                         String page = webView.getUrl();
                         StripRec.start(page);
-                        Toast.makeText(SniffActivity.this, "已开始录制（请保持本页播放）", Toast.LENGTH_LONG).show();
+                        try { webView.evaluateJavascript(
+                            "document.querySelectorAll('video').forEach(function(v){v.muted=true;v.volume=0;});", null); } catch (Throwable ignored) {}
+                        DlManager.startStripCard();
+                        Toast.makeText(SniffActivity.this, "已开始录制(页面已静音)，下载卡片控制", Toast.LENGTH_LONG).show();
                     } catch (Throwable e) { Toast.makeText(SniffActivity.this, "启动失败", Toast.LENGTH_SHORT).show(); }
                     return true;
                 }

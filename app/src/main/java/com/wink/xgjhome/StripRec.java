@@ -21,8 +21,14 @@ public class StripRec {
     private static volatile boolean initWritten = false;
     private static volatile String pageUrl = null;
     private static volatile long bytes = 0;
+    private static volatile boolean paused = false;
 
     public static boolean isRunning() { return recOn; }
+    public static boolean isPaused() { return paused; }
+    public static long getBytes() { return bytes; }
+
+    public static synchronized void pause() { paused = true; }
+    public static synchronized void resume() { paused = false; }
     public static String getPageUrl() { return pageUrl; }
 
     public static synchronized void start(String page) {
@@ -55,7 +61,7 @@ public class StripRec {
             }
             return;
         }
-        if (recOn && out != null) {
+        if (recOn && !paused && out != null) {
             try { out.write(body); bytes += body.length; } catch (Throwable ignored) {}
         }
     }
@@ -90,6 +96,17 @@ public class StripRec {
             HistoryStore.add(c.get(), "视频", "stripchat_" + (outFile.getName()), "file://" + outFile.getAbsolutePath());
         } catch (Throwable ignored) {}
         try { for (File f : workDir.listFiles()) f.delete(); workDir.delete(); } catch (Throwable ignored) {}
+        // ffmpeg 重封装：重建索引/时长，修拖动与时间轴
+        try {
+            File fin = new File(outFile.getParentFile(), "final_" + outFile.getName());
+            com.arthenica.ffmpegkit.FFmpegSession cs = com.arthenica.ffmpegkit.FFmpegKit.executeWithArguments(
+                new String[]{"-y", "-i", outFile.getAbsolutePath(), "-c", "copy",
+                    "-movflags", "+faststart", fin.getAbsolutePath()});
+            if (cs.getState().equals(com.arthenica.ffmpegkit.SessionState.COMPLETED) && fin.length() > 0) {
+                outFile.delete();
+                outFile = fin;
+            }
+        } catch (Throwable ignored) {}
         return outFile.getAbsolutePath();
     }
 
