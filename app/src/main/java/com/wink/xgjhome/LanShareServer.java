@@ -22,18 +22,19 @@ public class LanShareServer {
 
     public static synchronized void start() {
         if (running) return;
+        // 同步绑定：调用返回时端口一定就绪（不再出现 -1）
+        ServerSocket tmp = null;
+        int p2 = -1;
+        for (int i = 0; i < 20; i++) {
+            try { p2 = randomPort(); tmp = new ServerSocket(p2); break; }
+            catch (Throwable e) { tmp = null; }
+        }
+        if (tmp == null) return;
+        ss = tmp;
+        port = p2;
         running = true;
         new Thread(new Runnable() { public void run() {
             try {
-                ServerSocket tmp = null;
-                int p2 = -1;
-                for (int i = 0; i < 20; i++) {
-                    try { p2 = randomPort(); tmp = new ServerSocket(p2); break; }
-                    catch (Throwable e) { tmp = null; }
-                }
-                if (tmp == null) { running = false; return; }
-                ss = tmp;
-                port = p2;
                 while (running) {
                     final Socket s = ss.accept();
                     new Thread(new Runnable() { public void run() {
