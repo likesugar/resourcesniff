@@ -9,18 +9,31 @@ import java.util.Collections;
 /** 局域网共享：浏览器打开 http://手机IP:8180 可见并打开记录中的链接 */
 public class LanShareServer {
 
-    public static final int PORT = 8180;
+    private static volatile int port = -1;
     private static volatile boolean running = false;
     private static ServerSocket ss = null;
 
     public static boolean isRunning() { return running; }
+    public static int getPort() { return port; }
+
+    private static int randomPort() {
+        return 10000 + new java.util.Random().nextInt(55536);  // 五位数端口
+    }
 
     public static synchronized void start() {
         if (running) return;
         running = true;
         new Thread(new Runnable() { public void run() {
             try {
-                ss = new ServerSocket(PORT);
+                ServerSocket tmp = null;
+                int p2 = -1;
+                for (int i = 0; i < 20; i++) {   // 随机试绑，占用则换
+                    try { p2 = randomPort(); tmp = new ServerSocket(p2); break; }
+                    catch (Throwable e) { tmp = null; }
+                }
+                if (tmp == null) { running = false; return; }
+                ss = tmp;
+                port = p2;
                 while (running) {
                     final Socket s = ss.accept();
                     new Thread(new Runnable() { public void run() {

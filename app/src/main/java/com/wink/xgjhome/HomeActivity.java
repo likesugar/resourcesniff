@@ -14,6 +14,16 @@ import android.widget.TextView;
 public class HomeActivity extends Activity {
 
     // ---------- 主题（纯黑 / 冰蓝） ----------
+    @Override
+    protected void onDestroy() {
+        if (isFinishing()) {   // 应用退出：局域网共享随进程结束
+            LanShareServer.stop();
+            android.app.NotificationManager nm = (android.app.NotificationManager) getSystemService(NOTIFICATION_SERVICE);
+            nm.cancel(1001);
+        }
+        super.onDestroy();
+    }
+
     private void applyTheme() {
         boolean dark = getSharedPreferences("settings", MODE_PRIVATE).getBoolean("dark", false);
         findViewById(R.id.toolRoot).setBackgroundColor(dark ? 0xFF000000 : 0xFFEEF4FF);
@@ -119,7 +129,7 @@ public class HomeActivity extends Activity {
                         requestPermissions(new String[]{"android.permission.POST_NOTIFICATIONS"}, 900);
                     }
                     LanShareServer.start();
-                    String url = "http://" + LanShareServer.localIp() + ":" + LanShareServer.PORT;
+                    String url = "http://" + LanShareServer.localIp() + ":" + LanShareServer.getPort();
                     android.app.NotificationManager nm = (android.app.NotificationManager) getSystemService(NOTIFICATION_SERVICE);
                     if (android.os.Build.VERSION.SDK_INT >= 26) {
                         nm.createNotificationChannel(new android.app.NotificationChannel("lan", "局域网共享", android.app.NotificationManager.IMPORTANCE_LOW));
