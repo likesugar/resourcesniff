@@ -235,16 +235,17 @@ public class ShortcutActivity extends Activity {
         int n = sp.getInt("count", 0);
         java.util.ArrayList<String> all = new java.util.ArrayList<String>();
         for (int i = 0; i < n; i++) { String r = sp.getString("s" + i, null); if (r != null) all.add(r); }
+        boolean replaced = false;
         for (int i = 0; i < all.size(); i++) {
             String[] p3 = all.get(i).split("\\u0001");
             String k = p3.length > 9 ? p3[9] : "";
-            if (k.equals(key)) { all.set(i, rec + "\\u0001" + key); rec = null; break; }
+            if (k.equals(key)) { all.set(i, rec + "\\u0001" + key); replaced = true; break; }
         }
-        if (rec != null) all.add(rec + "\\u0001" + key);
+        if (!replaced) all.add(rec + "\\u0001" + key);
         android.content.SharedPreferences.Editor e = sp.edit();
         e.putInt("count", all.size());
         for (int i = 0; i < all.size(); i++) e.putString("s" + i, all.get(i));
-        e.putString("k_" + key, rec == null ? sp.getString("k_" + key, rec) : rec);
+        e.putString("k_" + key, rec);   // 始终写最新内容，编辑回显才正确
         e.apply();
     }
 
