@@ -1192,6 +1192,19 @@ public class SniffActivity extends Activity {
 
     /** 内置 jessibuca 播放器：player.html 通过 AndroidPlayer 桥取地址 */
     void playUrl(String url) {
+        // stripchat：流是会话绑定的，直接打开直播间页面
+        if (url != null && (url.contains("doppiocdn") || url.contains("stripchat"))) {
+            try {
+                String page = StripRec.getPageUrl();
+                android.content.Intent i = new android.content.Intent(Intent.ACTION_VIEW);
+                i.setData(android.net.Uri.parse(page != null ? page : url));
+                i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                startActivity(i);
+                return;
+            } catch (Throwable e) {
+                Toast.makeText(this, "无法唤起浏览器", Toast.LENGTH_SHORT).show();
+            }
+        }
         // FC2 中转流：按 http 链接直接唤起浏览器播放
         if (url != null && url.contains("127.0.0.1:8123/relay") && url.contains("guangdongvideo")) {
             try {
