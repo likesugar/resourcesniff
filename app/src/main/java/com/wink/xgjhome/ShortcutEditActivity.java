@@ -145,6 +145,13 @@ public class ShortcutEditActivity extends Activity {
         ivp.gravity = Gravity.CENTER_HORIZONTAL;
         iconView.setLayoutParams(ivp);
         iconView.setOnClickListener(new View.OnClickListener() { public void onClick(View v) { pickSystemIcon(); } });
+
+        TextView pickAppBtn = new TextView(this);
+        pickAppBtn.setText("从已装应用选择 ›");
+        pickAppBtn.setTextColor(0xFF3D7BFF);
+        pickAppBtn.setTextSize(14);
+        pickAppBtn.setPadding(dp(4), dp(10), 0, dp(10));
+        pickAppBtn.setOnClickListener(new View.OnClickListener() { public void onClick(View v) { pickApp(); } });
         body.addView(iconView);
         if (curIcon != null) iconView.setImageBitmap(curIcon);
 
