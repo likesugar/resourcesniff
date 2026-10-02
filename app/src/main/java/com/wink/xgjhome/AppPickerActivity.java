@@ -9,6 +9,7 @@ import android.view.Gravity;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.BaseAdapter;
+import android.widget.EditText;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.ScrollView;
@@ -23,6 +24,9 @@ public class AppPickerActivity extends Activity {
     private java.util.List<android.content.pm.PackageInfo> all = new java.util.ArrayList<android.content.pm.PackageInfo>();
     private java.util.List<android.content.pm.PackageInfo> shown = new java.util.ArrayList<android.content.pm.PackageInfo>();
     private boolean showSystem = false;
+    private boolean hideNoActs = true;    // 隐藏无可列出活动的包
+    private boolean onlyExported = false; // 仅可直启(exported)活动
+    private String searchText = "";
     private android.content.pm.PackageManager pm;
 
     @Override
@@ -62,6 +66,56 @@ public class AppPickerActivity extends Activity {
         top.addView(tvToggle);
         root.addView(top);
 
+        LinearLayout row2 = new LinearLayout(this);
+        row2.setOrientation(LinearLayout.HORIZONTAL);
+        row2.setGravity(Gravity.CENTER_VERTICAL);
+        row2.setPadding(dp(14), 0, dp(14), dp(8));
+        EditText etSearch = new EditText(this);
+        etSearch.setHint("搜索应用/包名");
+        etSearch.setBackground(null);
+        etSearch.setTextColor(0xFFE8ECF2);
+        etSearch.setHintTextColor(0xFF5C6470);
+        etSearch.setTextSize(14);
+        etSearch.setSingleLine(true);
+        row2.addView(etSearch, new LinearLayout.LayoutParams(0, -2, 1f));
+        final TextView tg2 = new TextView(this);
+        tg2.setText("无活动:隐");
+        tg2.setTextSize(12);
+        tg2.setTextColor(0xFF3D7BFF);
+        tg2.setPadding(dp(10), dp(6), dp(10), dp(6));
+        tg2.setBackgroundColor(0xFF1B222B);
+        tg2.setOnClickListener(new View.OnClickListener() { public void onClick(View v) {
+            hideNoActs = !hideNoActs;
+            tg2.setText(hideNoActs ? "无活动:隐" : "无活动:显");
+            applyFilter();
+        }});
+        row2.addView(tg2);
+        final TextView tg3 = new TextView(this);
+        tg3.setText("仅可直启:关");
+        tg3.setTextSize(12);
+        tg3.setTextColor(0xFF8A919E);
+        tg3.setPadding(dp(10), dp(6), dp(10), dp(6));
+        tg3.setBackgroundColor(0xFF1B222B);
+        LinearLayout.LayoutParams t3p = new LinearLayout.LayoutParams(-2, -2);
+        t3p.leftMargin = dp(8);
+        tg3.setLayoutParams(t3p);
+        tg3.setOnClickListener(new View.OnClickListener() { public void onClick(View v) {
+            onlyExported = !onlyExported;
+            tg3.setText(onlyExported ? "仅可直启:开" : "仅可直启:关");
+            tg3.setTextColor(onlyExported ? 0xFF3D7BFF : 0xFF8A919E);
+            applyFilter();
+        }});
+        row2.addView(tg3);
+        root.addView(row2);
+        etSearch.addTextChangedListener(new android.text.TextWatcher() {
+            public void beforeTextChanged(CharSequence c, int a, int s2, int d2) { }
+            public void onTextChanged(CharSequence c, int a, int s2, int d2) { }
+            public void afterTextChanged(android.text.Editable e) {
+                searchText = e.toString().trim().toLowerCase();
+                applyFilter();
+            }
+        });
+
         ScrollView sv = new ScrollView(this);
         sv.setFillViewport(true);
         list = new LinearLayout(this);
@@ -88,6 +142,16 @@ public class AppPickerActivity extends Activity {
         shown.clear();
         for (android.content.pm.PackageInfo pi : all) {
             if (!showSystem && (pi.applicationInfo.flags & android.content.pm.ApplicationInfo.FLAG_SYSTEM) != 0) continue;
+            if (hideNoActs) {
+                try {
+                    android.content.pm.ActivityInfo[] acts = pm.getPackageInfo(pi.packageName, android.content.pm.PackageManager.GET_ACTIVITIES).activities;
+                    if (acts == null || acts.length == 0) continue;
+                } catch (Throwable ignored) {}
+            }
+            if (searchText.length() > 0) {
+                String l = labelOf(pi).toLowerCase();
+                if (!l.contains(searchText) && !pi.packageName.toLowerCase().contains(searchText)) continue;
+            }
             shown.add(pi);
         }
         tvCount.setText("共" + shown.size() + "个（系统应用" + (showSystem ? "已显示" : "已隐藏") + "）");
@@ -158,20 +222,26 @@ public class AppPickerActivity extends Activity {
 
     private void showActivities(final android.content.pm.PackageInfo pi) {
         try {
-            android.content.pm.ActivityInfo[] acts = pm.getPackageInfo(pi.packageName, android.content.pm.PackageManager.GET_ACTIVITIES).activities;
-            if (acts == null || acts.length == 0) { toast("该包没有可列出的活动"); return; }
-            String[] names = new String[acts.length];
-            for (int i = 0; i < acts.length; i++) {
-                String nm = acts[i].name;
+            android.content.pm.ActivityInfo[] acts0 = pm.getPackageInfo(pi.packageName, android.content.pm.PackageManager.GET_ACTIVITIES).activities;
+            if (acts0 == null || acts0.length == 0) { toast("该包没有可列出的活动"); return; }
+            java.util.ArrayList<android.content.pm.ActivityInfo> filtered = new java.util.ArrayList<android.content.pm.ActivityInfo>();
+            for (android.content.pm.ActivityInfo a2 : acts0) {
+                if (!onlyExported || a2.exported) filtered.add(a2);
+            }
+            if (filtered.isEmpty()) { toast("没有可直启的活动（可关掉'仅可直启'或用Root）"); return; }
+            final android.content.pm.ActivityInfo[] arr = filtered.toArray(new android.content.pm.ActivityInfo[0]);
+            String[] names = new String[arr.length];
+            for (int i = 0; i < arr.length; i++) {
+                String nm = arr[i].name;
                 int dot = nm.lastIndexOf('.');
                 String short2 = dot >= 0 && dot < nm.length() - 1 ? nm.substring(dot + 1) : nm;
-                names[i] = short2 + (acts[i].exported ? "  [可直启]" : "  [需Root]");
+                names[i] = short2 + (arr[i].exported ? "  [可直启]" : "  [需Root]");
             }
             new android.app.AlertDialog.Builder(this)
-                .setTitle(pi.packageName + " 的 " + acts.length + " 个活动")
+                .setTitle(pi.packageName + " 的 " + arr.length + " 个活动")
                 .setItems(names, new android.content.DialogInterface.OnClickListener() {
                     public void onClick(android.content.DialogInterface d, int w) {
-                        finishWith(pi.packageName, acts[w].name);
+                        finishWith(pi.packageName, arr[w].name);
                     }
                 }).show();
         } catch (Throwable e) { toast("读取活动失败"); }
