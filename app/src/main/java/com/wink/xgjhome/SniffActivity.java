@@ -79,6 +79,7 @@ public class SniffActivity extends Activity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         sDumpCtx = this;
+        try { LiveProxy.setSCCtx(this); } catch (Throwable ignored) {}
         try { LiveProxy.start(); } catch (Throwable ignored) {}   // 本地中转必须常驻，FC2/B站记录才能播/录/下
         DlManager.init(this);
         setContentView(R.layout.activity_sniff);
@@ -110,6 +111,7 @@ public class SniffActivity extends Activity {
         ws.setCacheMode(WebSettings.LOAD_DEFAULT);
         ws.setDatabaseEnabled(true);
         CookieManager.getInstance().setAcceptCookie(true);
+        try { ws.setMixedContentMode(android.webkit.WebSettings.MIXED_CONTENT_ALWAYS_ALLOW); } catch (Throwable ignored) {}
         CookieManager.getInstance().setAcceptThirdPartyCookies(webView, true);
         webView.addJavascriptInterface(new Object() {
             @android.webkit.JavascriptInterface
@@ -308,6 +310,9 @@ public class SniffActivity extends Activity {
                 }
                 if (url != null && (url.contains("live.fc2.com") || url.contains("guangdongvideo.com"))) {
                     injectFc2Hook();
+                }
+                if (url != null && (url.contains("stripchat") || url.contains("doppiocdn"))) {
+                    injectStripRecorder();
                 }
                 // DK：直播房间页 → 持续解析（reload 由看门狗触发，回到这里重新武装提取）
                 if (url != null && url.contains("live.douyin.com")) {
@@ -750,6 +755,96 @@ public class SniffActivity extends Activity {
         } catch (Throwable ignored) {}
     }
 
+
+    private static android.webkit.WebView sWV = null;
+
+    /** stripchat 菜单：开始/停止页面录制 */
+    public static void stripRecToggle() {
+        if (sWV == null) return;
+        if (!stripRecording) {
+            sWV.post(new Runnable() { public void run() {
+                try {
+                    sWV.evaluateJavascript("String(window.__recStart&&window.__recStart())", new android.webkit.ValueCallback<String>() {
+                        public void onReceiveValue(String v) {
+                            if (v != null && v.contains("ok")) {
+                                stripRecording = true;
+                                DlManager.startStripCard();
+                            }
+                        }
+                    });
+                } catch (Throwable ignored) {}
+            }});
+        } else {
+            sWV.post(new Runnable() { public void run() {
+                try { sWV.evaluateJavascript("String(window.__recStop&&window.__recStop())", null); } catch (Throwable ignored) {}
+                stripRecording = false;
+            }});
+        }
+    }
+
+    /** MPMux式页面录制：MediaRecorder 抓 <video>，分片经本地中转落盘 */
+    void injectStripRecorder() {
+        sWV = webView;
+        String js =
+            "(function(){" +
+            "if(window.__mpmuxRec)return;window.__mpmuxRec=1;" +
+            "window.__recState='idle';var R=null,CH=[];" +
+            "function post(u,cb){var x=new XMLHttpRequest();x.open('GET',u,true);x.onreadystatechange=function(){if(x.readyState==4&&cb)cb(x.responseText);};x.send();}" +
+            "window.__recStart=function(){" +
+            " if(window.__recState!=='idle'){return 'already';}" +
+            " var v=document.querySelector('video');if(!v)return 'novideo';" +
+            " try{post('http://127.0.0.1:8123/striprec?act=start');}catch(e){return 'server';}" +
+            " var st=v.captureStream?v.captureStream():v.mozCaptureStream;" +
+            " var tracks=[];" +
+            " try{var vs=(v.captureStream?v.captureStream():null);if(vs)tracks.push(vs.getVideoTracks()[0]);}catch(e){}" +
+            " try{var AC=window.AudioContext||window.webkitAudioContext;var ac=new AC();" +
+            "  var src=ac.createMediaElementSource(v);" +
+            "  var dst=ac.createMediaStreamDestination();" +
+            "  src.connect(dst);" +          // 不连 destination => 页面静音，录制有声
+            "  if(dst.stream.getAudioTracks().length)tracks.push(dst.stream.getAudioTracks()[0]);" +
+            "  window.__recAC=ac;" +
+            " }catch(e){}" +
+            " var ms=new MediaStream(tracks.filter(function(t){return !!t;}));" +
+            " var mt='video/webm;codecs=vp8,opus';" +
+            " if(!MediaRecorder.isTypeSupported(mt))mt='video/webm';" +
+            " R=new MediaRecorder(ms,{mimeType:mt,videoBitsPerSecond:3000000});" +
+            " CH=[];" +
+            " R.ondataavailable=function(e){if(e.data&&e.data.size>0){" +
+            "  var fr=new FileReader();fr.onload=function(){" +
+            "   var b64=fr.result.split(',')[1];" +
+            "   post('http://127.0.0.1:8123/striprec?act=chunk&d='+encodeURIComponent(b64));" +
+            "  };fr.readAsDataURL(e.data);" +
+            " }};" +
+            " R.start(1000);" +
+            " window.__recState='rec';return 'ok';" +
+            "};" +
+            "window.__recPause=function(){if(R&&R.state==='recording'){R.pause();window.__recState='pause';return 'ok';}return 'no';};" +
+            "window.__recResume=function(){if(R&&R.state==='paused'){R.resume();window.__recState='rec';return 'ok';}return 'no';};" +
+            "window.__recStop=function(){if(R&&R.state!=='inactive'){" +
+            " R.onstop=function(){" +
+            "  if(window.__recAC){try{window.__recAC.close();}catch(e){}window.__recAC=null;}" +
+            "  var last=CH;post('http://127.0.0.1:8123/striprec?act=stop');" +
+            "  window.__recState='idle';R=null;" +
+            " };" +
+            " R.stop();return 'ok';}return 'no';};" +
+            "})();";
+        try { webView.evaluateJavascript(js, null); } catch (Throwable ignored) {}
+    }
+
+    private static volatile boolean stripRecording = false;
+
+    public static String stripRecState() {
+        return stripRecording ? "rec" : "idle";
+    }
+
+    /** 下载卡片控制入口（RecordActivity 调用） */
+    public static String recControl(String act) {
+        try {
+            if (sWV == null) return "nowv";
+            sWV.evaluateJavascript("window.__rec" + act + " ? String(window.__rec" + act + "()) : 'no'", null);
+            return "ok";
+        } catch (Throwable e) { return "err"; }
+    }
 
     /** FC2：钩住页面 WebSocket 拿 ws-flv 地址 */
     void injectFc2Hook() {
@@ -1263,7 +1358,8 @@ public class SniffActivity extends Activity {
         android.widget.PopupMenu pm = new android.widget.PopupMenu(this, anchor);
         pm.getMenu().add("下载");
         pm.getMenu().add("播放");
-        final String label = recThreads.containsKey(url) ? "停止录制" : "直播录制";
+        boolean scRec = url != null && (url.contains("doppiocdn") || url.contains("stripchat"));
+        final String label = (recThreads.containsKey(url) || (scRec && stripRecording)) ? "停止录制" : "直播录制";
         pm.getMenu().add(label);
         pm.getMenu().add("删除");
         pm.setOnMenuItemClickListener(new android.widget.PopupMenu.OnMenuItemClickListener() {
@@ -1272,6 +1368,14 @@ public class SniffActivity extends Activity {
                 String t = item.getTitle().toString();
                 if (t.equals("下载")) downloadUrl(curUrl);
                 else if (t.equals("播放")) playUrl(curUrl);
+                else if (t.equals("直播录制") && scRec) {
+                    stripRecToggle();
+                    return true;
+                }
+                else if (t.equals("停止录制") && scRec) {
+                    stripRecToggle();
+                    return true;
+                }
                 else if (t.equals("直播录制")) {
                     final String url = curUrl;
                     finish(); // 先退出资源嗅探

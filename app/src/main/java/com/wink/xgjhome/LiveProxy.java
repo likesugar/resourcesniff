@@ -45,6 +45,11 @@ public class LiveProxy {
     private static volatile boolean refreshing = false;
     private static final LinkedHashSet<String> fetched = new LinkedHashSet<>();
 
+    private static volatile java.io.File scFile = null;
+    private static volatile FileOutputStream scOut = null;
+    private static android.content.Context sSCCtx = null;
+    public static void setSCCtx(android.content.Context c) { sSCCtx = c.getApplicationContext(); }
+
     public static void start() {
         if (running) return;
         running = true;
@@ -190,6 +195,74 @@ public class LiveProxy {
                     writeResp(s, "404 Not Found", "text/plain", "upstream err".getBytes());
                 } catch (Throwable e) {
                     writeResp(s, "404 Not Found", "text/plain", "relay err".getBytes());
+                }
+                return;
+            }
+
+            if (path.startsWith("/striprec")) {
+                // MPMux式页面录制：接收 MediaRecorder 分片 / 控制结束转封装
+                try {
+                    java.util.Map<String,String> q = new java.util.HashMap<String,String>();
+                    int qi3 = path.indexOf('?');
+                    if (qi3 >= 0) for (String kv : path.substring(qi3 + 1).split("&")) {
+                        int eq = kv.indexOf('=');
+                        if (eq > 0) q.put(kv.substring(0, eq), kv.substring(eq + 1));
+                    }
+                    String act = q.get("act");
+                    java.io.File base = new java.io.File(sSCCtx != null ? sSCCtx.getExternalFilesDir(null) : null, "sc_mp4");
+                    base.mkdirs();
+                    if ("start".equals(act)) {
+                        scFile = new java.io.File(base, "rec" + System.currentTimeMillis() / 1000 + ".webm");
+                        if (scOut != null) try { scOut.close(); } catch (Throwable ignored) {}
+                        scOut = new java.io.FileOutputStream(scFile);
+                        writeResp(s, "200 OK", "text/plain", "ok".getBytes());
+                    } else if ("chunk".equals(act) && scOut != null) {
+                        // 分片以 base64 走 query，避免与 BufferedReader 冲突
+                        String d64 = q.get("d");
+                        if (d64 != null && d64.length() > 0) {
+                            byte[] bb = java.util.Base64.getDecoder().decode(d64);
+                            scOut.write(bb);
+                            scOut.flush();
+                        }
+                        writeResp(s, "200 OK", "text/plain", "ok".getBytes());
+                    } else if ("stop".equals(act)) {
+                        try { if (scOut != null) scOut.close(); } catch (Throwable ignored) {}
+                        scOut = null;
+                        final java.io.File wf = scFile;
+                        scFile = null;
+                        if (wf != null && wf.exists() && wf.length() > 0 && sSCCtx != null) {
+                            new Thread(new Runnable() { public void run() {
+                                try {
+                                    java.io.File fin = new java.io.File(wf.getParentFile(), wf.getName().replace(".webm", ".mp4"));
+                                    com.arthenica.ffmpegkit.FFmpegSession cs = com.arthenica.ffmpegkit.FFmpegKit.executeWithArguments(
+                                        new String[]{"-y", "-i", wf.getAbsolutePath(), "-c", "copy",
+                                            "-movflags", "+faststart", fin.getAbsolutePath()});
+                                    if (cs.getState().equals(com.arthenica.ffmpegkit.SessionState.COMPLETED) && fin.length() > 0) {
+                                        android.content.ContentValues cv = new android.content.ContentValues();
+                                        cv.put(android.provider.MediaStore.Video.Media.DISPLAY_NAME, fin.getName());
+                                        cv.put(android.provider.MediaStore.Video.Media.MIME_TYPE, "video/mp4");
+                                        if (android.os.Build.VERSION.SDK_INT >= 29)
+                                            cv.put(android.provider.MediaStore.Video.Media.RELATIVE_PATH, "Movies/资源嗅探");
+                                        android.net.Uri uri = sSCCtx.getContentResolver().insert(android.provider.MediaStore.Video.Media.EXTERNAL_CONTENT_URI, cv);
+                                        if (uri != null) {
+                                            java.io.InputStream in2 = new java.io.FileInputStream(fin);
+                                            OutputStream os2 = sSCCtx.getContentResolver().openOutputStream(uri);
+                                            byte[] bb2 = new byte[64 * 1024]; int n2;
+                                            while ((n2 = in2.read(bb2)) > 0) os2.write(bb2, 0, n2);
+                                            os2.close(); in2.close();
+                                        }
+                                        HistoryStore.add(sSCCtx, "视频", fin.getName(), "file://" + fin.getAbsolutePath());
+                                        wf.delete();
+                                    }
+                                } catch (Throwable ignored) {}
+                            } }).start();
+                        }
+                        writeResp(s, "200 OK", "text/plain", "ok".getBytes());
+                    } else {
+                        writeResp(s, "400 Bad Request", "text/plain", "bad act".getBytes());
+                    }
+                } catch (Throwable e4) {
+                    writeResp(s, "500 Error", "text/plain", ("err " + e4.getClass().getSimpleName()).getBytes());
                 }
                 return;
             }

@@ -33,6 +33,31 @@ public class DlManager {
 
     public static java.util.Collection<DlJob> jobs() { return JOBS.values(); }
 
+    /** stripchat 页面录制卡片：控制走 SniffActivity.recControl */
+    public static void startStripCard() {
+        DlJob j = new DlJob();
+        j.id = SEQ.incrementAndGet();
+        j.url = "stripchat://card";
+        j.title = "Stripchat·录制";
+        j.hls = true;
+        j.file = new java.io.File(sCtx.getExternalFilesDir(null), "下载/stripchat" + j.id);
+        j.file.mkdirs();
+        j.active = true;
+        j.state = "录制中";
+        JOBS.put(j.id, j);
+    }
+
+    static void refreshStripCard() {
+        for (DlJob j : JOBS.values()) {
+            if (j.url != null && j.url.startsWith("stripchat://")) {
+                String st = SniffActivity.stripRecState();
+                if ("rec".equals(st)) { j.active = true; j.paused = false; j.state = "录制中"; }
+                else if ("pause".equals(st)) { j.active = false; j.paused = true; j.state = "已暂停"; }
+                else if ("idle".equals(st) && !j.done) { j.done = true; j.active = false; j.paused = false; j.state = "已完成(视频栏)"; }
+            }
+        }
+    }
+
     public static void start(String url) {
         String lu = url.toLowerCase();
         if (lu.contains("127.0.0.1:8123/relay") || lu.contains(".m3u8") || lu.contains("playlist")) startHls(url);
@@ -98,6 +123,7 @@ public class DlManager {
     public static void pauseHls(int id) {
         DlJob j = JOBS.get(id);
         if (j == null || !j.hls) return;
+        if (j.url.startsWith("stripchat://")) { SniffActivity.recControl("Pause"); return; }
         com.arthenica.ffmpegkit.FFmpegSession st = HLS_SESS.remove(id);
         if (st != null) { try { com.arthenica.ffmpegkit.FFmpegKit.cancel(st.getSessionId()); } catch (Throwable ignored) {} }
         j.paused = true;
@@ -109,6 +135,7 @@ public class DlManager {
     public static void resumeHls(int id) {
         DlJob j = JOBS.get(id);
         if (j == null || !j.hls) return;
+        if (j.url.startsWith("stripchat://")) { SniffActivity.recControl("Resume"); return; }
         launchSegmentFfmpeg(j);
     }
 
@@ -116,6 +143,11 @@ public class DlManager {
     public static void finishHls(final int id) {
         final DlJob j = JOBS.get(id);
         if (j == null || !j.hls) return;
+        if (j.url.startsWith("stripchat://")) {
+            j.state = "合并MP4中…";
+            SniffActivity.recControl("Stop");
+            return;
+        }
         com.arthenica.ffmpegkit.FFmpegSession st = HLS_SESS.remove(id);
         if (st != null) { try { com.arthenica.ffmpegkit.FFmpegKit.cancel(st.getSessionId()); } catch (Throwable ignored) {} }
         j.state = "合并MP4中…";
