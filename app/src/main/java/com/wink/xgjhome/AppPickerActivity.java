@@ -88,6 +88,19 @@ public class AppPickerActivity extends Activity {
         tg2.setOnClickListener(new View.OnClickListener() { public void onClick(View v) {
             hideNoActs = !hideNoActs;
             tg2.setText(hideNoActs ? "无活动:隐" : "无活动:显");
+            if (hideNoActs && actCount.isEmpty()) {
+                tg2.setText("扫描中…");
+                new Thread(new Runnable() { public void run() {
+                    for (android.content.pm.PackageInfo pi : all) {
+                        try {
+                            android.content.pm.ActivityInfo[] acts = pm.getPackageInfo(pi.packageName, android.content.pm.PackageManager.GET_ACTIVITIES).activities;
+                            actCount.put(pi.packageName, acts == null ? 0 : acts.length);
+                        } catch (Throwable t) { actCount.put(pi.packageName, 0); }
+                    }
+                    runOnUiThread(new Runnable() { public void run() { applyFilter(); } });
+                } }).start();
+                return;
+            }
             applyFilter();
         }});
         row2.addView(tg2);
@@ -134,11 +147,8 @@ public class AppPickerActivity extends Activity {
 
     private void loadApps() {
         try { all = pm.getInstalledPackages(0); } catch (Throwable e) { all = new java.util.ArrayList<android.content.pm.PackageInfo>(); }
+        // 活动数按需扫描（点"无活动:隐"或"活动列表"时才查），加快首屏
         for (android.content.pm.PackageInfo pi : all) {
-            try {
-                android.content.pm.ActivityInfo[] acts = pm.getPackageInfo(pi.packageName, android.content.pm.PackageManager.GET_ACTIVITIES).activities;
-                actCount.put(pi.packageName, acts == null ? 0 : acts.length);
-            } catch (Throwable t) { actCount.put(pi.packageName, 0); }
             try { iconCache.put(pi.packageName, iconToBmp(pi)); } catch (Throwable t) { }
         }
         java.util.Collections.sort(all, new java.util.Comparator<android.content.pm.PackageInfo>() {

@@ -106,6 +106,19 @@ public class HomeActivity extends Activity {
                 startActivity(new Intent(HomeActivity.this, RecordActivity.class));
             }
         });
+        findViewById(R.id.lanToggle).setOnClickListener(new View.OnClickListener() {
+            public void onClick(View v) {
+                if (LanShareServer.isRunning()) {
+                    LanShareServer.stop();
+                    android.widget.Toast.makeText(HomeActivity.this, "局域网共享已关闭", android.widget.Toast.LENGTH_SHORT).show();
+                } else {
+                    LanShareServer.start();
+                    android.widget.Toast.makeText(HomeActivity.this,
+                        "局域网共享已开启\n电脑浏览器打开 http://" + LanShareServer.localIp() + ":" + LanShareServer.PORT,
+                        android.widget.Toast.LENGTH_LONG).show();
+                }
+            }
+        });
         findViewById(R.id.cardShortcut).setOnClickListener(new View.OnClickListener() {
             public void onClick(View v) {
                 try { startActivity(new Intent(HomeActivity.this, ShortcutActivity.class)); }

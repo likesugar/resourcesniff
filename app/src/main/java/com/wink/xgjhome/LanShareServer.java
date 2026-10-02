@@ -1,0 +1,102 @@
+package com.wink.xgjhome;
+
+import java.io.OutputStream;
+import java.net.ServerSocket;
+import java.net.Socket;
+import java.net.NetworkInterface;
+import java.util.Collections;
+
+/** 局域网共享：浏览器打开 http://手机IP:8180 可见并打开记录中的链接 */
+public class LanShareServer {
+
+    public static final int PORT = 8180;
+    private static volatile boolean running = false;
+    private static ServerSocket ss = null;
+
+    public static boolean isRunning() { return running; }
+
+    public static synchronized void start() {
+        if (running) return;
+        running = true;
+        new Thread(new Runnable() { public void run() {
+            try {
+                ss = new ServerSocket(PORT);
+                while (running) {
+                    final Socket s = ss.accept();
+                    new Thread(new Runnable() { public void run() {
+                        try { handle(s); } catch (Throwable ignored) {}
+                        finally { try { s.close(); } catch (Throwable ignored) {} }
+                    }}).start();
+                }
+            } catch (Throwable ignored) {}
+        }}).start();
+    }
+
+    public static synchronized void stop() {
+        running = false;
+        try { if (ss != null) ss.close(); } catch (Throwable ignored) {}
+        ss = null;
+    }
+
+    private static void handle(Socket s) throws Exception {
+        java.io.InputStream in = s.getInputStream();
+        String req = readLine(in);
+        // 消费剩余请求头
+        String l;
+        while ((l = readLine(in)) != null && !l.isEmpty()) { }
+        String path = "/";
+        if (req != null && req.startsWith("GET ")) {
+            String[] parts = req.split(" ");
+            if (parts.length >= 2) path = parts[1];
+        }
+        String body;
+        if (path.startsWith("/open?u=")) {
+            String u = java.net.URLDecoder.decode(path.substring(8), "UTF-8");
+            body = "<html><meta charset='utf-8'><body style='background:#111;color:#eee;font-family:monospace'>"
+                + "<p>目标链接：</p><p><a style='color:#8ab4f8' href='" + u + "'>" + u + "</a></p>"
+                + "<p>（复制到电脑播放器/浏览器打开）</p></body></html>";
+        } else {
+            StringBuilder sb = new StringBuilder();
+            sb.append("<html><meta charset='utf-8'><meta name='viewport' content='width=device-width'>")
+              .append("<body style='background:#111;color:#eee;font-family:monospace'>")
+              .append("<h3>记录的链接</h3>");
+            java.util.LinkedHashMap<String, String> links = SniffActivity.lanLinks();
+            for (java.util.Map.Entry<String, String> e : links.entrySet()) {
+                String enc = java.net.URLEncoder.encode(e.getKey(), "UTF-8");
+                sb.append("<p><a style='color:#8ab4f8' href='/open?u=").append(enc).append("'>")
+                  .append(e.getValue()).append("</a><br><small style='color:#888'>").append(e.getKey()).append("</small></p>");
+            }
+            if (links.isEmpty()) sb.append("<p>（暂无记录）</p>");
+            sb.append("</body></html>");
+            body = sb.toString();
+        }
+        byte[] bb = body.getBytes("UTF-8");
+        OutputStream os = s.getOutputStream();
+        os.write(("HTTP/1.1 200 OK\r\nContent-Type: text/html; charset=utf-8\r\nContent-Length: " + bb.length
+            + "\r\nConnection: close\r\n\r\n").getBytes());
+        os.write(bb);
+        os.flush();
+    }
+
+    private static String readLine(java.io.InputStream in) throws Exception {
+        java.io.ByteArrayOutputStream b = new java.io.ByteArrayOutputStream();
+        int c = -1;
+        while ((c = in.read()) >= 0) {
+            if (c == '\n') break;
+            if (c != '\r') b.write(c);
+        }
+        if (b.size() == 0 && c < 0) return null;
+        return b.toString();
+    }
+
+    public static String localIp() {
+        try {
+            for (java.util.Enumeration<NetworkInterface> en = NetworkInterface.getNetworkInterfaces(); en.hasMoreElements(); ) {
+                for (java.net.InetAddress a : Collections.list(en.nextElement().getInetAddresses())) {
+                    if (!a.isLoopbackAddress() && a.getHostAddress().indexOf(':') < 0) return a.getHostAddress();
+                }
+            }
+        } catch (Throwable ignored) {}
+        return "?";
+    }
+}

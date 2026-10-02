@@ -1142,9 +1142,16 @@ public class SniffActivity extends Activity {
         }
     }
 
+    // 局域网共享：记录的链接（url -> title）
+    private static final java.util.LinkedHashMap<String, String> LAN_LINKS = new java.util.LinkedHashMap<String, String>();
+    public static java.util.LinkedHashMap<String, String> lanLinks() {
+        synchronized (LAN_LINKS) { return new java.util.LinkedHashMap<String, String>(LAN_LINKS); }
+    }
+
     void addRecord(final String url, String title) {
         // 流畅/极速不显示
         if (title != null && title.contains("抖音") && (url.contains("_ld.") || url.contains("_md."))) return;
+        try { synchronized (LAN_LINKS) { if (!LAN_LINKS.containsKey(url)) { LAN_LINKS.put(url, title == null ? url : title); if (LAN_LINKS.size() > 500) LAN_LINKS.remove(LAN_LINKS.keySet().iterator().next()); } } } catch (Throwable ignored) {}
         // 同一路流只留一条最高画质：原画(_or4) > 蓝光(_uhd) > 高清(_hd)
         final int rank = qualRank(url);
         final String bk = baseKey(url);
