@@ -144,6 +144,16 @@ public class ShortcutActivity extends Activity {
                     else if (w == 1) {
                         Intent i = new Intent(ShortcutActivity.this, ShortcutEditActivity.class);
                         i.putExtra("key", key);
+                        i.putExtra("e_name", us[0]);
+                        i.putExtra("e_pkg", us[1]);
+                        i.putExtra("e_cls", us[2]);
+                        i.putExtra("e_data", us[3]);
+                        i.putExtra("e_extra", us[4]);
+                        i.putExtra("e_am", us[5]);
+                        i.putExtra("e_custom", us[6]);
+                        i.putExtra("e_newtask", us[7]);
+                        i.putExtra("e_root", us[8]);
+                        if (us.length > 10) i.putExtra("e_icon", us[10]);
                         startActivity(i);
                     } else {
                         deleteByKey(key);
@@ -236,12 +246,23 @@ public class ShortcutActivity extends Activity {
         java.util.ArrayList<String> all = new java.util.ArrayList<String>();
         for (int i = 0; i < n; i++) { String r = sp.getString("s" + i, null); if (r != null) all.add(r); }
         boolean replaced = false;
+        String recName = rec.split("\\u0001")[0];
         for (int i = 0; i < all.size(); i++) {
             String[] p3 = all.get(i).split("\\u0001");
             String k = p3.length > 9 ? p3[9] : "";
-            if (k.equals(key)) { all.set(i, rec + "\\u0001" + key); replaced = true; break; }
+            // key 匹配，或老版本无 key 条目按名称兜底替换
+            if (k.equals(key) || (k.length() == 0 && p3[0].equals(recName))) {
+                all.set(i, rec + "\\u0001" + key); replaced = true; break;
+            }
         }
-        if (!replaced) all.add(rec + "\\u0001" + key);
+        if (!replaced) {
+            // 兜底：移除同名旧条目，避免重复卡片
+            for (int i = all.size() - 1; i >= 0; i--) {
+                String[] p3 = all.get(i).split("\\u0001");
+                if (p3[0].equals(recName)) all.remove(i);
+            }
+            all.add(rec + "\\u0001" + key);
+        }
         android.content.SharedPreferences.Editor e = sp.edit();
         e.putInt("count", all.size());
         for (int i = 0; i < all.size(); i++) e.putString("s" + i, all.get(i));

@@ -195,28 +195,39 @@ public class ShortcutEditActivity extends Activity {
 
         // 编辑模式：带 key 进来
         String key = getIntent().getStringExtra("key");
-        if (key != null) {
+        String[] it = null;
+        if (getIntent().hasExtra("e_name")) {
+            // 直接用卡片传来的现值（老条目无镜像也能回显）
+            it = new String[]{
+                getIntent().getStringExtra("e_name"), getIntent().getStringExtra("e_pkg"),
+                getIntent().getStringExtra("e_cls"), getIntent().getStringExtra("e_data"),
+                getIntent().getStringExtra("e_extra"), getIntent().getStringExtra("e_am"),
+                getIntent().getStringExtra("e_custom"), getIntent().getStringExtra("e_newtask"),
+                getIntent().getStringExtra("e_root"),
+                getIntent().hasExtra("e_icon") ? getIntent().getStringExtra("e_icon") : "",
+                getIntent().hasExtra("e_icon") ? getIntent().getStringExtra("e_icon") : ""};
+        } else if (key != null) {
+            it = ShortcutActivity.findByKey(this, key);
+        }
+        if (it != null) {
             editKey = key;
-            String[] it = ShortcutActivity.findByKey(this, key);
-            if (it != null) {
-                etName.setText(it[0]);
-                etPkg.setText(it[1]);
-                etCls.setText(it[2]);
-                if (it.length > 3 && it[3].length() > 0) etData.setText(it[3]);
-                if (it.length > 4 && it[4].length() > 0) etExtra.setText(it[4]);
-                int am2 = it.length > 5 ? parseInt(it[5]) : 0;
-                if (am2 == 1) { rbMain.setChecked(true); etCustom.setVisibility(View.GONE); }
-                else if (am2 == 2) { rbCustom.setChecked(true); etCustom.setVisibility(View.VISIBLE);
-                    if (it.length > 6) etCustom.setText(it[6]); }
-                if (it.length > 7) cbNewTask.setChecked(!it[7].equals("0"));
-                if (it.length > 8) cbRoot.setChecked(it[8].equals("1"));
-                if (it.length > 10 && it[10].length() > 0) {
-                    iconPath = it[10];
-                    try {
-                        android.graphics.Bitmap bm2 = android.graphics.BitmapFactory.decodeFile(iconPath);
-                        if (bm2 != null) { curIcon = bm2; iconView.setImageBitmap(bm2); iconHint.setText("已使用自选图标"); }
-                    } catch (Throwable ignored) {}
-                }
+            etName.setText(it[0]);
+            etPkg.setText(it[1]);
+            etCls.setText(it[2]);
+            if (it.length > 3 && it[3].length() > 0) etData.setText(it[3]);
+            if (it.length > 4 && it[4].length() > 0) etExtra.setText(it[4]);
+            int am2 = it.length > 5 ? parseInt(it[5]) : 0;
+            if (am2 == 1) { rbMain.setChecked(true); etCustom.setVisibility(View.GONE); }
+            else if (am2 == 2) { rbCustom.setChecked(true); etCustom.setVisibility(View.VISIBLE);
+                if (it.length > 6) etCustom.setText(it[6]); }
+            if (it.length > 7) cbNewTask.setChecked(!it[7].equals("0"));
+            if (it.length > 8) cbRoot.setChecked(it[8].equals("1"));
+            if (it.length > 10 && it[10].length() > 0) {
+                iconPath = it[10];
+                try {
+                    android.graphics.Bitmap bm2 = android.graphics.BitmapFactory.decodeFile(iconPath);
+                    if (bm2 != null) { curIcon = bm2; iconView.setImageBitmap(bm2); iconHint.setText("已使用自选图标"); }
+                } catch (Throwable ignored) {}
             }
         }
     }
