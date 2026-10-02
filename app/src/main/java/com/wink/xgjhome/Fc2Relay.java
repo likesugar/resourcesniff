@@ -124,7 +124,8 @@ public class Fc2Relay {
 
             if (op == 0x9) { out.write(pong(payload)); out.flush(); continue; }
             if (op == 0x8) { sk.close(); throw new Exception("close frame"); }
-            if (op == 0x1 || op == 0x0) {
+            boolean isJson = (op == 0x1 || op == 0x0) || (payload.length > 0 && payload[0] == '{');
+            if (isJson) {
                 txtAcc.write(payload, 0, payload.length);
                 if (!fin) continue;
                 String msg = txtAcc.toString("UTF-8");
@@ -134,8 +135,14 @@ public class Fc2Relay {
                 gotPlaylists = gp[0];
 
                 // 就绪后每5秒重发 get_hls_information，直到拿到列表（官方实现同款重试）
-                if ((msg.contains("connect_complete") || msg.contains("initial_connect"))) ready = true;
-                if (ready && !gotPlaylists && System.currentTimeMillis() - lastHb > 5000) {
+                if (msg.contains("connect_complete") || msg.contains("initial_connect")) {
+                    if (!ready) {  // 就绪立刻请求
+                        sendText(out, msg("get_hls_information"));
+                        lastHb = System.currentTimeMillis();
+                    }
+                    ready = true;
+                }
+                if (ready && !gotPlaylists && System.currentTimeMillis() - lastHb > 3000) {
                     sendText(out, msg("get_hls_information"));
                     lastHb = System.currentTimeMillis();
                 }
