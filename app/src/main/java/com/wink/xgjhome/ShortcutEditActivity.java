@@ -146,18 +146,6 @@ public class ShortcutEditActivity extends Activity {
         iconView.setLayoutParams(ivp);
         iconView.setOnClickListener(new View.OnClickListener() { public void onClick(View v) { pickSystemIcon(); } });
         body.addView(iconView);
-        TextView pickAppBtn = new TextView(this);
-        pickAppBtn.setText("选择应用");
-        pickAppBtn.setTextColor(0xFF3D7BFF);
-        pickAppBtn.setTextSize(14);
-        pickAppBtn.setGravity(Gravity.CENTER);
-        pickAppBtn.setBackgroundColor(0xFF1B222B);
-        pickAppBtn.setPadding(0, dp(8), 0, dp(8));
-        LinearLayout.LayoutParams pap = new LinearLayout.LayoutParams(-1, -2);
-        pap.topMargin = dp(8);
-        pickAppBtn.setLayoutParams(pap);
-        pickAppBtn.setOnClickListener(new View.OnClickListener() { public void onClick(View v) { pickApp(); } });
-        body.addView(pickAppBtn);
         if (curIcon != null) iconView.setImageBitmap(curIcon);
 
         etName = field(body, "名称");
@@ -415,28 +403,53 @@ public class ShortcutEditActivity extends Activity {
     private void pickApp() {
         try {
             android.content.pm.PackageManager pm = getPackageManager();
-            Intent li = new Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER);
-            java.util.List<android.content.pm.ResolveInfo> apps = pm.queryIntentActivities(li, 0);
-            java.util.Collections.sort(apps, new java.util.Comparator<android.content.pm.ResolveInfo>() {
-                public int compare(android.content.pm.ResolveInfo a, android.content.pm.ResolveInfo b) {
-                    return String.valueOf(a.loadLabel(pm)).compareToIgnoreCase(String.valueOf(b.loadLabel(pm)));
+            java.util.List<android.content.pm.PackageInfo> pkgs = pm.getInstalledPackages(0);
+            java.util.Collections.sort(pkgs, new java.util.Comparator<android.content.pm.PackageInfo>() {
+                public int compare(android.content.pm.PackageInfo a, android.content.pm.PackageInfo b) {
+                    return labelOf(pm, a).compareToIgnoreCase(labelOf(pm, b));
                 }
             });
-            final android.content.pm.ResolveInfo[] arr = apps.toArray(new android.content.pm.ResolveInfo[0]);
+            final android.content.pm.PackageInfo[] arr = pkgs.toArray(new android.content.pm.PackageInfo[0]);
             String[] names = new String[arr.length];
-            for (int i2 = 0; i2 < arr.length; i2++)
-                names[i2] = arr[i2].loadLabel(pm) + " (" + arr[i2].activityInfo.packageName + ")";
+            for (int i = 0; i < arr.length; i++) names[i] = labelOf(pm, arr[i]) + "  [" + arr[i].packageName + "]";
             new android.app.AlertDialog.Builder(this)
-                .setTitle("选择应用")
+                .setTitle("选择应用(全部 " + arr.length + " 个)")
                 .setItems(names, new android.content.DialogInterface.OnClickListener() {
-                    public void onClick(android.content.DialogInterface d, int w) {
-                        etPkg.setText(arr[w].activityInfo.packageName);
-                        etCls.setText(arr[w].activityInfo.name);
-                        if (etName.getText().length() == 0) etName.setText(String.valueOf(arr[w].loadLabel(pm)));
-                    }
+                    public void onClick(android.content.DialogInterface d, int w) { showActivityPicker(arr[w]); }
                 }).show();
         } catch (Throwable e) { toast("获取应用列表失败"); }
     }
+
+    private String labelOf(android.content.pm.PackageManager pm, android.content.pm.PackageInfo pi) {
+        try { return String.valueOf(pi.applicationInfo.loadLabel(pm)); }
+        catch (Throwable e) { return pi.packageName; }
+    }
+
+    private void showActivityPicker(final android.content.pm.PackageInfo pi) {
+        try {
+            android.content.pm.ActivityInfo[] acts = pi.activities;
+            if (acts == null || acts.length == 0) { toast("该包没有可列出的活动"); return; }
+            final android.content.pm.ActivityInfo[] arr = acts;
+            String[] names = new String[arr.length];
+            for (int i = 0; i < arr.length; i++) {
+                String nm = arr[i].name;
+                int dot = nm.lastIndexOf('.');
+                String short2 = dot >= 0 && dot < nm.length() - 1 ? nm.substring(dot + 1) : nm;
+                names[i] = short2 + (arr[i].exported ? "  [可直启]" : "  [需Root]");
+            }
+            new android.app.AlertDialog.Builder(this)
+                .setTitle(pi.packageName + " 的 " + arr.length + " 个活动")
+                .setItems(names, new android.content.DialogInterface.OnClickListener() {
+                    public void onClick(android.content.DialogInterface d, int w) {
+                        etPkg.setText(pi.packageName);
+                        etCls.setText(arr[w].name);
+                        if (etName.getText().length() == 0)
+                            etName.setText(String.valueOf(arr[w].loadLabel(getPackageManager())));
+                    }
+                }).show();
+        } catch (Throwable e) { toast("读取活动失败"); }
+    }
+
 
     private int dp(int v) { return (int) (v * getResources().getDisplayMetrics().density); }
 }
