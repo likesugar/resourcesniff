@@ -79,6 +79,19 @@ public class AppPickerActivity extends Activity {
         etSearch.setTextSize(14);
         etSearch.setSingleLine(true);
         row2.addView(etSearch, new LinearLayout.LayoutParams(0, -2, 1f));
+        final TextView tg2 = new TextView(this);
+        tg2.setText("无活动:隐");
+        tg2.setTextSize(12);
+        tg2.setTextColor(0xFF3D7BFF);
+        tg2.setPadding(dp(10), dp(6), dp(10), dp(6));
+        tg2.setBackgroundColor(0xFF1B222B);
+        tg2.setOnClickListener(new View.OnClickListener() { public void onClick(View v) {
+            hideNoActs = !hideNoActs;
+            tg2.setText(hideNoActs ? "无活动:隐" : "无活动:显");
+            tg2.setTextColor(hideNoActs ? 0xFF3D7BFF : 0xFF8A919E);
+            applyFilter();
+        }});
+        row2.addView(tg2);
         final TextView tg3 = new TextView(this);
         tg3.setText("仅可直启:关");
         tg3.setTextSize(12);
@@ -122,8 +135,12 @@ public class AppPickerActivity extends Activity {
 
     private void loadApps() {
         try { all = pm.getInstalledPackages(0); } catch (Throwable e) { all = new java.util.ArrayList<android.content.pm.PackageInfo>(); }
-        // 活动数按需扫描（点"无活动:隐"或"活动列表"时才查），加快首屏
+        // 后台预取：图标缓存 + 每包活动数
         for (android.content.pm.PackageInfo pi : all) {
+            try {
+                android.content.pm.ActivityInfo[] acts = pm.getPackageInfo(pi.packageName, android.content.pm.PackageManager.GET_ACTIVITIES).activities;
+                actCount.put(pi.packageName, acts == null ? 0 : acts.length);
+            } catch (Throwable t) { actCount.put(pi.packageName, 0); }
             try { iconCache.put(pi.packageName, iconToBmp(pi)); } catch (Throwable t) { }
         }
         java.util.Collections.sort(all, new java.util.Comparator<android.content.pm.PackageInfo>() {
@@ -149,6 +166,10 @@ public class AppPickerActivity extends Activity {
         shown.clear();
         for (android.content.pm.PackageInfo pi : all) {
             if (!showSystem && (pi.applicationInfo.flags & android.content.pm.ApplicationInfo.FLAG_SYSTEM) != 0) continue;
+            if (hideNoActs) {
+                Integer cnt = actCount.get(pi.packageName);
+                if (cnt != null && cnt == 0) continue;
+            }
             if (searchText.length() > 0) {
                 String l = labelOf(pi).toLowerCase();
                 if (!l.contains(searchText) && !pi.packageName.toLowerCase().contains(searchText)) continue;

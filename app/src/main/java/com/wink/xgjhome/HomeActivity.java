@@ -114,6 +114,10 @@ public class HomeActivity extends Activity {
                     nm.cancel(1001);
                     android.widget.Toast.makeText(HomeActivity.this, "局域网共享已关闭", android.widget.Toast.LENGTH_SHORT).show();
                 } else {
+                    if (android.os.Build.VERSION.SDK_INT >= 33 &&
+                        checkSelfPermission("android.permission.POST_NOTIFICATIONS") != android.content.pm.PackageManager.PERMISSION_GRANTED) {
+                        requestPermissions(new String[]{"android.permission.POST_NOTIFICATIONS"}, 900);
+                    }
                     LanShareServer.start();
                     String url = "http://" + LanShareServer.localIp() + ":" + LanShareServer.PORT;
                     android.app.NotificationManager nm = (android.app.NotificationManager) getSystemService(NOTIFICATION_SERVICE);
