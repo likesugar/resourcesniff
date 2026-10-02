@@ -169,6 +169,7 @@ public class HomeActivity extends Activity {
                         requestPermissions(new String[]{"android.permission.POST_NOTIFICATIONS"}, 900);
                     }
                     try { LiveProxy.start(); } catch (Throwable ignored) {}
+                    LanShareServer.start();  // 同步绑定：返回时端口必就绪
                     startService(new Intent(HomeActivity.this, LanShareService.class));
                     status.setText("已开启，电脑浏览器访问：\nhttp://" + LanShareServer.localIp() + ":" + LanShareServer.getPort());
                 } else {
