@@ -207,7 +207,8 @@ public class SniffActivity extends Activity {
                                 java.util.ArrayList<String[]> keep = new java.util.ArrayList<String[]>();
                                 String[] parts = pu.getQuery() == null ? new String[0] : pu.getQuery().split("&");
                                 for (String kv : parts) {
-                                    if (kv.startsWith("playlistType=") || kv.startsWith("_HLS_msn=") || kv.startsWith("_HLS_part=")) continue;
+                                    if (kv.startsWith("_HLS_msn=") || kv.startsWith("_HLS_part=")) continue;
+                                    if (kv.startsWith("playlistType=")) { keep.add(new String[]{"playlistType=standard"}); continue; }
                                     keep.add(new String[]{kv});
                                 }
                                 StringBuilder qb = new StringBuilder(pu.getProtocol() + "://" + pu.getHost() + pu.getPath());
