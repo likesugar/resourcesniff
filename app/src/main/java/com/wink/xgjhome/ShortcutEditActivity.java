@@ -2,76 +2,31 @@ package com.wink.xgjhome;
 
 import android.app.Activity;
 import android.content.Intent;
-import android.net.Uri;
 import android.graphics.drawable.Drawable;
+import android.net.Uri;
 import android.os.Bundle;
-import android.widget.ScrollView;
 import android.view.Gravity;
 import android.view.View;
 import android.widget.EditText;
+import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.RadioButton;
 import android.widget.RadioGroup;
+import android.widget.ScrollView;
 import android.widget.TextView;
 import android.widget.Toast;
 
-/** MT管理器风格快捷方式编辑页（扁平化深色） */
+/** MT管理器风格快捷方式编辑页（扁平化深色·单份干净实现） */
 public class ShortcutEditActivity extends Activity {
 
     private EditText etName, etPkg, etCls, etData, etExtra, etCustom;
     private RadioButton rbView, rbMain, rbCustom;
     private android.widget.CheckBox cbNewTask, cbRoot;
     private TextView iconHint;
-    private android.widget.ImageView iconView;
-    private android.graphics.Bitmap curIcon = null;   // 用户自选 > 应用图标
-    private String editKey = null;
+    private ImageView iconView;
+    private android.graphics.Bitmap curIcon = null;
     private String iconPath = "";
-
-    private void pickSystemIcon() {
-        try {
-            Intent i = new Intent(Intent.ACTION_GET_CONTENT);
-            i.setType("image/*");
-            i.addCategory(Intent.CATEGORY_OPENABLE);
-            startActivityForResult(Intent.createChooser(i, "选择图标"), 7001);
-        } catch (Throwable t) { toast("无法打开系统选择器"); }
-    }
-
-    @Override
-    protected void onActivityResult(int req, int res, Intent data) {
-        super.onActivityResult(req, res, data);
-        if (req == 7001 && res == RESULT_OK && data != null && data.getData() != null) {
-            try {
-                android.graphics.BitmapFactory.Options o = new android.graphics.BitmapFactory.Options();
-                o.inJustDecodeBounds = true;
-                java.io.InputStream is = getContentResolver().openInputStream(data.getData());
-                android.graphics.BitmapFactory.decodeStream(is, null, o);
-                try { is.close(); } catch (Throwable ignored) {}
-                int size = Math.max(o.outWidth, o.outHeight);
-                int sample = 1;
-                while (size / sample > 192) sample *= 2;
-                o = new android.graphics.BitmapFactory.Options();
-                o.inSampleSize = sample;
-                is = getContentResolver().openInputStream(data.getData());
-                android.graphics.Bitmap bm = android.graphics.BitmapFactory.decodeStream(is, null, o);
-                try { is.close(); } catch (Throwable ignored) {}
-                if (bm != null) {
-                    curIcon = bm;
-                    iconView.setImageBitmap(bm);
-                    iconHint.setText("已使用自选图标");
-                }
-            } catch (Throwable t) { toast("读取图片失败"); }
-        }
-    }
-
-    private android.graphics.Bitmap iconToBitmap(Drawable d) {
-        int w = d.getIntrinsicWidth() > 0 ? d.getIntrinsicWidth() : 96;
-        int h = d.getIntrinsicHeight() > 0 ? d.getIntrinsicHeight() : 96;
-        android.graphics.Bitmap bm = android.graphics.Bitmap.createBitmap(w, h, android.graphics.Bitmap.Config.ARGB_8888);
-        android.graphics.Canvas cv = new android.graphics.Canvas(bm);
-        d.setBounds(0, 0, w, h);
-        d.draw(cv);
-        return bm;
-    }
+    private String editKey = null;
 
     @Override
     protected void onCreate(Bundle b) {
@@ -80,7 +35,7 @@ public class ShortcutEditActivity extends Activity {
         root.setOrientation(LinearLayout.VERTICAL);
         root.setBackgroundColor(0xFF0B0D10);
 
-        // 顶栏：← 标题
+        // 顶栏
         LinearLayout top = new LinearLayout(this);
         top.setOrientation(LinearLayout.HORIZONTAL);
         top.setGravity(Gravity.CENTER_VERTICAL);
@@ -100,7 +55,7 @@ public class ShortcutEditActivity extends Activity {
         top.addView(title);
         root.addView(top);
 
-        // 按钮行：收藏 / 取消 / 打开 / 创建
+        // 按钮行：收藏/取消/打开/创建
         LinearLayout btns = new LinearLayout(this);
         btns.setOrientation(LinearLayout.HORIZONTAL);
         btns.setPadding(dp(12), 0, dp(12), dp(6));
@@ -109,7 +64,7 @@ public class ShortcutEditActivity extends Activity {
             new View.OnClickListener() { public void onClick(View v) { doSave(false); } },
             new View.OnClickListener() { public void onClick(View v) { finish(); } },
             new View.OnClickListener() { public void onClick(View v) { doOpen(); } },
-            new View.OnClickListener() { public void onClick(View v) { doCreate(); } }
+            new View.OnClickListener() { public void onClick(View v) { doSave(true); } }
         };
         for (int i = 0; i < labels.length; i++) {
             TextView bt = new TextView(this);
@@ -132,6 +87,7 @@ public class ShortcutEditActivity extends Activity {
         body.setOrientation(LinearLayout.VERTICAL);
         body.setPadding(dp(14), dp(8), dp(14), dp(14));
 
+        // 图标区：提示 + 预览 + 两个按钮
         iconHint = new TextView(this);
         iconHint.setText("快捷方式的图标(点击从系统选择)");
         iconHint.setTextColor(0xFF8A919E);
@@ -139,30 +95,24 @@ public class ShortcutEditActivity extends Activity {
         iconHint.setGravity(Gravity.CENTER);
         iconHint.setPadding(0, dp(4), 0, dp(4));
         body.addView(iconHint);
-        iconView = new android.widget.ImageView(this);
-        iconView.setScaleType(android.widget.ImageView.ScaleType.FIT_CENTER);
+        iconView = new ImageView(this);
+        iconView.setScaleType(ImageView.ScaleType.FIT_CENTER);
         LinearLayout.LayoutParams ivp = new LinearLayout.LayoutParams(dp(64), dp(64));
         ivp.gravity = Gravity.CENTER_HORIZONTAL;
         iconView.setLayoutParams(ivp);
         iconView.setOnClickListener(new View.OnClickListener() { public void onClick(View v) { pickSystemIcon(); } });
-
-        TextView pickAppBtn = new TextView(this);
-        pickAppBtn.setText("从已装应用选择 ›");
-        pickAppBtn.setTextColor(0xFF3D7BFF);
-        pickAppBtn.setTextSize(14);
-        pickAppBtn.setPadding(dp(4), dp(10), 0, dp(10));
-        pickAppBtn.setOnClickListener(new View.OnClickListener() { public void onClick(View v) { pickApp(); } });
-        body.addView(pickAppBtn);
         body.addView(iconView);
-        if (curIcon != null) iconView.setImageBitmap(curIcon);
+        body.addView(flatButton("选择应用", new View.OnClickListener() { public void onClick(View v) { pickApp(); } }));
+        body.addView(flatButton("从已装应用选择 ›", new View.OnClickListener() { public void onClick(View v) { pickApp(); } }));
 
+        // 字段
         etName = field(body, "名称");
         etPkg = field(body, "包名");
         etPkg.addTextChangedListener(new android.text.TextWatcher() {
             public void beforeTextChanged(CharSequence c, int a, int s2, int d2) { }
             public void onTextChanged(CharSequence c, int a, int s2, int d2) { }
             public void afterTextChanged(android.text.Editable e) {
-                if (curIcon != null) return;  // 用户自选图标优先
+                if (curIcon != null) return;
                 try {
                     curIcon = iconToBitmap(getPackageManager().getApplicationIcon(e.toString()));
                     iconView.setImageBitmap(curIcon);
@@ -201,59 +151,65 @@ public class ShortcutEditActivity extends Activity {
         root.addView(sv, new LinearLayout.LayoutParams(-1, 0, 1f));
         setContentView(root);
 
-        // 编辑模式：带 key 进来
+        // 编辑模式回填（直传数据优先，其次镜像）
         String key = getIntent().getStringExtra("key");
         String[] it = null;
         if (getIntent().hasExtra("e_name")) {
-            // 直接用卡片传来的现值（老条目无镜像也能回显）
             it = new String[]{
                 getIntent().getStringExtra("e_name"), getIntent().getStringExtra("e_pkg"),
                 getIntent().getStringExtra("e_cls"), getIntent().getStringExtra("e_data"),
                 getIntent().getStringExtra("e_extra"), getIntent().getStringExtra("e_am"),
                 getIntent().getStringExtra("e_custom"), getIntent().getStringExtra("e_newtask"),
-                getIntent().getStringExtra("e_root"),
-                getIntent().hasExtra("e_icon") ? getIntent().getStringExtra("e_icon") : "",
+                getIntent().getStringExtra("e_root"), "",
                 getIntent().hasExtra("e_icon") ? getIntent().getStringExtra("e_icon") : ""};
         } else if (key != null) {
-            it = ShortcutActivity.findByKey(this, key);
+            String raw = getSharedPreferences("home_shortcuts", MODE_PRIVATE).getString("k_" + key, null);
+            if (raw != null) it = raw.split("\\\\u0001");
         }
-        if (it != null) {
+        if (it != null && it.length >= 3) {
             editKey = key;
-            etName.setText(it[0]);
-            etPkg.setText(it[1]);
-            etCls.setText(it[2]);
-            if (it.length > 3 && it[3].length() > 0) etData.setText(it[3]);
-            if (it.length > 4 && it[4].length() > 0) etExtra.setText(it[4]);
-            int am2 = it.length > 5 ? parseInt(it[5]) : 0;
-            if (am2 == 1) { rbMain.setChecked(true); etCustom.setVisibility(View.GONE); }
-            else if (am2 == 2) { rbCustom.setChecked(true); etCustom.setVisibility(View.VISIBLE);
-                if (it.length > 6) etCustom.setText(it[6]); }
-            if (it.length > 7) cbNewTask.setChecked(!it[7].equals("0"));
-            if (it.length > 8) cbRoot.setChecked(it[8].equals("1"));
-            if (it.length > 10 && it[10].length() > 0) {
-                iconPath = it[10];
+            etName.setText(z(it, 0));
+            etPkg.setText(z(it, 1));
+            etCls.setText(z(it, 2));
+            if (z(it, 3).length() > 0) etData.setText(z(it, 3));
+            if (z(it, 4).length() > 0) etExtra.setText(z(it, 4));
+            int am2 = parseInt(z(it, 5), 0);
+            if (am2 == 1) rbMain.setChecked(true);
+            else if (am2 == 2) { rbCustom.setChecked(true); etCustom.setVisibility(View.VISIBLE); etCustom.setText(z(it, 6)); }
+            cbNewTask.setChecked(!z(it, 7).equals("0"));
+            cbRoot.setChecked(z(it, 8).equals("1"));
+            if (z(it, 10).length() > 0) {
+                iconPath = z(it, 10);
             } else {
-                // 老条目兜底：取最近保存的自选图标文件
-                try {
-                    java.io.File idir = new java.io.File(getFilesDir(), "sc_icons");
-                    java.io.File[] fs = idir.listFiles();
-                    if (fs != null && fs.length > 0) {
-                        java.io.File newest = fs[0];
-                        for (java.io.File f : fs) if (f.lastModified() > newest.lastModified()) newest = f;
-                        iconPath = newest.getAbsolutePath();
-                    }
-                } catch (Throwable ignored) {}
+                iconPath = newestIconFile();
+            }
+            if (iconPath.length() == 0 && curIcon == null) {
+                // 再兜底一次：编辑回填的 curIcon 可能来自包名
             }
             if (iconPath.length() > 0) {
-                try {
-                    android.graphics.Bitmap bm2 = android.graphics.BitmapFactory.decodeFile(iconPath);
-                    if (bm2 != null) { curIcon = bm2; iconView.setImageBitmap(bm2); iconHint.setText("已使用自选图标"); }
-                } catch (Throwable ignored) {}
+                android.graphics.Bitmap bm2 = android.graphics.BitmapFactory.decodeFile(iconPath);
+                if (bm2 != null) { curIcon = bm2; iconView.setImageBitmap(bm2); iconHint.setText("已使用自选图标"); }
             }
         }
     }
 
-    private int parseInt(String s2) { try { return Integer.parseInt(s2); } catch (Throwable e) { return 0; } }
+    private static String z(String[] a, int i) { return i < a.length && a[i] != null ? a[i] : ""; }
+    private int parseInt(String s2, int def) { try { return Integer.parseInt(s2); } catch (Throwable e) { return def; } }
+
+    private TextView flatButton(String text, View.OnClickListener click) {
+        TextView t = new TextView(this);
+        t.setText(text);
+        t.setTextColor(0xFF3D7BFF);
+        t.setTextSize(14);
+        t.setGravity(Gravity.CENTER);
+        t.setBackgroundColor(0xFF1B222B);
+        t.setPadding(0, dp(8), 0, dp(8));
+        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(-1, -2);
+        lp.topMargin = dp(8);
+        t.setLayoutParams(lp);
+        t.setOnClickListener(click);
+        return t;
+    }
 
     private EditText field(LinearLayout parent, String hint) {
         EditText et = new EditText(this);
@@ -291,7 +247,70 @@ public class ShortcutEditActivity extends Activity {
         return cb;
     }
 
-    private Intent buildIntent(boolean forOpen) {
+    private void pickSystemIcon() {
+        try {
+            Intent i = new Intent(Intent.ACTION_GET_CONTENT);
+            i.setType("image/*");
+            i.addCategory(Intent.CATEGORY_OPENABLE);
+            startActivityForResult(Intent.createChooser(i, "选择图标"), 7001);
+        } catch (Throwable t) { toast("无法打开系统选择器"); }
+    }
+
+    private void pickApp() {
+        try { startActivityForResult(new Intent(this, AppPickerActivity.class), 7002); }
+        catch (Throwable e) { toast("无法打开应用选择页"); }
+    }
+
+    @Override
+    protected void onActivityResult(int req, int res, Intent data) {
+        super.onActivityResult(req, res, data);
+        if (req == 7002 && res == RESULT_OK && data != null) {
+            String pkg = data.getStringExtra("pkg");
+            String cls = data.getStringExtra("cls");
+            String nm = data.getStringExtra("name");
+            if (pkg != null) {
+                etPkg.setText(pkg);
+                etCls.setText(cls == null ? "" : cls);
+                if (nm != null && nm.length() > 0 && etName.getText().length() == 0) etName.setText(nm);
+            }
+            return;
+        }
+        if (req == 7001 && res == RESULT_OK && data != null && data.getData() != null) {
+            try {
+                android.graphics.BitmapFactory.Options o = new android.graphics.BitmapFactory.Options();
+                o.inJustDecodeBounds = true;
+                java.io.InputStream is = getContentResolver().openInputStream(data.getData());
+                android.graphics.BitmapFactory.decodeStream(is, null, o);
+                try { is.close(); } catch (Throwable ignored) {}
+                int size = Math.max(o.outWidth, o.outHeight);
+                int sample = 1;
+                while (size / sample > 192) sample *= 2;
+                o = new android.graphics.BitmapFactory.Options();
+                o.inSampleSize = sample;
+                is = getContentResolver().openInputStream(data.getData());
+                android.graphics.Bitmap bm = android.graphics.BitmapFactory.decodeStream(is, null, o);
+                try { is.close(); } catch (Throwable ignored) {}
+                if (bm != null) {
+                    curIcon = bm;
+                    iconPath = "";
+                    iconView.setImageBitmap(bm);
+                    iconHint.setText("已使用自选图标");
+                }
+            } catch (Throwable t) { toast("读取图片失败"); }
+        }
+    }
+
+    private android.graphics.Bitmap iconToBitmap(Drawable d) {
+        int w = d.getIntrinsicWidth() > 0 ? d.getIntrinsicWidth() : 96;
+        int h = d.getIntrinsicHeight() > 0 ? d.getIntrinsicHeight() : 96;
+        android.graphics.Bitmap bm = android.graphics.Bitmap.createBitmap(w, h, android.graphics.Bitmap.Config.ARGB_8888);
+        android.graphics.Canvas cv = new android.graphics.Canvas(bm);
+        d.setBounds(0, 0, w, h);
+        d.draw(cv);
+        return bm;
+    }
+
+    private Intent buildIntent() {
         String pkg = etPkg.getText().toString().trim();
         String cls = etCls.getText().toString().trim();
         String data = etData.getText().toString().trim();
@@ -303,15 +322,15 @@ public class ShortcutEditActivity extends Activity {
         else i.setAction(Intent.ACTION_VIEW);
         if (data.length() > 0) { try { i.setData(Uri.parse(data)); } catch (Throwable t) { toast("Data格式错误"); return null; } }
         if (cls.length() > 0) i.setComponent(new android.content.ComponentName(pkg, cls));
-        String[] lines = etExtra.getText().toString().split("\n");
-        for (String ln : lines) {
+        for (String ln : etExtra.getText().toString().split("\n")) {
             ln = ln.trim();
             int eq = ln.indexOf('=');
             if (eq <= 0) continue;
             String k = ln.substring(0, eq), v = ln.substring(eq + 1);
-            try { if (v.matches("-?\\d+")) i.putExtra(k, Long.parseLong(v));
-            else if (v.equals("true") || v.equals("false")) i.putExtra(k, Boolean.parseBoolean(v));
-            else i.putExtra(k, v);
+            try {
+                if (v.matches("-?\\d+")) i.putExtra(k, Long.parseLong(v));
+                else if (v.equals("true") || v.equals("false")) i.putExtra(k, Boolean.parseBoolean(v));
+                else i.putExtra(k, v);
             } catch (Throwable t) { i.putExtra(k, v); }
         }
         if (cbNewTask.isChecked()) i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
@@ -319,9 +338,10 @@ public class ShortcutEditActivity extends Activity {
     }
 
     private void doOpen() {
-        Intent i = buildIntent(true);
+        Intent i = buildIntent();
         if (i == null) return;
-        try { startActivity(i); } catch (Throwable t) {
+        try { startActivity(i); }
+        catch (Throwable t) {
             if (cbRoot.isChecked()) rootOpen();
             else toast("打开失败: " + t.getClass().getSimpleName());
         }
@@ -330,11 +350,9 @@ public class ShortcutEditActivity extends Activity {
     private void rootOpen() {
         try {
             String cls = etCls.getText().toString().trim();
-            String cmd = "am start -n " + etPkg.getText().toString().trim()
-                + (cls.length() > 0 ? "/" + cls : "");
+            String cmd = "am start -n " + etPkg.getText().toString().trim() + (cls.length() > 0 ? "/" + cls : "");
             Process p2 = Runtime.getRuntime().exec(new String[]{"su", "-c", cmd});
-            if (p2.waitFor() == 0) toast("Root启动成功");
-            else toast("Root启动失败");
+            toast(p2.waitFor() == 0 ? "Root启动成功" : "Root启动失败");
         } catch (Throwable t) { toast("无Root权限"); }
     }
 
@@ -343,7 +361,7 @@ public class ShortcutEditActivity extends Activity {
         String pkg = etPkg.getText().toString().trim();
         if (name.length() == 0 || pkg.length() == 0) { toast("名称和包名不能为空"); return; }
         if (curIcon == null) {
-            // 兜底：自动恢复最近自选图标
+            // 兜底：恢复最近自选图标
             try {
                 java.io.File idir = new java.io.File(getFilesDir(), "sc_icons");
                 java.io.File[] fs = idir.listFiles();
@@ -366,13 +384,12 @@ public class ShortcutEditActivity extends Activity {
                 curIcon.compress(android.graphics.Bitmap.CompressFormat.PNG, 90, fo);
                 fo.close();
                 iconPath = ifile.getAbsolutePath();
-                rec = joinFields();  // 重新生成含路径的记录
+                rec = joinFields();
             } catch (Throwable ignored) {}
         }
         ShortcutActivity.saveByKey(this, key, rec);
-        try { ShortcutActivity.dumpFc2Debug("SAVE key=" + key + " iconPath=[" + iconPath + "] curIcon=" + (curIcon != null)); } catch (Throwable ignored) {}
         if (alsoPin) {
-            Intent i = buildIntent(false);
+            Intent i = buildIntent();
             if (i != null) {
                 try {
                     android.content.pm.ShortcutManager sm = (android.content.pm.ShortcutManager) getSystemService(SHORTCUT_SERVICE);
@@ -380,84 +397,43 @@ public class ShortcutEditActivity extends Activity {
                         android.content.pm.ShortcutInfo.Builder sb2 = new android.content.pm.ShortcutInfo.Builder(this, key)
                             .setShortLabel(name).setLongLabel(name).setIntent(i);
                         if (curIcon != null) sb2.setIcon(android.graphics.drawable.Icon.createWithBitmap(curIcon));
-                        android.content.pm.ShortcutInfo si = sb2.build();
-                        sm.requestPinShortcut(si, null);
+                        sm.requestPinShortcut(sb2.build(), null);
+                        toast("请在系统弹窗中确认添加");
                     } else toast("桌面不支持固定快捷方式");
                 } catch (Throwable t) { toast("固定失败: " + t.getClass().getSimpleName()); }
             }
         }
-        setResult(RESULT_OK);
         finish();
     }
 
-    private void doCreate() { doSave(true); }
-
     private String joinFields() {
         String am2 = rbMain.isChecked() ? "1" : (rbCustom.isChecked() ? "2" : "0");
-        String cu = etCustom.getText().toString().trim();
-        return etName.getText().toString().trim() + "\u0001"
-            + etPkg.getText().toString().trim() + "\u0001"
-            + etCls.getText().toString().trim() + "\u0001"
-            + etData.getText().toString().trim() + "\u0001"
-            + etExtra.getText().toString().trim() + "\u0001"
-            + am2 + "\u0001" + cu + "\u0001"
-            + (cbNewTask.isChecked() ? "1" : "0") + "\u0001"
-            + (cbRoot.isChecked() ? "1" : "0") + "\u0001"
+        return etName.getText().toString().trim() + SEP
+            + etPkg.getText().toString().trim() + SEP
+            + etCls.getText().toString().trim() + SEP
+            + etData.getText().toString().trim() + SEP
+            + etExtra.getText().toString().trim() + SEP
+            + am2 + SEP
+            + etCustom.getText().toString().trim() + SEP
+            + (cbNewTask.isChecked() ? "1" : "0") + SEP
+            + (cbRoot.isChecked() ? "1" : "0") + SEP
             + iconPath;
     }
 
+    private String newestIconFile() {
+        try {
+            java.io.File idir = new java.io.File(getFilesDir(), "sc_icons");
+            java.io.File[] fs = idir.listFiles();
+            if (fs == null || fs.length == 0) return "";
+            java.io.File newest = fs[0];
+            for (java.io.File f : fs) if (f.lastModified() > newest.lastModified()) newest = f;
+            return newest.getAbsolutePath();
+        } catch (Throwable e) { return ""; }
+    }
+
+    static final String SEP = "\\u0001";
+
     private void toast(String s2) { Toast.makeText(this, s2, Toast.LENGTH_SHORT).show(); }
-
-    private void pickApp() {
-        try {
-            android.content.pm.PackageManager pm = getPackageManager();
-            java.util.List<android.content.pm.PackageInfo> pkgs = pm.getInstalledPackages(0);
-            java.util.Collections.sort(pkgs, new java.util.Comparator<android.content.pm.PackageInfo>() {
-                public int compare(android.content.pm.PackageInfo a, android.content.pm.PackageInfo b) {
-                    return labelOf(pm, a).compareToIgnoreCase(labelOf(pm, b));
-                }
-            });
-            final android.content.pm.PackageInfo[] arr = pkgs.toArray(new android.content.pm.PackageInfo[0]);
-            String[] names = new String[arr.length];
-            for (int i = 0; i < arr.length; i++) names[i] = labelOf(pm, arr[i]) + "  [" + arr[i].packageName + "]";
-            new android.app.AlertDialog.Builder(this)
-                .setTitle("选择应用(全部 " + arr.length + " 个)")
-                .setItems(names, new android.content.DialogInterface.OnClickListener() {
-                    public void onClick(android.content.DialogInterface d, int w) { showActivityPicker(arr[w]); }
-                }).show();
-        } catch (Throwable e) { toast("获取应用列表失败"); }
-    }
-
-    private String labelOf(android.content.pm.PackageManager pm, android.content.pm.PackageInfo pi) {
-        try { return String.valueOf(pi.applicationInfo.loadLabel(pm)); }
-        catch (Throwable e) { return pi.packageName; }
-    }
-
-    private void showActivityPicker(final android.content.pm.PackageInfo pi) {
-        try {
-            android.content.pm.ActivityInfo[] acts = pi.activities;
-            if (acts == null || acts.length == 0) { toast("该包没有可列出的活动"); return; }
-            final android.content.pm.ActivityInfo[] arr = acts;
-            String[] names = new String[arr.length];
-            for (int i = 0; i < arr.length; i++) {
-                String nm = arr[i].name;
-                int dot = nm.lastIndexOf('.');
-                String short2 = dot >= 0 && dot < nm.length() - 1 ? nm.substring(dot + 1) : nm;
-                names[i] = short2 + (arr[i].exported ? "  [可直启]" : "  [需Root]");
-            }
-            new android.app.AlertDialog.Builder(this)
-                .setTitle(pi.packageName + " 的 " + arr.length + " 个活动")
-                .setItems(names, new android.content.DialogInterface.OnClickListener() {
-                    public void onClick(android.content.DialogInterface d, int w) {
-                        etPkg.setText(pi.packageName);
-                        etCls.setText(arr[w].name);
-                        if (etName.getText().length() == 0)
-                            etName.setText(String.valueOf(arr[w].loadLabel(getPackageManager())));
-                    }
-                }).show();
-        } catch (Throwable e) { toast("读取活动失败"); }
-    }
-
 
     private int dp(int v) { return (int) (v * getResources().getDisplayMetrics().density); }
 }
