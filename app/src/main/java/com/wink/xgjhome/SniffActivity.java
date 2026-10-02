@@ -692,17 +692,7 @@ public class SniffActivity extends Activity {
                     for (int j2 = i + 1; j2 < lines.length; j2++) {
                         String u2 = lines[j2].trim();
                         if (u2.isEmpty() || u2.startsWith("#")) continue;
-                        if (!u2.startsWith("http")) {
-                            if (u2.startsWith("/")) {
-                                // 绝对路径：协议+主机
-                                try {
-                                    java.net.URL mba = new java.net.URL(masterUrl);
-                                    u2 = mba.getProtocol() + "://" + mba.getHost() + (mba.getPort() > 0 ? ":" + mba.getPort() : "") + u2;
-                                } catch (Throwable ignored) {}
-                            } else {
-                                u2 = normalizeUrl(base, u2);
-                            }
-                        }
+                        if (!u2.startsWith("http")) u2 = base + u2.replaceFirst("^/", "");
                         bws.add(new long[]{bw});
                         urls.add(u2);
                         names.add(nm);
@@ -732,15 +722,6 @@ public class SniffActivity extends Activity {
     }
 
     private static volatile String bestFc2Name = null;
-
-    private static String normalizeUrl(String base, String rel) {
-        try {
-            java.net.URL b = new java.net.URL(new java.net.URL(base), rel);
-            return b.toString();
-        } catch (Throwable e) {
-            return base + rel;
-        }
-    }
 
     private static boolean probeHls(String url) {
         try {
