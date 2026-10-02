@@ -349,12 +349,7 @@ public class RecordActivity extends Activity {
                     public boolean onMenuItemClick(android.view.MenuItem m2) {
                         String t = m2.getTitle().toString();
                         if (t.equals("播放")) {
-                            try {
-                                Intent i = new Intent(Intent.ACTION_VIEW);
-                                i.setDataAndType(android.net.Uri.parse(it.path), "video/*");
-                                i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_GRANT_READ_URI_PERMISSION);
-                                startActivity(i);
-                            } catch (Throwable e) { Toast.makeText(RecordActivity.this, "打不开", Toast.LENGTH_SHORT).show(); }
+                            try { playInApp(it.path, it.title); } catch (Throwable e) { Toast.makeText(RecordActivity.this, "打不开", Toast.LENGTH_SHORT).show(); }
                         } else if (t.equals("删除")) {
                             HistoryStore.removeAt(RecordActivity.this, idx);
                             hist = HistoryStore.load(RecordActivity.this);
@@ -372,6 +367,15 @@ public class RecordActivity extends Activity {
         infoRef.set(tvInfo);
     }
 
+    private void playInApp(String path, String title) {
+        Intent i = new Intent(this, NativePlayerActivity.class);
+        i.putExtra("url", path);
+        i.putExtra("title", title == null ? "播放" : title);
+        i.putExtra("kernel", "native");
+        i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+        startActivity(i);
+    }
+
     private void showDlMenu(View anchor, final DlManager.DlJob j) {
         PopupMenu pm = new PopupMenu(this, anchor);
         if (j.active) pm.getMenu().add("取消");
@@ -382,12 +386,7 @@ public class RecordActivity extends Activity {
                 String t = it.getTitle().toString();
                 if (t.equals("取消")) DlManager.cancel(j.id);
                 else if (t.equals("播放")) {
-                    try {
-                        Intent i = new Intent(Intent.ACTION_VIEW);
-                        i.setDataAndType(android.net.Uri.parse("file://" + j.file.getAbsolutePath()), "video/mp2t");
-                        i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_GRANT_READ_URI_PERMISSION);
-                        startActivity(i);
-                    } catch (Throwable e) { Toast.makeText(RecordActivity.this, "打不开", Toast.LENGTH_SHORT).show(); }
+                    try { playInApp("file://" + j.file.getAbsolutePath(), j.title); } catch (Throwable e) { Toast.makeText(RecordActivity.this, "打不开", Toast.LENGTH_SHORT).show(); }
                 } else if (t.equals("删除")) { DlManager.cancel(j.id); }
                 rebuild();
                 return true;
