@@ -194,6 +194,22 @@ public class SniffActivity extends Activity {
                     if (!"http".equals(u.getScheme()) && !"https".equals(u.getScheme())) return null;
                     String url = u.toString();
                     if (url.contains("/log/")) return null;
+                    if (url.contains("stripchat")) {
+                        String lu2 = url.toLowerCase();
+                        if (lu2.contains(".m3u8")) {
+                            final String fUrl3 = url;
+                            final String chKey2 = url.substring(0, url.indexOf('?') > 0 ? url.indexOf('?') : url.length());
+                            main.post(new Runnable() { public void run() {
+                                try {
+                                    if (fc2HlsSeen.add(chKey2)) {
+                                        addRecord(fUrl3, "Stripchat·直播");
+                                        if (!isRecordsVisible) toggleRecords();
+                                    }
+                                } catch (Throwable ignored) {}
+                            }});
+                        }
+                        return null;
+                    }
                     if (url.contains("guangdongvideo.com") || url.contains("live.fc2.com")) {
                         String lu = url.toLowerCase();
                         boolean isMaster = lu.contains("master_playlist");
