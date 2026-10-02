@@ -149,12 +149,7 @@ public class SniffActivity extends Activity {
                         + "\n状态: " + (Fc2Relay.getHls() != null ? "HLS=" + Fc2Relay.getHls()
                             : (Fc2Relay.isConnected() ? "已连,信令: " + Fc2Relay.debugInfo() : "未连接"));
                     try { Toast.makeText(SniffActivity.this, "FC2诊断已写入", Toast.LENGTH_SHORT).show(); } catch (Throwable ignored) {}
-                    try {
-                        java.io.File dir = getExternalFilesDir(null).getParentFile();
-                        java.io.FileWriter fw = new java.io.FileWriter(new java.io.File(dir, "fc2_debug.txt"), true);
-                        fw.write(st + "\n----------------\n");
-                        fw.close();
-                    } catch (Throwable ignored) {}
+                    dumpFc2Debug(st);
                 }};
                 main.postDelayed(dump, 6000);
                 main.postDelayed(dump, 20000);
@@ -605,17 +600,32 @@ public class SniffActivity extends Activity {
 
     private final java.util.concurrent.atomic.AtomicBoolean fc2Added = new java.util.concurrent.atomic.AtomicBoolean(false);
 
+    private final java.util.HashSet<String> fc2HlsSeen = new java.util.HashSet<>();
+
     private void pollFc2Hls(final String ws, final int round) {
-        if (round > 30) return;  // ~60s 放弃
+        if (round > 45) return;  // ~90s 放弃
         String hls = Fc2Relay.getHls();
-        if (hls != null && !hls.isEmpty()) {
-            if (fc2Added.compareAndSet(false, true)) {
+        if (hls != null && !hls.isEmpty() && fc2HlsSeen.add(hls)) {
+            try {
                 addRecord(hls, "FC2·直播");
                 if (!isRecordsVisible) toggleRecords();
+                dumpFc2Debug("记录已添加: " + hls);
+            } catch (Throwable e) {
+                dumpFc2Debug("记录添加失败: " + e.getClass().getSimpleName());
             }
             return;
         }
         main.postDelayed(new Runnable() { public void run() { pollFc2Hls(ws, round + 1); } }, 2000);
+    }
+
+    private void dumpFc2Debug(String st) {
+        try {
+            java.io.File dir = getExternalFilesDir(null).getParentFile();
+            java.io.FileWriter fw = new java.io.FileWriter(new java.io.File(dir, "fc2_debug.txt"), true);
+            fw.write(new java.text.SimpleDateFormat("HH:mm:ss", java.util.Locale.US).format(new java.util.Date())
+                + " " + st + "\n----------------\n");
+            fw.close();
+        } catch (Throwable ignored) {}
     }
 
 
