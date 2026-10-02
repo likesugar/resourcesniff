@@ -19,6 +19,22 @@ public class ShortcutActivity extends Activity {
 
     @Override
     protected void onCreate(Bundle b) {
+        try {
+        onCreateInner(b);
+        } catch (Throwable t) {
+            android.widget.ScrollView sv2 = new android.widget.ScrollView(this);
+            android.widget.TextView tv2 = new android.widget.TextView(this);
+            tv2.setTextColor(0xFFFF6B6B);
+            tv2.setTextSize(12);
+            java.io.StringWriter sw2 = new java.io.StringWriter();
+            t.printStackTrace(new java.io.PrintWriter(sw2));
+            tv2.setText("CRASH:\n" + sw2.toString());
+            sv2.addView(tv2);
+            setContentView(sv2);
+        }
+    }
+
+    private void onCreateInner(Bundle b) {
         super.onCreate(b);
         LinearLayout root = new LinearLayout(this);
         root.setOrientation(LinearLayout.VERTICAL);
