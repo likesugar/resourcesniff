@@ -194,7 +194,7 @@ public class SniffActivity extends Activity {
                     if (!"http".equals(u.getScheme()) && !"https".equals(u.getScheme())) return null;
                     String url = u.toString();
                     if (url.contains("/log/")) return null;
-                    if (url.contains("stripchat")) {
+                    if (url.contains("stripchat") || url.contains("doppiocdn")) {
                         String lu2 = url.toLowerCase();
                         if (lu2.contains(".m3u8") && !lu2.contains("ping")) {  // ping.m3u8 是保活心跳，不是流
                             final String fUrl3 = url;
