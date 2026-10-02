@@ -78,6 +78,7 @@ public class SniffActivity extends Activity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        sDumpCtx = this;
         try { LiveProxy.start(); } catch (Throwable ignored) {}   // 本地中转必须常驻，FC2/B站记录才能播/录/下
         DlManager.init(this);
         setContentView(R.layout.activity_sniff);
@@ -707,8 +708,11 @@ public class SniffActivity extends Activity {
             });
             for (int i = 0; i < idx.length; i++) {
                 String cand = urls.get(idx[i]);
+                dumpFc2Debug("候选#" + (i + 1) + " bw=" + bws.get(idx[i])[0] + " name=" + names.get(idx[i]) + " " + cand);
                 if (probeHls(cand)) {
-                    bestFc2Name = names.get(idx[i]);
+                    int rank = i + 1;  // 1=最高带宽
+                    bestFc2Name = rank == 1 ? "原画" : (rank == 2 ? "高清" : (rank == 3 ? "极速" : "直播"));
+                    dumpFc2Debug("选中: " + bestFc2Name);
                     return cand;
                 }
             }
@@ -734,9 +738,11 @@ public class SniffActivity extends Activity {
         } catch (Throwable e) { return false; }
     }
 
-    private void dumpFc2Debug(String st) {
+    private static android.content.Context sDumpCtx;
+
+    private static void dumpFc2Debug(String st) {
         try {
-            java.io.File dir = getExternalFilesDir(null).getParentFile();
+            java.io.File dir = sDumpCtx.getExternalFilesDir(null).getParentFile();
             java.io.FileWriter fw = new java.io.FileWriter(new java.io.File(dir, "fc2_debug.txt"), true);
             fw.write(new java.text.SimpleDateFormat("HH:mm:ss", java.util.Locale.US).format(new java.util.Date())
                 + " " + st + "\n----------------\n");
