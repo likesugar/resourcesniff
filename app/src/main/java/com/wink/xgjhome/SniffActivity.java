@@ -738,6 +738,7 @@ public class SniffActivity extends Activity {
             // stripchat/doppiocdn 低延迟HLS：去掉动态 _HLS_msn/_HLS_part 参数后入库，标题带画质
             String ll = url.toLowerCase();
             if (ll.contains("doppiocdn.net")) {
+                if (ll.contains("/ping.m3u8")) return;  // 心跳地址不是流
                 if (ll.contains(".m3u8")) {
                     android.net.Uri uu = android.net.Uri.parse(url);
                     String key = "sc#" + uu.getHost() + uu.getPath();
@@ -790,6 +791,7 @@ public class SniffActivity extends Activity {
     void maybeRecordDouyin(final String url) {
         String l = url.toLowerCase();
         if (url.contains("/log/")) return;
+        if (l.contains("doppiocdn.net") || l.contains("/ping.m3u8")) return;  // stripchat流/心跳，非抖音
         if (l.contains("bilivideo") || l.contains("upos-")) return;
         // 抖音直播：无参数裸地址 .../stage/xxxxx（不带 .flv?e= 签名参数，签名地址每次都变会死循环）
         String base = url;
