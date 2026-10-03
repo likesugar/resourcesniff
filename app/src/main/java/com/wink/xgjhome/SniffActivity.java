@@ -52,6 +52,16 @@ public class SniffActivity extends Activity {
     private boolean isTopBarVisible = true;
 
     private final ArrayList<String> foundUrls = new ArrayList<>();
+    private volatile boolean diagActive = false;
+    private static void dumpDiag(String st) {
+        try {
+            java.io.File dir = sDumpCtx.getExternalFilesDir(null).getParentFile();
+            java.io.FileWriter fw = new java.io.FileWriter(new java.io.File(dir, "网页诊断.txt"), true);
+            fw.write(new java.text.SimpleDateFormat("HH:mm:ss", java.util.Locale.US).format(new java.util.Date())
+                + " " + st + "\n----------------\n");
+            fw.close();
+        } catch (Throwable ignored) {}
+    }
     private final java.util.Set<String> recordKeys = java.util.Collections.synchronizedSet(new LinkedHashSet<String>());
     // 同一路流按画质去重：baseKey -> [rank, url, tv, tvUrl]
     private final java.util.HashMap<String, Object[]> recByBase = new java.util.HashMap<>();
@@ -418,6 +428,9 @@ public class SniffActivity extends Activity {
 
             @Override
             public void onPageStarted(WebView view, String url, android.graphics.Bitmap favicon) {
+                // 诊断模式：stripchat 等抓不到的站，全量请求落 网页诊断.txt
+                diagActive = url != null && (url.contains("stripchat") || url.contains("zh.stripchat"));
+                if (diagActive) dumpDiag("PAGE: " + url);
                 // B站手机UA会导致房间初始化失败，全程桌面UA
                 if (url != null && url.contains("bilibili.com") && !biliDesktopSet) {
                     biliDesktopSet = true;
@@ -720,6 +733,7 @@ public class SniffActivity extends Activity {
     void maybeRecordGeneric(final String url, final String method) {
         try {
             if (url == null || url.length() < 20) return;
+            if (diagActive || url.contains("stripchat")) dumpDiag("WEBREQ: " + method + " " + url);
             if (url.contains("127.0.0.1:8123")) return;
             // 调试：B站全量请求落日志（用户回传 fc2_debug.txt 定位直播流）
             if (url.contains("bilibili") || url.contains("b23.tv")) {
