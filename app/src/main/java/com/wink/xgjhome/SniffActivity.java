@@ -1213,10 +1213,11 @@ public class SniffActivity extends Activity {
         menuBtn.setTextColor(0xFFFFFFFF);
         menuBtn.setTextSize(16);
         menuBtn.setPadding(12, 4, 12, 4);
-        menuBtn.setOnClickListener(new View.OnClickListener() {
+        menuBtn.setVisibility(View.GONE); // 右侧悬浮菜单已集合到下载页
+        row.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                showRecordMenu(v, url, row);
+                downloadUrl(url);  // 点条目 → 直接入下载页
             }
         });
         LinearLayout headRow = new LinearLayout(this);

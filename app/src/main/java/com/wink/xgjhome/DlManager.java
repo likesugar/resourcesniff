@@ -7,6 +7,10 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 /** 轻量下载管理：嗅探"下载"入口 → 下载页卡片。HLS 走 ffmpeg 分段下载，支持 开始/暂停/结束(合并MP4) */
 public class DlManager {
+    /** 数据变化回调（视频下载式刷新：由数据变化驱动UI重建） */
+    public static volatile Runnable onProgress;
+    static void notifyP() { Runnable r = onProgress; if (r != null) try { r.run(); } catch (Throwable ignored) {} }
+
 
     public static class DlJob {
         public int id;
@@ -194,12 +198,15 @@ public class DlManager {
             out = new java.io.FileOutputStream(j.file);
             byte[] buf = new byte[32 * 1024];
             int n;
+            long lastN = -1;
             while ((n = in.read(buf)) > 0) {
                 if (!j.active) return;
                 out.write(buf, 0, n);
                 j.doneBytes += n;
                 j.state = "下载中";
+                if (j.doneBytes - lastN > 512 * 1024) { lastN = j.doneBytes; notifyP(); }
             }
+            notifyP();
             out.close(); out = null;
             j.state = insertGallery(j) ? "已完成" : "完成(未入相册)";
             HistoryStore.add(sCtx, "视频", j.title, "file://" + j.file.getAbsolutePath());

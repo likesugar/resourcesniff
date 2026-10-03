@@ -21,7 +21,6 @@ import android.widget.Toast;
 public class RecordActivity extends Activity {
 
     private Handler handler;
-    private Runnable tick;
     private LinearLayout list;
     private TextView tvEmpty;
     private TextView[] tabBtns;
@@ -142,22 +141,62 @@ public class RecordActivity extends Activity {
 
         sv.addView(col);
         root.addView(sv);
+
+        // 底部胶囊导航（对齐"视频下载"）：首页 / 下载
+        LinearLayout pill = new LinearLayout(this);
+        pill.setOrientation(LinearLayout.HORIZONTAL);
+        android.graphics.drawable.GradientDrawable pillBg = new android.graphics.drawable.GradientDrawable();
+        pillBg.setCornerRadius(50 * dmv());
+        pillBg.setColor(0xD9FFFFFF);
+        pill.setBackground(pillBg);
+        pill.setPadding(14, 14, 14, 14);
+        FrameLayout.LayoutParams plp = new FrameLayout.LayoutParams(-2, -2, Gravity.BOTTOM | Gravity.CENTER_HORIZONTAL);
+        plp.bottomMargin = (int)(18 * dmv());
+        pill.setLayoutParams(plp);
+        String[] pillTabs = {"首页", "下载"};
+        final TextView[] segs = new TextView[2];
+        for (int i = 0; i < 2; i++) {
+            final int pi = i;
+            TextView tv = new TextView(this);
+            tv.setText(pillTabs[i]);
+            tv.setTextSize(15);
+            tv.setGravity(Gravity.CENTER);
+            tv.setPadding(0, 26, 0, 26);
+            LinearLayout.LayoutParams sp = new LinearLayout.LayoutParams((int)(118 * dmv()), (int)(50 * dmv()));
+            if (i == 0) sp.rightMargin = (int)(6 * dmv());
+            tv.setLayoutParams(sp);
+            tv.setOnClickListener(new View.OnClickListener() {
+                public void onClick(View v) {
+                    restylePill(segs, pi);
+                    if (pi == 0) finish();  // 首页 → 回小工具首页
+                }
+            });
+            segs[i] = tv;
+            pill.addView(tv);
+        }
+        restylePill(segs, 1);
+        root.addView(pill);
         setContentView(root);
 
-        handler = new Handler();
-        tick = new Runnable() {
-            public void run() {
-                rebuild();
-                handler.postDelayed(this, 1500);
-            }
-        };
+        // 视频下载式刷新：数据变化驱动（DlManager/RecManager 回调），不再用定时轮询
+        DlManager.onProgress = new Runnable() { public void run() { runOnUiThread(new Runnable() { public void run() { rebuild(); } }); } };
+        RecManager.onProgress = DlManager.onProgress;
+    }
+
+    private float dmv() { return getResources().getDisplayMetrics().density; }
+    private void restylePill(TextView[] segs, int sel) {
+        for (int i = 0; i < 2; i++) {
+            android.graphics.drawable.GradientDrawable bg = new android.graphics.drawable.GradientDrawable();
+            bg.setCornerRadius(50 * dmv());
+            bg.setColor(i == sel ? 0xFF315CDE : 0x00000000);
+            segs[i].setBackground(bg);
+            segs[i].setTextColor(i == sel ? Color.WHITE : 0xFF8A919E);
+            segs[i].setTypeface(i == sel ? Typeface.DEFAULT_BOLD : Typeface.DEFAULT);
+        }
     }
 
     @Override
-    protected void onResume() { super.onResume(); handler.post(tick); }
-
-    @Override
-    protected void onPause() { super.onPause(); handler.removeCallbacks(tick); }
+    protected void onResume() { super.onResume(); rebuild(); }
 
     private static String fmtDur(long s) {
         return String.format(java.util.Locale.US, "%02d:%02d:%02d", s / 3600, s / 60 % 60, s % 60);
@@ -179,20 +218,27 @@ public class RecordActivity extends Activity {
         for (DlManager.DlJob j : DlManager.jobs()) meta.put("D" + j.id, new Object[]{1, j, Boolean.FALSE});
         if (hist != null) for (int i = 0; i < hist.size(); i++) meta.put("H" + i, new Object[]{2, hist.get(i), Boolean.FALSE});
 
-        // 分类：录制中/下载中 → 下载；录制完成/暂停 → 录制；下载完成 → 视频
+        // 分类：kind(视频/录制) + state(进行中/已完成)，chips=全部/视频/录制/进行中/已完成
         java.util.HashMap<String, String> cat = new java.util.HashMap<String, String>();
+        java.util.HashMap<String, String> st = new java.util.HashMap<String, String>();
         for (java.util.Map.Entry<String, Object[]> e : meta.entrySet()) {
             int type = (Integer) e.getValue()[0];
             boolean live = (Boolean) e.getValue()[2];
-            if (type == 2) { cat.put(e.getKey(), ((HistoryStore.Item) e.getValue()[1]).type); continue; }
-            if (type == 1) {
+            if (type == 2) {
+                HistoryStore.Item it = (HistoryStore.Item) e.getValue()[1];
+                cat.put(e.getKey(), it.type == null ? "视频" : it.type);
+                st.put(e.getKey(), "已完成");
+            } else if (type == 1) {
                 DlManager.DlJob dj = (DlManager.DlJob) e.getValue()[1];
-                cat.put(e.getKey(), (dj.active || dj.paused) ? "下载" : "视频");
+                cat.put(e.getKey(), "视频");
+                st.put(e.getKey(), (dj.active || dj.paused) ? "进行中" : "已完成");
             } else {
-                cat.put(e.getKey(), live ? "下载" : "录制");
+                cat.put(e.getKey(), "录制");
+                st.put(e.getKey(), live ? "进行中" : "已完成");
             }
         }
-        String want = new String[]{"全部", "视频", "录制", "下载"}[curTab];
+        String want = new String[]{"全部", "视频", "录制", "进行中", "已完成"}[curTab];
+        String wantSt = curTab == 3 ? "进行中" : (curTab == 4 ? "已完成" : null);
 
         // 稳定顺序
         java.util.ArrayList<String> order = new java.util.ArrayList<String>(rowOrder);
@@ -202,7 +248,12 @@ public class RecordActivity extends Activity {
 
         // 当前tab要显示的
         java.util.ArrayList<String> shown = new java.util.ArrayList<String>();
-        for (String k : order) if (want.equals("全部") || want.equals(cat.get(k))) shown.add(k);
+        for (String k : order) {
+            String w = new String[]{"全部", "视频", "录制", "进行中", "已完成"}[curTab];
+            String kind = cat.get(k), state = st.get(k);
+            boolean show = w.equals("全部") || (state != null && w.equals(state)) || (state == null && w.equals(kind));
+            if (show) shown.add(k);
+        }
         tvEmpty.setVisibility(shown.isEmpty() ? View.VISIBLE : View.GONE);
 
         // 已显示行 == 当前应显示行 → 只刷文字

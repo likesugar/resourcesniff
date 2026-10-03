@@ -5,6 +5,10 @@ import android.content.Intent;
 import com.wink.xgjhome.HomeActivity;
 
 public class RecManager {
+    /** 数据变化回调 */
+    public static volatile Runnable onProgress;
+    static void notifyP() { Runnable r = onProgress; if (r != null) try { r.run(); } catch (Throwable ignored) {} }
+
 
     // ---------- 直播录制（纯 Java 拉流写文件，支持多路并行） ----------
     static class RecJob {
@@ -452,6 +456,7 @@ public class RecManager {
                 try { Thread.sleep(1000); } catch (Throwable e) { break; }
                 if (!job.active) break;
                 job.bytes = dirTotal(job);
+                notifyP();
                 c++;
                 if (c % 5 != 0) continue;
                 long total = job.bytes;
