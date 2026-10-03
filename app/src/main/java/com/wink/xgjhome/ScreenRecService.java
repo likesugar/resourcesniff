@@ -29,6 +29,7 @@ public class ScreenRecService extends Service {
     private static MediaRecorder recorder;
     private static String outFile;
     private static long startAt;
+    private android.os.PowerManager.WakeLock wl;  // 亮屏锁：录制期间防灭屏（灭屏=画面源消失）
 
     @Override
     public IBinder onBind(Intent intent) { return null; }
@@ -90,6 +91,12 @@ public class ScreenRecService extends Service {
                     DisplayManager.VIRTUAL_DISPLAY_FLAG_AUTO_MIRROR, recorder.getSurface(), null, null);
             recorder.start();
             startAt = System.currentTimeMillis();
+            try {
+                android.os.PowerManager pm = (android.os.PowerManager) getSystemService(POWER_SERVICE);
+                wl = pm.newWakeLock(android.os.PowerManager.SCREEN_BRIGHT_WAKE_LOCK
+                        | android.os.PowerManager.ON_AFTER_RELEASE, "xgjhome:webrec");
+                wl.acquire();
+            } catch (Throwable ignored) {}
             SniffActivity.webRecState = 1;
             SniffActivity.webRecFile = outFile;
             updateNotification("录制中 00:00");
@@ -109,11 +116,32 @@ public class ScreenRecService extends Service {
     private void stopRecording() {
         stopCaptureQuiet();
         SniffActivity.webRecState = 0;
+        try { if (wl != null && wl.isHeld()) wl.release(); } catch (Throwable ignored) {}
         try {
             if (outFile != null) {
-                HistoryStore.add(this, "录制网页", "网页录制_" + startAt / 1000, "file://" + outFile);
+                String name = "网页录制_" + startAt / 1000;
+                String usePath = "file://" + outFile;
                 try {
-                    SniffActivity.registerLanLink("file://" + outFile, "网页录制");
+                    // 与下载同路径：MediaStore Movies/资源嗅探，下载页/相册都能看到
+                    android.content.ContentValues cv = new android.content.ContentValues();
+                    cv.put(android.provider.MediaStore.Video.Media.DISPLAY_NAME, name + ".mp4");
+                    cv.put(android.provider.MediaStore.Video.Media.MIME_TYPE, "video/mp4");
+                    if (android.os.Build.VERSION.SDK_INT >= 29)
+                        cv.put(android.provider.MediaStore.Video.Media.RELATIVE_PATH, "Movies/资源嗅探");
+                    android.net.Uri uri = getContentResolver().insert(android.provider.MediaStore.Video.Media.EXTERNAL_CONTENT_URI, cv);
+                    if (uri != null) {
+                        java.io.OutputStream os = getContentResolver().openOutputStream(uri);
+                        java.io.FileInputStream fis = new java.io.FileInputStream(outFile);
+                        byte[] buf = new byte[65536]; int r;
+                        while ((r = fis.read(buf)) > 0) os.write(buf, 0, r);
+                        fis.close(); os.close();
+                        usePath = uri.toString();
+                        new java.io.File(outFile).delete();
+                    }
+                } catch (Throwable ignored) {}
+                HistoryStore.add(this, "视频", name, usePath);
+                try {
+                    SniffActivity.registerLanLink(usePath, name);
                 } catch (Throwable ignored) {}
             }
         } catch (Throwable ignored) {}
