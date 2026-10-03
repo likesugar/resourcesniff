@@ -564,7 +564,35 @@ public class SniffActivity extends Activity {
             }
         }
         if (!url.startsWith("http")) url = "https://" + url;
+        if (url.contains("v.douyin.com")) { resolveDouyinShort(url); return; }  // 抖音短链原生解析302直达房间
         webView.loadUrl(url);
+    }
+
+    /** 抖音短链(v.douyin.com)原生跟随302，直达直播间地址 */
+    void resolveDouyinShort(final String shortUrl) {
+        dumpFc2Debug("DYRESOLVE: " + shortUrl);
+        new Thread(new Runnable() { public void run() {
+            String cur = shortUrl;
+            try {
+                for (int i = 0; i < 5; i++) {
+                    java.net.HttpURLConnection c = (java.net.HttpURLConnection) new java.net.URL(cur).openConnection();
+                    c.setInstanceFollowRedirects(false);
+                    c.setConnectTimeout(8000); c.setReadTimeout(8000);
+                    c.setRequestProperty("User-Agent", UA_MOBILE);
+                    int code = c.getResponseCode();
+                    String loc = c.getHeaderField("Location");
+                    c.disconnect();
+                    if (code >= 300 && code < 400 && loc != null && loc.length() > 0) {
+                        cur = loc.startsWith("http") ? loc : new java.net.URL(new java.net.URL(cur), loc).toString();
+                    } else break;
+                }
+            } catch (Throwable t) { dumpFc2Debug("DYRESOLVE err " + t); }
+            dumpFc2Debug("DYRESOLVE final: " + cur);
+            final String fu = cur;
+            runOnUiThread(new Runnable() { public void run() {
+                try { webView.loadUrl(fu); } catch (Throwable ignored) {}
+            }});
+        }}).start();
     }
 
     static String extractUrl(String text) {
