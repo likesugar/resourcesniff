@@ -67,7 +67,7 @@ public class RecordActivity extends Activity {
         head.setGravity(Gravity.CENTER_VERTICAL);
         head.setPadding(0, 0, 0, 20);
         TextView title = new TextView(this);
-        title.setText("资源下载页");
+        title.setText("下载");
         title.setTextSize(22);
         title.setTypeface(Typeface.DEFAULT_BOLD);
         title.setTextColor(Color.WHITE);
@@ -143,7 +143,57 @@ public class RecordActivity extends Activity {
         sv.addView(col);
         root.addView(sv);
 
-        setContentView(root);
+        // 底部胶囊导航（FloatingTabs 移植）：半透明胶囊 + 蓝色滑块 + 首页/下载
+        try {
+            float dm = getResources().getDisplayMetrics().density;
+            final int TAB_W = (int)(118 * dm), TAB_H = (int)(50 * dm), INSET = (int)(7 * dm);
+            android.widget.FrameLayout capsule = new android.widget.FrameLayout(this);
+            android.graphics.drawable.GradientDrawable capBg = new android.graphics.drawable.GradientDrawable();
+            capBg.setCornerRadius(50 * dm);
+            capBg.setColor(0x8CFFFFFF);
+            capsule.setBackground(capBg);
+            capsule.setElevation(4 * dm);
+            android.widget.FrameLayout.LayoutParams clp = new android.widget.FrameLayout.LayoutParams(
+                    TAB_W * 2 + INSET * 2, TAB_H + INSET * 2,
+                    android.view.Gravity.BOTTOM | android.view.Gravity.CENTER_HORIZONTAL);
+            clp.bottomMargin = (int)(18 * dm);
+            capsule.setLayoutParams(clp);
+
+            final android.widget.FrameLayout thumb = new android.widget.FrameLayout(this);
+            android.graphics.drawable.GradientDrawable thBg = new android.graphics.drawable.GradientDrawable();
+            thBg.setCornerRadius(50 * dm);
+            thBg.setColor(0xFF4666DB);
+            thumb.setBackground(thBg);
+            android.widget.FrameLayout.LayoutParams tlp = new android.widget.FrameLayout.LayoutParams(TAB_W, TAB_H);
+            tlp.leftMargin = INSET;
+            thumb.setLayoutParams(tlp);
+            capsule.addView(thumb);
+
+            LinearLayout labels = new LinearLayout(this);
+            labels.setOrientation(LinearLayout.HORIZONTAL);
+            capsule.addView(labels, new android.widget.FrameLayout.LayoutParams(-1, -1));
+            final TextView[] segs = new TextView[2];
+            final String[] labs = {"⌂ 首页", "⬇ 下载"};
+            for (int i = 0; i < 2; i++) {
+                final int idx = i;
+                TextView tv = new TextView(this);
+                tv.setText(labs[i]);
+                tv.setTextSize(14);
+                tv.setGravity(Gravity.CENTER);
+                tv.setLayoutParams(new LinearLayout.LayoutParams(0, -1, 1f));
+                tv.setOnClickListener(new View.OnClickListener() {
+                    public void onClick(View v) {
+                        restylePill(thumb, segs, idx, INSET, TAB_W);
+                        if (idx == 0) finish();  // 首页 → 回小工具首页
+                    }
+                });
+                segs[i] = tv;
+                labels.addView(tv);
+            }
+            restylePill(thumb, segs, 1, INSET, TAB_W);
+            root.addView(capsule);
+        } catch (Throwable t) { }
+                setContentView(root);
 
         // 视频下载式刷新：数据变化驱动（DlManager/RecManager 回调），不再用定时轮询
         DlManager.onProgress = new Runnable() { public void run() { runOnUiThread(new Runnable() { public void run() { rebuild(); } }); } };
@@ -151,6 +201,16 @@ public class RecordActivity extends Activity {
     }
 
     private float dmv() { return getResources().getDisplayMetrics().density; }
+    private void restylePill(android.widget.FrameLayout thumb, TextView[] segs, int sel, int inset, int tabW) {
+        android.widget.FrameLayout.LayoutParams lp = (android.widget.FrameLayout.LayoutParams) thumb.getLayoutParams();
+        lp.leftMargin = inset + sel * tabW;
+        thumb.setLayoutParams(lp);
+        for (int i = 0; i < 2; i++) {
+            segs[i].setTextColor(i == sel ? 0xFFFFFFFF : 0xFF5F6B7A);
+            segs[i].setTypeface(i == sel ? Typeface.DEFAULT_BOLD : Typeface.DEFAULT);
+        }
+    }
+
     @Override
     protected void onResume() { super.onResume(); rebuild(); }
 
