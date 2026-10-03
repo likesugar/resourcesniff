@@ -48,7 +48,7 @@ public class DlManager {
         if (t.contains("?")) t = t.substring(0, t.indexOf('?'));
         if (t.length() == 0) t = "资源嗅探_" + System.currentTimeMillis() / 1000;
         j.title = t;
-        j.file = new java.io.File(sCtx.getExternalFilesDir(null), "下载/dl" + j.id + ".ts");
+        j.file = new java.io.File(sCtx.getExternalFilesDir(null), "下载/dl_" + Integer.toHexString(url.hashCode()) + ".ts");
         try { j.file.getParentFile().mkdirs(); } catch (Throwable ignored) {}
         JOBS.put(j.id, j);
         new Thread(new Runnable() { public void run() { download(j); } }).start();
@@ -189,18 +189,36 @@ public class DlManager {
             if (j.url.contains("bilibili") || j.url.contains("bilivideo"))
                 c.setRequestProperty("Referer", "https://www.bilibili.com/");
             c.setRequestProperty("User-Agent", "Mozilla/5.0 (Linux; Android 13) AppleWebKit/537.36");
-            j.total = c.getContentLength();
+            // 断点续传：.part 记录已下字节，Range 续传；服务器不支持206则重下
+            final java.io.File part = new java.io.File(j.file.getAbsolutePath() + ".part");
+            long have = 0;
+            if (part.exists() && part.length() > 0) {
+                have = part.length();
+                c.setRequestProperty("Range", "bytes=" + have + "-");
+            }
+            int code = c.getResponseCode();
+            boolean resumed = have > 0 && code == 206;
+            if (have > 0 && !resumed) { part.delete(); have = 0; }
+            j.doneBytes = have;
+            j.total = resumed ? have + Math.max(0, c.getContentLength()) : c.getContentLength();
             in = c.getInputStream();
-            out = new java.io.FileOutputStream(j.file);
+            out = new java.io.FileOutputStream(part, resumed);
             byte[] buf = new byte[32 * 1024];
             int n;
             while ((n = in.read(buf)) > 0) {
-                if (!j.active) return;
+                if (!j.active) return;   // 暂停/中断保留 .part，下次续传
                 out.write(buf, 0, n);
                 j.doneBytes += n;
-                j.state = "下载中";
+                j.state = "下载中" + (resumed ? "（续传）" : "");
             }
             out.close(); out = null;
+            if (!part.renameTo(j.file)) {
+                java.io.InputStream pin = new java.io.FileInputStream(part);
+                java.io.OutputStream po = new java.io.FileOutputStream(j.file);
+                byte[] pb = new byte[64 * 1024]; int pn;
+                while ((pn = pin.read(pb)) > 0) po.write(pb, 0, pn);
+                po.close(); pin.close(); part.delete();
+            }
             j.state = insertGallery(j) ? "已完成" : "完成(未入相册)";
             HistoryStore.add(sCtx, "视频", j.title, "file://" + j.file.getAbsolutePath());
             j.done = true;
@@ -242,6 +260,7 @@ public class DlManager {
         try { if (j.file != null) {
             if (j.file.isDirectory()) { for (java.io.File f : j.file.listFiles()) f.delete(); }
             j.file.delete();
+            new java.io.File(j.file.getAbsolutePath() + ".part").delete();
         } } catch (Throwable ignored) {}
     }
 }

@@ -7,22 +7,22 @@ import com.wink.xgjhome.HomeActivity;
 public class RecManager {
 
     // ---------- 直播录制（纯 Java 拉流写文件，支持多路并行） ----------
-    public static class RecJob {
-        public int id;
-        public volatile boolean active = true;
-        public volatile boolean paused = false;
-        public volatile java.net.HttpURLConnection conn;
-        public Thread thread;
-        public String name;
-        public String url;
-        public java.io.File file;
-        public android.net.Uri storeUri;
-        public volatile long bytes = 0;
-        public volatile boolean finishNow = false;
+    static class RecJob {
+        int id;
+        volatile boolean active = true;
+        volatile boolean paused = false;
+        volatile java.net.HttpURLConnection conn;
+        Thread thread;
+        String name;
+        String url;
+        java.io.File file;
+        android.net.Uri storeUri;
+        volatile long bytes = 0;
+        volatile boolean finishNow = false;
         volatile String state = null;   // null=暂停录制 / 转换MP4中 / 转换失败
-        public int notifId;
-        public volatile long secs = 0;
-        public volatile long startTs = 0;
+        int notifId;
+        volatile long secs = 0;
+        volatile long startTs = 0;
     }
     public static final java.util.concurrent.ConcurrentHashMap<Integer, RecJob> recJobs =
         new java.util.concurrent.ConcurrentHashMap<>();
@@ -51,10 +51,10 @@ public class RecManager {
         } catch (Throwable ignored) {}
     }
 
-    public static void startRecJob(final String url) { startRecJob(url, null); }
+    static void startRecJob(final String url) { startRecJob(url, null); }
 
     /** title: 页面标题/分享文案，作为录制名 */
-    public static void startRecJob(final String url, final String title) {
+    static void startRecJob(final String url, final String title) {
         String u = url == null ? "" : url.trim();
         while (u.endsWith("\\") || u.endsWith("\"") || u.endsWith("'") || u.endsWith(",")) u = u.substring(0, u.length() - 1).trim();
         if (u.isEmpty() || !u.startsWith("http")) return;
