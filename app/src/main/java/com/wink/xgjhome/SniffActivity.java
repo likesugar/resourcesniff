@@ -34,7 +34,7 @@ import java.util.regex.Pattern;
 public class SniffActivity extends Activity {
 
     private static final Pattern MEDIA = Pattern.compile(
-        "\\.(m3u8|mp4|flv|mkv|avi|ts|webm|mp3|m4a|aac|flac|mov)(\\?|$)|\\.ts\\?|/stream/|media-worker", Pattern.CASE_INSENSITIVE);
+        "\\.(m3u8|mp4|flv|mkv|avi|ts|webm|mp3|m4a|aac|flac|mov|m4s|fmp4)(\\?|$)|\\.ts\\?|/stream/|media-worker|/live-bvc/|live-bvc", Pattern.CASE_INSENSITIVE);
     private static final Pattern URL_IN_TEXT = Pattern.compile(
         "(https?://|www\\.)[\\w\\-./?:#=&%+~@!$'*;,\\[\\]]+", Pattern.CASE_INSENSITIVE);
 
@@ -1140,7 +1140,7 @@ public class SniffActivity extends Activity {
                             String u = arr.optString(i);
                             if (u == null || u.length() < 12) continue;
                             String l = u.toLowerCase();
-                            if (!l.matches(".*\\.(ts|m4s|mp4|webm|flv|m3u8|mpd|aac|mp3|ogg|mov|mkv)(\\?|#|$).*")) continue;
+                            if (!l.matches(".*\\.(ts|m4s|mp4|webm|flv|m3u8|mpd|aac|mp3|ogg|mov|mkv|fmp4)(\\?|#|$).*") && !l.contains("live-bvc")) continue;
                             if (l.contains("bilivideo") || l.contains("upos-") || l.contains("127.0.0.1:8123")) continue;
                             String ext = ""; int dot = u.lastIndexOf('.');
                             if (dot > 0) { ext = u.substring(dot); int q = ext.indexOf('?'); if (q > 0) ext = ext.substring(0, q); }
