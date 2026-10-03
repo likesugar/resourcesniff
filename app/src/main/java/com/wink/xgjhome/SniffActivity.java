@@ -774,11 +774,14 @@ public class SniffActivity extends Activity {
     void recordGeneric(final String url) { recordGenericT(url, null); }
 
     void recordGenericT(final String url, final String forceTitle) {
-        if (!recordKeys.add(url)) return;
+        boolean ok = recordKeys.add(url);
+        dumpDiag("SC ADD: ok=" + ok + " url=" + url + " title=" + forceTitle);
+        if (!ok) return;
         foundUrls.add(url);
         final String page = webView.getTitle();
         runOnUiThread(new Runnable() { public void run() {
-            try { addRecord(url, forceTitle != null ? forceTitle : (page == null ? "" : page)); } catch (Throwable ignored) {}
+            try { addRecord(url, forceTitle != null ? forceTitle : (page == null ? "" : page)); }
+            catch (Throwable t) { dumpDiag("SC ADD ERR: " + t); }
         }});
     }
 
