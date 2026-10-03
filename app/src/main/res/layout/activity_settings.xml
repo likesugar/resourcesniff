@@ -27,7 +27,7 @@
                 android:text="平台账号" android:textSize="15sp" android:id="@+id/label1"
                 android:paddingTop="8dp" android:paddingBottom="14dp"/>
 
-            <LinearLayout
+            <LinearLayout android:id="@+id/card1"
                 android:layout_width="match_parent" android:layout_height="wrap_content"
                 android:orientation="vertical"
                 android:background="@drawable/bg_card"
@@ -106,7 +106,7 @@
                 android:text="链接与提醒" android:textSize="15sp" android:id="@+id/label2"
                 android:paddingTop="26dp" android:paddingBottom="14dp"/>
 
-            <LinearLayout
+            <LinearLayout android:id="@+id/card2"
                 android:layout_width="match_parent" android:layout_height="wrap_content"
                 android:orientation="vertical"
                 android:background="@drawable/bg_card"
@@ -132,7 +132,7 @@
                     android:textSize="14sp" android:id="@+id/desc4"/>
             </LinearLayout>
 
-            <LinearLayout
+            <LinearLayout android:id="@+id/card3"
                 android:layout_width="match_parent" android:layout_height="wrap_content"
                 android:orientation="vertical"
                 android:background="@drawable/bg_card"

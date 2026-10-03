@@ -131,6 +131,8 @@ public class SettingsActivity extends Activity {
         for (int id : subs) ((TextView) findViewById(id)).setTextColor(sub);
         int[] accents = {R.id.biliAction, R.id.dyAction, R.id.ytAction, R.id.btnClearAll, R.id.arrow, R.id.btnBack};
         for (int id : accents) ((TextView) findViewById(id)).setTextColor(accent);
+        int[] cards = {R.id.card1, R.id.card2, R.id.card3, R.id.cardNotify};
+        for (int id : cards) findViewById(id).setBackgroundColor(card);
         int[] divs = {R.id.div1, R.id.div2, R.id.div3};
         for (int id : divs) findViewById(id).setBackgroundColor(div);
         if (Build.VERSION.SDK_INT >= 23) {
