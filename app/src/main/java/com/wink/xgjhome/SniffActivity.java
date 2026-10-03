@@ -55,6 +55,7 @@ public class SniffActivity extends Activity {
     private final java.util.Set<String> recordKeys = java.util.Collections.synchronizedSet(new LinkedHashSet<String>());
     // 同一路流按画质去重：baseKey -> [rank, url, tv, tvUrl]
     private final java.util.HashMap<String, Object[]> recByBase = new java.util.HashMap<>();
+    static volatile int biliSeq = 100;  // B站直播刷新序号：每次master/url递增，新地址原地替换旧地址
 
     static int qualRank(String u) {
         if (u.contains("_or4")) return 3;
@@ -310,11 +311,13 @@ public class SniffActivity extends Activity {
                                 final String jstr = new String(body2, "UTF-8");
                                 dumpFc2Debug("MASTERURL head: " + jstr.substring(0, Math.min(300, jstr.length())));
                                 String qn = "直播";
-                                java.util.regex.Matcher qm = java.util.regex.Pattern.compile("\"current_qn\":(\\d+)").matcher(jstr);
+                                java.util.regex.Matcher qm = java.util.regex.Pattern.compile("\"current_qn\"\\s*:\\s*(\\d+)").matcher(jstr);
+                                if (!qm.find()) qm = java.util.regex.Pattern.compile("\"qn\"\\s*:\\s*(\\d+)").matcher(jstr);
                                 if (qm.find()) {
                                     long q = Long.parseLong(qm.group(1));
                                     qn = q >= 30000 ? "杜比" : q >= 25000 ? "4K" : q >= 10000 ? "原画" : q >= 400 ? "蓝光" : q >= 250 ? "超清" : q >= 150 ? "高清" : "流畅";
                                 }
+                                biliSeq++;
                                 final String qTitle = "B站直播·" + qn;
                                 java.util.ArrayList<String> urls = new java.util.ArrayList<String>();
                                 java.util.regex.Matcher mm = java.util.regex.Pattern
@@ -1382,15 +1385,22 @@ public class SniffActivity extends Activity {
             }
         } catch (Throwable ignored) {}
         // 同一路流只留一条最高画质：原画(_or4) > 蓝光(_uhd) > 高清(_hd)
-        final int rank = qualRank(url);
-        final String bk = baseKey(url);
+        boolean isBiliLive = title != null && title.startsWith("B站直播");
+        final int rank = isBiliLive ? biliSeq : qualRank(url);
+        final String bk = isBiliLive ? url.substring(0, url.indexOf('?') > 0 ? url.indexOf('?') : url.length())
+                                     : baseKey(url);
         if (recByBase.containsKey(bk)) {
             Object[] prev = recByBase.get(bk);
             int pr = (Integer) prev[0];
-            if (rank <= pr) return;  // 已有更高或同等画质，丢弃
-            prev[0] = rank; prev[1] = url;  // 原地升级为更高画质
-            String qn = qualName(rank);
-            ((TextView) prev[2]).setText(qn == null ? title : "抖音·" + qn);
+            if (rank < pr || (rank == pr && !isBiliLive)) return;  // 已有更高或同等画质，丢弃
+            // B站直播：新地址(带新有效期)原地替换旧地址，记录永不过期
+            prev[0] = rank; prev[1] = url;
+            if (isBiliLive) {
+                ((TextView) prev[2]).setText(title);
+            } else {
+                String qn = qualName(rank);
+                ((TextView) prev[2]).setText(qn == null ? title : "抖音·" + qn);
+            }
             ((TextView) prev[3]).setText(url);
             return;
         }
