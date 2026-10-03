@@ -14,9 +14,9 @@ import android.widget.Toast;
 public class SettingsActivity extends Activity {
 
     private static final String[][] PLATFORMS = {
-            {"哔哩哔哩", "https://passport.bilibili.com/h5-app/login", "SESSDATA="},
-            {"抖音", "https://www.douyin.com/", "sessionid="},
-            {"YouTube", "https://m.youtube.com/", "SAPISID="},
+            {"哔哩哔哩", "https://passport.bilibili.com/h5-app/passport/login", "SESSDATA="},
+            {"抖音", "https://www.douyin.com/jingxuan", "sessionid="},
+            {"YouTube", "https://www.youtube.com/signin?next=%2F&hl=zh-CN", "SAPISID="},
     };
 
     private boolean dark;
