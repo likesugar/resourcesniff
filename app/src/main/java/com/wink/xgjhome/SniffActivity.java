@@ -134,6 +134,17 @@ public class SniffActivity extends Activity {
             }
 
             @android.webkit.JavascriptInterface
+            public void onGenericMedia(String url, String why) {
+                if (url == null || url.length() < 12) return;
+                String ext = "";
+                int dot = url.lastIndexOf('.');
+                if (dot > 0) { ext = url.substring(dot); int q = ext.indexOf('?'); if (q > 0) ext = ext.substring(0, q); }
+                final String t = "嗅探·" + (ext.isEmpty() ? "媒体" : ext.substring(1));
+                final String u = url;
+                main.post(new Runnable() { public void run() { try { addRecord(u, t); } catch (Throwable ignored) {} } });
+            }
+
+            @android.webkit.JavascriptInterface
             public void onHlsJson(String data) {
                 if (data == null || !data.contains("url")) return;
                 String best = null; int bestMode = -1;
@@ -303,6 +314,11 @@ public class SniffActivity extends Activity {
 
             @Override
             public void onPageFinished(WebView view, String url) {
+                // cat-catch 式通用媒体嗅探：全站注入
+                try {
+                    String cc = readAsset("catcatch.js");
+                    if (cc != null) view.evaluateJavascript(cc, null);
+                } catch (Throwable ignored) {}
                 if (url != null && (url.contains("douyin.com") || url.contains("iesdouyin"))) {
                     injectDouyinScript();
                 }
