@@ -68,16 +68,6 @@ public class HomeActivity extends Activity {
         if (hasFocus) applyImmersive();
     }
 
-    private void restylePill(android.widget.FrameLayout thumb, TextView[] segs, int sel, int inset, int tabW) {
-        android.widget.FrameLayout.LayoutParams lp = (android.widget.FrameLayout.LayoutParams) thumb.getLayoutParams();
-        lp.leftMargin = inset + sel * tabW;
-        thumb.setLayoutParams(lp);
-        for (int i = 0; i < 2; i++) {
-            segs[i].setTextColor(i == sel ? 0xFFFFFFFF : 0xFF5F6B7A);
-            segs[i].setTypeface(i == sel ? Typeface.DEFAULT_BOLD : Typeface.DEFAULT);
-        }
-    }
-
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -120,6 +110,38 @@ public class HomeActivity extends Activity {
                 catch (Throwable t) {
                     android.widget.Toast.makeText(HomeActivity.this, "打开失败: " + t, android.widget.Toast.LENGTH_LONG).show();
                 }
+            }
+        });
+        findViewById(R.id.cardDownload).setOnClickListener(new View.OnClickListener() {
+            public void onClick(View v) { startActivity(new Intent(HomeActivity.this, RecordActivity.class)); }
+        });
+        findViewById(R.id.cardVideoDl).setOnClickListener(new View.OnClickListener() {
+            public void onClick(View v) {
+                try { startActivity(new Intent(HomeActivity.this, com.daxiaamu.dbdown.MainActivity.class)); }
+                catch (Throwable t) {
+                    android.widget.Toast.makeText(HomeActivity.this, "打开失败: " + t, android.widget.Toast.LENGTH_LONG).show();
+                }
+            }
+        });
+        findViewById(R.id.cardSettings).setOnClickListener(new View.OnClickListener() {
+            public void onClick(View v) {
+                try {
+                    Intent i = new Intent(HomeActivity.this, com.daxiaamu.dbdown.MainActivity.class);
+                    i.putExtra("settings", true);
+                    startActivity(i);
+                } catch (Throwable t) {
+                    android.widget.Toast.makeText(HomeActivity.this, "打开失败: " + t, android.widget.Toast.LENGTH_LONG).show();
+                }
+            }
+        });
+        findViewById(R.id.pillHome).setOnClickListener(new View.OnClickListener() {
+            public void onClick(View v) { }  // 已在首页
+        });
+        findViewById(R.id.pillDl).setOnClickListener(new View.OnClickListener() {
+            public void onClick(View v) {
+                Intent i = new Intent(HomeActivity.this, RecordActivity.class);
+                i.putExtra("tab", 0);
+                startActivity(i);
             }
         });
 
