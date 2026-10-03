@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <application>
+        <provider android:name="androidx.core.content.FileProvider" android:authorities="${applicationId}.updates"
+            android:exported="false" android:grantUriPermissions="true">
+            <meta-data android:name="android.support.FILE_PROVIDER_PATHS" android:resource="@xml/update_paths" />
+        </provider>
+        <activity android:name=".LoginActivity" android:exported="false" android:launchMode="singleTask" android:windowSoftInputMode="adjustResize" />
+        <activity android:name=".MainActivity" android:exported="false" android:launchMode="singleTop" android:windowSoftInputMode="adjustResize" android:theme="@style/Theme.DBDown">
+            <intent-filter>
+                <action android:name="android.intent.action.SEND" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="text/plain" />
+            </intent-filter>
+        </activity>
+        <service android:name=".DownloadService" android:exported="false" android:foregroundServiceType="dataSync" />
+    </application>
+</manifest>

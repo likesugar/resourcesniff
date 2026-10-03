@@ -107,6 +107,25 @@ public class HomeActivity extends Activity {
                 startActivity(new Intent(HomeActivity.this, RecordActivity.class));
             }
         });
+        findViewById(R.id.cardVideoDl).setOnClickListener(new View.OnClickListener() {
+            public void onClick(View v) {
+                try { startActivity(new Intent(HomeActivity.this, com.daxiaamu.dbdown.MainActivity.class)); }
+                catch (Throwable t) {
+                    android.widget.Toast.makeText(HomeActivity.this, "打开失败: " + t, android.widget.Toast.LENGTH_LONG).show();
+                }
+            }
+        });
+        findViewById(R.id.cardSettings).setOnClickListener(new View.OnClickListener() {
+            public void onClick(View v) {
+                try {
+                    Intent i = new Intent(HomeActivity.this, com.daxiaamu.dbdown.MainActivity.class);
+                    i.putExtra("settings", true);
+                    startActivity(i);
+                } catch (Throwable t) {
+                    android.widget.Toast.makeText(HomeActivity.this, "打开失败: " + t, android.widget.Toast.LENGTH_LONG).show();
+                }
+            }
+        });
         findViewById(R.id.lanToggle).setOnClickListener(new View.OnClickListener() {
             public void onClick(View v) { showLanDialog(); }
         });
