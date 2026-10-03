@@ -735,6 +735,19 @@ public class SniffActivity extends Activity {
             if (url == null || url.length() < 20) return;
             if (diagActive || url.contains("stripchat")) dumpDiag("WEBREQ: " + method + " " + url);
             if (url.contains("127.0.0.1:8123")) return;
+            // stripchat/doppiocdn 低延迟HLS：去掉动态 _HLS_msn/_HLS_part 参数后入库，标题带画质
+            String ll = url.toLowerCase();
+            if (ll.contains("doppiocdn.net") && ll.contains(".m3u8")) {
+                android.net.Uri uu = android.net.Uri.parse(url);
+                String key = "sc#" + uu.getHost() + uu.getPath();
+                if (recordKeys.add(key)) {
+                    String cu = url.replaceAll("(&|\\?)_HLS_msn=\\d+", "").replaceAll("(&|\\?)_HLS_part=\\d+", "");
+                    java.util.regex.Matcher pm2 = java.util.regex.Pattern.compile("_(\\d+p)\\.m3u8").matcher(url);
+                    String t = "Stripchat" + (pm2.find() ? "·" + pm2.group(1) : "");
+                    recordGenericT(cu, t);
+                }
+                return;
+            }
             // 调试：B站全量请求落日志（用户回传 fc2_debug.txt 定位直播流）
             if (url.contains("bilibili") || url.contains("b23.tv")) {
                 dumpFc2Debug("BREQ: " + method + " " + url);
@@ -757,12 +770,14 @@ public class SniffActivity extends Activity {
         } catch (Throwable ignored) {}
     }
 
-    void recordGeneric(final String url) {
+    void recordGeneric(final String url) { recordGenericT(url, null); }
+
+    void recordGenericT(final String url, final String forceTitle) {
         if (!recordKeys.add(url)) return;
         foundUrls.add(url);
         final String page = webView.getTitle();
         runOnUiThread(new Runnable() { public void run() {
-            try { addRecord(url, page == null ? "" : page); } catch (Throwable ignored) {}
+            try { addRecord(url, forceTitle != null ? forceTitle : (page == null ? "" : page)); } catch (Throwable ignored) {}
         }});
     }
 
