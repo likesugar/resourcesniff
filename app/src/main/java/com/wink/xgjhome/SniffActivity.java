@@ -192,7 +192,7 @@ public class SniffActivity extends Activity {
 
             @Override
             public WebResourceResponse shouldInterceptRequest(WebView view, WebResourceRequest request) {
-                try { maybeRecordGeneric(request.getUrl().toString()); } catch (Throwable ignored) {}
+                try { maybeRecordGeneric(request.getUrl().toString(), request.getMethod()); } catch (Throwable ignored) {}
                 try {
                     if (!"GET".equalsIgnoreCase(request.getMethod())) return null;
                     Uri u = request.getUrl();
@@ -594,10 +594,15 @@ public class SniffActivity extends Activity {
     private static final java.util.regex.Pattern ASSET_EXT = java.util.regex.Pattern.compile(
             "\\.(js|css|png|jpe?g|gif|webp|ico|woff2?|svg|ttf|eot|html?|xml|json)(\\?|$)", java.util.regex.Pattern.CASE_INSENSITIVE);
 
-    void maybeRecordGeneric(final String url) {
+    void maybeRecordGeneric(final String url) { maybeRecordGeneric(url, "GET"); }
+    void maybeRecordGeneric(final String url, final String method) {
         try {
             if (url == null || url.length() < 20) return;
-            if (url.contains("127.0.0.1:8123") || url.contains("/log/")) return;
+            if (url.contains("127.0.0.1:8123")) return;
+            // 调试：B站全量请求落日志（用户回传 fc2_debug.txt 定位直播流）
+            if (url.contains("bilibili") || url.contains("b23.tv")) {
+                dumpFc2Debug("BREQ: " + method + " " + url);
+            }
             String l = url.toLowerCase();
             int q = l.indexOf('?');
             String base = q > 0 ? l.substring(0, q) : l;
