@@ -289,6 +289,45 @@ public class SniffActivity extends Activity {
                             }
                         } catch (Throwable e) { }
                     }
+                    // B站直播（PC 播放器）：截 play-gateway/master/url 响应，正则提取流地址
+                    if (url.contains("api.live.bilibili.com") && url.contains("play-gateway/master/url")) {
+                        try {
+                            java.net.HttpURLConnection hc = (java.net.HttpURLConnection) new java.net.URL(url).openConnection();
+                            hc.setConnectTimeout(10000); hc.setReadTimeout(15000);
+                            for (java.util.Map.Entry<String, String> h : request.getRequestHeaders().entrySet()) {
+                                String k = h.getKey(), v = h.getValue();
+                                if (k.equalsIgnoreCase("cookie")) hc.setRequestProperty("Cookie", v);
+                                else if (!k.equalsIgnoreCase("accept-encoding") && !k.equalsIgnoreCase("host") && !k.equalsIgnoreCase("connection"))
+                                    hc.setRequestProperty(k, v);
+                            }
+                            if (hc.getResponseCode() == 200) {
+                                java.io.InputStream hin = hc.getInputStream();
+                                java.io.ByteArrayOutputStream bo2 = new java.io.ByteArrayOutputStream();
+                                byte[] bb = new byte[8192]; int nn;
+                                while ((nn = hin.read(bb)) > 0) bo2.write(bb, 0, nn);
+                                hin.close(); hc.disconnect();
+                                byte[] body2 = bo2.toByteArray();
+                                final String jstr = new String(body2, "UTF-8");
+                                dumpFc2Debug("MASTERURL head: " + jstr.substring(0, Math.min(300, jstr.length())));
+                                java.util.ArrayList<String> urls = new java.util.ArrayList<String>();
+                                java.util.regex.Matcher mm = java.util.regex.Pattern
+                                        .compile("https?:\\/\\/[^\"\\\\\\s,]+")
+                                        .matcher(jstr);
+                                while (mm.find()) {
+                                    String cand = mm.group().replace("\\/", "/");
+                                    if (cand.contains("live-bvc") || cand.contains(".m3u8") || cand.contains(".flv")) urls.add(cand);
+                                }
+                                for (final String su : urls) {
+                                    runOnUiThread(new Runnable() { public void run() {
+                                        try { if (recordKeys.add("bili#" + su)) addRecord(su, "B站直播"); } catch (Throwable ignored) {}
+                                    }});
+                                }
+                                dumpFc2Debug("MASTERURL: " + urls.size() + " urls");
+                                return new android.webkit.WebResourceResponse("application/json", "UTF-8",
+                                        new java.io.ByteArrayInputStream(body2));
+                            }
+                        } catch (Throwable t) { dumpFc2Debug("MASTERURL fail " + t); }
+                    }
                     // B站直播：截 getRoomPlayInfo 的 JSON 响应，直接解析流地址进记录
                     if (url.contains("api.live.bilibili.com") && url.contains("getRoomPlayInfo")) {
                         try {
