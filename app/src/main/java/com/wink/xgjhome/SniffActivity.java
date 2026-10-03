@@ -443,15 +443,9 @@ public class SniffActivity extends Activity {
         static final java.util.Set<String> parsed = new java.util.HashSet<String>();
 
         static String storedCookies(android.content.Context c) {
-            android.content.SharedPreferences sp =
-                    c.getSharedPreferences("bili", android.content.Context.MODE_PRIVATE);
-            long t = sp.getLong("time", 0);
-            // Cookie 有效期约 7 天：到期或无时间戳即删除，触发重新登录
-            if (t > 0 && System.currentTimeMillis() - t > 7L * 24 * 3600 * 1000) {
-                sp.edit().remove("cookies").remove("time").apply();
-                return null;
-            }
-            return sp.getString("cookies", null);
+            // 统一走全局 CookieManager（与"设置-平台账号"网页登录同一份 Cookie）
+            try { return android.webkit.CookieManager.getInstance().getCookie("https://www.bilibili.com"); }
+            catch (Throwable t) { return null; }
         }
 
         static void tryParse(final SniffActivity act, String pageUrl) {
@@ -481,7 +475,7 @@ public class SniffActivity extends Activity {
                                     .setNegativeButton("取消", null)
                                     .setPositiveButton("去登录", new android.content.DialogInterface.OnClickListener() {
                                         public void onClick(android.content.DialogInterface d, int w) {
-                                            act.startActivity(new android.content.Intent(act, BiliLoginActivity.class));
+                                            act.startActivity(new android.content.Intent(act, com.daxiaamu.dbdown.LoginActivity.class).putExtra("platform", "BILI"));
                                         }
                                     })
                                     .show();

@@ -67,7 +67,7 @@ public class RecordActivity extends Activity {
         head.setGravity(Gravity.CENTER_VERTICAL);
         head.setPadding(0, 0, 0, 20);
         TextView title = new TextView(this);
-        title.setText("下载");
+        title.setText("资源下载页");
         title.setTextSize(22);
         title.setTypeface(Typeface.DEFAULT_BOLD);
         title.setTextColor(Color.WHITE);
