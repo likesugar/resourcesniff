@@ -289,6 +289,63 @@ public class SniffActivity extends Activity {
                             }
                         } catch (Throwable e) { }
                     }
+                    // B站直播：截 getRoomPlayInfo 的 JSON 响应，直接解析流地址进记录
+                    if (url.contains("api.live.bilibili.com") && url.contains("getRoomPlayInfo")) {
+                        try {
+                            java.net.HttpURLConnection hc = (java.net.HttpURLConnection) new java.net.URL(url).openConnection();
+                            hc.setConnectTimeout(10000); hc.setReadTimeout(15000);
+                            for (java.util.Map.Entry<String, String> h : request.getRequestHeaders().entrySet()) {
+                                String k = h.getKey(), v = h.getValue();
+                                if (k.equalsIgnoreCase("cookie")) hc.setRequestProperty("Cookie", v);
+                                else if (!k.equalsIgnoreCase("accept-encoding") && !k.equalsIgnoreCase("host") && !k.equalsIgnoreCase("connection"))
+                                    hc.setRequestProperty(k, v);
+                            }
+                            int code = hc.getResponseCode();
+                            if (code == 200) {
+                                java.io.InputStream hin = hc.getInputStream();
+                                java.io.ByteArrayOutputStream bo2 = new java.io.ByteArrayOutputStream();
+                                byte[] bb = new byte[8192]; int nn;
+                                while ((nn = hin.read(bb)) > 0) bo2.write(bb, 0, nn);
+                                hin.close(); hc.disconnect();
+                                byte[] body2 = bo2.toByteArray();
+                                final String jstr = new String(body2, "UTF-8");
+                                new Thread(new Runnable() { public void run() {
+                                    try {
+                                        org.json.JSONObject root = new org.json.JSONObject(jstr);
+                                        org.json.JSONArray list = root.optJSONObject("data") == null ? null
+                                                : root.optJSONObject("data").optJSONObject("play_url_info") == null ? null
+                                                : root.optJSONObject("data").optJSONObject("play_url_info").optJSONArray("play_url_list");
+                                        java.util.ArrayList<String> urls = new java.util.ArrayList<String>();
+                                        if (list != null) {
+                                            for (int i = 0; i < list.length(); i++) {
+                                                org.json.JSONObject item = list.optJSONObject(i);
+                                                if (item == null) continue;
+                                                String bu = item.optString("base_url", "");
+                                                String ex = item.optString("extra", "");
+                                                if (bu.startsWith("http")) urls.add(bu + (ex.startsWith("?") ? ex : ""));
+                                            }
+                                        }
+                                        if (urls.isEmpty()) {  // 结构兜底：正则抓 live-bvc 地址
+                                            java.util.regex.Matcher mm = java.util.regex.Pattern
+                                                    .compile("https?:\\/\\/[^\"\\\\\\s]+(?:live-bvc|\\.m3u8|\\.flv)[^\"\\\\\\s]*")
+                                                    .matcher(jstr);
+                                            while (mm.find()) urls.add(mm.group().replace("\\/", "/"));
+                                        }
+                                        for (final String su : urls) {
+                                            if (su.contains("live-bvc") || su.contains(".m3u8") || su.contains(".flv")) {
+                                                runOnUiThread(new Runnable() { public void run() {
+                                                    try { if (recordKeys.add("bili#" + su)) addRecord(su, "B站直播"); } catch (Throwable ignored) {}
+                                                }});
+                                            }
+                                        }
+                                        dumpFc2Debug("ROOMPLAY: " + urls.size() + " urls");
+                                    } catch (Throwable t) { dumpFc2Debug("ROOMPLAY err " + t); }
+                                }}).start();
+                                return new android.webkit.WebResourceResponse("application/json", "UTF-8",
+                                        new java.io.ByteArrayInputStream(body2));
+                            }
+                        } catch (Throwable t) { dumpFc2Debug("ROOMPLAY fail " + t); }
+                    }
                     maybeRecordDouyin(url);
                     if (isMediaUrl(url) && recordKeys.add(url)) {
                         foundUrls.add(url);
