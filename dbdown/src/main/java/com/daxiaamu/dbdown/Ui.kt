@@ -547,7 +547,7 @@ private val paths = mapOf(
         Surface(shape = RoundedCornerShape(22.dp)) {
             Column(Modifier.fillMaxWidth().padding(20.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 Text("保存位置", style = MaterialTheme.typography.titleMedium)
-                Text("视频：Movies / 逗逼下载器\n图片：Pictures / 逗逼下载器\n配乐：Music / 逗逼下载器", style = MaterialTheme.typography.bodyLarge)
+                Text("视频：Movies / 视频下载\n图片：Pictures / 图片保存\n配乐：Music / 配乐", style = MaterialTheme.typography.bodyLarge)
                 Text("视频和图片保存到系统相册，独立配乐保存到音乐目录。B 站和 YouTube 音视频自动合并；抖音图集按原始素材保存，图片与配乐分开下载。",
                     style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }

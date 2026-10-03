@@ -32,9 +32,13 @@ public class RecordActivity extends Activity {
     private void restyleTabs() {
         for (int i = 0; i < tabBtns.length; i++) {
             boolean sel = i == curTab;
-            tabBtns[i].setTextColor(sel ? Color.WHITE : 0xFF8A919E);
+            // 圆角筛选chip样式（对齐"视频下载"页 全部/进行中/已完成）
+            android.graphics.drawable.GradientDrawable bg = new android.graphics.drawable.GradientDrawable();
+            bg.setCornerRadius(50 * getResources().getDisplayMetrics().density);
+            bg.setColor(sel ? 0xFFE7EDFD : 0xFFF2F4F8);
+            tabBtns[i].setBackground(bg);
+            tabBtns[i].setTextColor(sel ? 0xFF315CDE : 0xFF8A919E);
             tabBtns[i].setTypeface(sel ? Typeface.DEFAULT_BOLD : Typeface.DEFAULT);
-            tabLines[i].setBackgroundColor(sel ? 0xFF3D7BFF : 0x00000000);
         }
     }
 
@@ -108,26 +112,19 @@ public class RecordActivity extends Activity {
         tabLines = new View[tabs.length];
         for (int i = 0; i < tabs.length; i++) {
             final int idx = i;
-            LinearLayout tc = new LinearLayout(this);
-            tc.setOrientation(LinearLayout.VERTICAL);
-            tc.setGravity(Gravity.CENTER_HORIZONTAL);
-            LinearLayout.LayoutParams tlp = new LinearLayout.LayoutParams(0, -2, 1f);
-            tc.setLayoutParams(tlp);
             TextView tb = new TextView(this);
             tb.setText(tabs[i]);
-            tb.setTextSize(15);
+            tb.setTextSize(14);
             tb.setGravity(Gravity.CENTER);
-            tb.setPadding(0, 16, 0, 12);
+            tb.setPadding(28, 16, 28, 16);
+            LinearLayout.LayoutParams tlp = new LinearLayout.LayoutParams(-2, -2);
+            tlp.rightMargin = (int)(8 * getResources().getDisplayMetrics().density);
+            tb.setLayoutParams(tlp);
             tb.setOnClickListener(new View.OnClickListener() {
                 public void onClick(View v) { curTab = idx; restyleTabs(); rebuild(); }
             });
-            View line = new View(this);
-            line.setBackgroundColor(0x00000000);
-            tc.addView(tb, new LinearLayout.LayoutParams(-1, -2));
-            tc.addView(line, new LinearLayout.LayoutParams(-1, 4));
             tabBtns[i] = tb;
-            tabLines[i] = line;
-            tabBar.addView(tc);
+            tabBar.addView(tb);
         }
         restyleTabs();
         col.addView(tabBar);

@@ -178,7 +178,7 @@ class DownloadService : Service() {
         val measuredFps = savedFrameRate(this@DownloadService,uri.toString())
         store.update(task.id) { it.copy(status = TaskStatus.COMPLETED, uri = uri.toString(),
             resolution = measured.ifBlank { it.resolution }, fps = measuredFps.takeIf { it > 0 } ?: it.fps, bytes = progress.snapshot().bytes, total = progress.snapshot().bytes, speed = 0, error = "") }
-        notifyResult(task.id, info.title, "已保存到 Movies/逗逼下载器", uri)
+        notifyResult(task.id, info.title, "已保存到 Movies/视频下载", uri)
     }
 
     private suspend fun downloadAlbum(task: DownloadTask, info: VideoInfo, dir: File, progress: TaskTransferProgress) {
@@ -356,7 +356,7 @@ class DownloadService : Service() {
         val values = ContentValues().apply {
             put(MediaStore.Video.Media.DISPLAY_NAME, "$clean-${id.take(12)}${if(motion) "_MP" else ""}.$extension")
             put(MediaStore.Video.Media.MIME_TYPE, mime)
-            put(MediaStore.Video.Media.RELATIVE_PATH, "${if(image) Environment.DIRECTORY_PICTURES else if(audio) Environment.DIRECTORY_MUSIC else Environment.DIRECTORY_MOVIES}/逗逼下载器")
+            put(MediaStore.Video.Media.RELATIVE_PATH, "${when { image -> Environment.DIRECTORY_PICTURES; audio -> Environment.DIRECTORY_MUSIC; else -> Environment.DIRECTORY_MOVIES }}/${when { image -> "图片保存"; audio -> "配乐"; else -> "视频下载" }}")
             put(MediaStore.Video.Media.IS_PENDING, 1)
         }
         val uri = contentResolver.insert(if(image) MediaStore.Images.Media.EXTERNAL_CONTENT_URI else if(audio) MediaStore.Audio.Media.EXTERNAL_CONTENT_URI else MediaStore.Video.Media.EXTERNAL_CONTENT_URI, values) ?: error("无法创建视频文件")
