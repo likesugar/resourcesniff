@@ -152,16 +152,12 @@ private val paths = mapOf(
     val messagesLifecycle = androidx.lifecycle.compose.LocalLifecycleOwner.current.lifecycle
     LaunchedEffect(vm, messagesLifecycle) {
         messagesLifecycle.repeatOnLifecycle(androidx.lifecycle.Lifecycle.State.RESUMED) {
-            while(true) { vm.refreshHomeMessages(); delay(300_000) }
         }
     }
     val tasks by vm.store.tasks.collectAsStateWithLifecycle()
     val paused by vm.store.paused.collectAsStateWithLifecycle()
     val context = LocalContext.current
     val haze = remember { HazeState() }
-    val updateHaze = remember { HazeState() }
-    val updateManager = (context.applicationContext as DownloaderApp).updates
-    val updateState by updateManager.state.collectAsStateWithLifecycle()
     val topInset = WindowInsets.statusBars.asPaddingValues().calculateTopPadding() + 72.dp
     val blurFadeStart = with(LocalDensity.current) { (topInset - 20.dp).toPx() }
     val blurFadeEnd = with(LocalDensity.current) { (topInset + 24.dp).toPx() }
@@ -176,40 +172,32 @@ private val paths = mapOf(
         snapshotFlow { if(pager.isScrollInProgress) null else pager.settledPage }
             .collect { page -> if(page != null) vm.onPageSettled(page) }
     }
-    BackHandler(vm.settings || pager.currentPage != 0) { if(vm.settings) vm.settings = false else vm.tab = 0 }
+    BackHandler(vm.settings) { (context as? android.app.Activity)?.finish() }
     LaunchedEffect(vm.notice) {
         vm.notice?.let { Toast.makeText(context, it, Toast.LENGTH_SHORT).show(); vm.notice = null }
     }
-    Surface(Modifier.fillMaxSize().then(if(updateState.dialog) Modifier.hazeSource(updateHaze) else Modifier),
+    Surface(Modifier.fillMaxSize(),
         color = MaterialTheme.colorScheme.background) {
         Box(Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal + WindowInsetsSides.Bottom))) {
             Box(Modifier.fillMaxSize().hazeSource(haze)) {
                 if(vm.settings) {
                     SettingsPage(vm, topInset) { enabled -> vm.setClipboard(enabled); if(enabled) checkClipboard() }
-                } else HorizontalPager(
-                    state = pager, modifier = Modifier.fillMaxSize().testTag("pages"),
-                    beyondViewportPageCount = 1, key = { it }
-                ) { page ->
-                    if(page == 0) {
-                    Box(Modifier.fillMaxSize().testTag("homePage").padding(top = topInset).padding(horizontal = 28.dp).padding(bottom = 120.dp), contentAlignment = Alignment.Center) {
-                        Column(Modifier.widthIn(max = 540.dp).fillMaxWidth()) {
-                        // Reserve the carousel and its gap even before remote messages arrive.
-                        Column(Modifier.fillMaxWidth().height(60.dp)) {
-                            HomeMessageCarousel(vm.homeMessages, pager.currentPage == 0 && !vm.inputVisible)
-                        }
-                        Surface(onClick = { vm.openInput() }, modifier = Modifier.widthIn(max = 540.dp).fillMaxWidth().height(66.dp),
+                } else {
+                    Column(Modifier.fillMaxSize()) {
+                        Surface(onClick = { vm.openInput() }, modifier = Modifier.fillMaxWidth().padding(top = topInset, start = 28.dp, end = 28.dp).height(66.dp),
                             shape = RoundedCornerShape(22.dp), color = MaterialTheme.colorScheme.surface,
                             shadowElevation = 2.dp) {
                             Row(Modifier.padding(horizontal = 20.dp), verticalAlignment = Alignment.CenterVertically,
                                 horizontalArrangement = Arrangement.spacedBy(14.dp)) {
                                 Glyph("link", tint = MaterialTheme.colorScheme.primary)
                                 Text("粘贴视频链接", color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.weight(1f))
-                                HomePasteButton(pager.currentPage == 0 && !vm.inputVisible, vm::openInput)
+                                HomePasteButton(!vm.inputVisible, vm::openInput)
                             }
                         }
+                        Box(Modifier.weight(1f)) {
+                            DownloadsPage(tasks, vm, requestNotifications, topInset)
                         }
                     }
-                } else DownloadsPage(tasks, vm, requestNotifications, topInset)
                 }
             }
             // Extend just the backdrop; layout and touch targets keep their original bounds.
@@ -223,12 +211,12 @@ private val paths = mapOf(
                 Row(Modifier.fillMaxWidth().statusBarsPadding().height(72.dp).padding(horizontal = 20.dp),
                     verticalAlignment = Alignment.CenterVertically) {
                     if(vm.settings) {
-                        IconButton(onClick = { vm.settings = false }) { Glyph("back", "返回") }
+                        IconButton(onClick = { (context as? android.app.Activity)?.finish() }) { Glyph("back", "返回") }
                         Text("设置", style = MaterialTheme.typography.titleLarge)
                     } else {
-                        Text(if(pager.currentPage == 0) androidx.compose.ui.res.stringResource(R.string.app_name) else "下载", style = MaterialTheme.typography.titleLarge,
+                        Text("视频下载", style = MaterialTheme.typography.titleLarge,
                             modifier = Modifier.weight(1f))
-                        if(pager.currentPage == 1) {
+                        run {
                             if(tasks.any { it.status.pending }) {
                                 IconButton(onClick = {
                                     if(paused) { vm.resumeDownloads(); requestNotifications() } else vm.pauseDownloads()
@@ -245,17 +233,12 @@ private val paths = mapOf(
                         IconButton(onClick = { vm.settings = true }) { Glyph("settings", "设置") }
                     }
                 }
-            if(!vm.settings) {
-                FloatingTabs(pager, haze,
-                    Modifier.align(Alignment.BottomCenter).padding(bottom = 18.dp)) { vm.tab = it }
-            }
             ClipboardSuggestionOverlay(vm, haze, requestNotifications)
         }
     }
     if(vm.inputVisible) LinkDialog(vm) { if(vm.submit()) requestNotifications() }
     DeleteTasksDialog(vm)
     SpecificationDialog(vm.specificationEditor)
-    com.daxiaamu.dbdown.update.UpdateOverlay(updateManager, updateHaze)
 }
 
 
@@ -341,7 +324,7 @@ private val paths = mapOf(
         else -> tasks
     }
     LazyColumn(state = listState, modifier = Modifier.fillMaxSize().testTag("downloadList"),
-        contentPadding = PaddingValues(top = topInset, bottom = 110.dp),
+        contentPadding = PaddingValues(top = topInset + 74.dp, bottom = 110.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)) {
         item(key = "filters") { Row(Modifier.padding(horizontal = 24.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             listOf("全部", "进行中", "已完成").forEachIndexed { index, title ->
@@ -564,11 +547,10 @@ private val paths = mapOf(
         Surface(shape = RoundedCornerShape(22.dp)) {
             Column(Modifier.fillMaxWidth().padding(20.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 Text("保存位置", style = MaterialTheme.typography.titleMedium)
-                Text("视频：Movies / 逗逼下载器\n图片：Pictures / 逗逼下载器", style = MaterialTheme.typography.bodyLarge)
+                Text("视频：Movies / 逗逼下载器\n图片：Pictures / 逗逼下载器\n配乐：Music / 逗逼下载器", style = MaterialTheme.typography.bodyLarge)
                 Text("视频和图片保存到系统相册，独立配乐保存到音乐目录。B 站和 YouTube 音视频自动合并；抖音图集按原始素材保存，图片与配乐分开下载。",
                     style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
-        com.daxiaamu.dbdown.update.AboutUpdateCard()
     }
 }

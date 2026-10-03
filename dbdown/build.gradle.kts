@@ -35,4 +35,5 @@ dependencies {
     implementation("androidx.media3:media3-muxer:1.9.0")
     implementation("androidx.media3:media3-exoplayer-dash:1.9.0")
     implementation("androidx.media3:media3-exoplayer-hls:1.9.0")
+
 }

@@ -31,7 +31,6 @@ class MainActivity : ComponentActivity() {
         lifecycleScope.launch {
             repeatOnLifecycle(Lifecycle.State.RESUMED) {
                 delay(2000)
-                (application as DownloaderApp).updates.check(false)
                 awaitCancellation()
             }
         }
@@ -59,7 +58,7 @@ class MainActivity : ComponentActivity() {
     override fun onResume() {
         super.onResume()
         WebAccounts.refresh()
-        window.decorView.post { checkClipboard(); (application as DownloaderApp).updates.onResume(this) }
+        window.decorView.post { checkClipboard() }
     }
     override fun onWindowFocusChanged(hasFocus: Boolean) {
         super.onWindowFocusChanged(hasFocus)

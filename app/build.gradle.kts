@@ -10,8 +10,8 @@ android {
         ndk { abiFilters += listOf("arm64-v8a") }
         minSdk = 29
         targetSdk = 36
-        versionCode = 349
-        versionName = "232.0"
+        versionCode = 351
+        versionName = "233.0"
     }
     signingConfigs {
         create("dist") {
@@ -47,4 +47,6 @@ dependencies {
     implementation(files("libs/ffk-classes.jar"))
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
     implementation("androidx.core:core-ktx:1.18.0")
+
 }
+
