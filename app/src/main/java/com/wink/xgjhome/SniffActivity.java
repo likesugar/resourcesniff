@@ -443,6 +443,11 @@ public class SniffActivity extends Activity {
         static final java.util.Set<String> parsed = new java.util.HashSet<String>();
 
         static String storedCookies(android.content.Context c) {
+            // 优先读设置页网页登录的全局 Cookie（CookieManager），无则回退老 prefs
+            try {
+                String ck = android.webkit.CookieManager.getInstance().getCookie("https://www.bilibili.com");
+                if (ck != null && ck.contains("SESSDATA=")) return ck;
+            } catch (Throwable ignored) {}
             android.content.SharedPreferences sp =
                     c.getSharedPreferences("bili", android.content.Context.MODE_PRIVATE);
             long t = sp.getLong("time", 0);
