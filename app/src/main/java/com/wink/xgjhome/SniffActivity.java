@@ -309,6 +309,13 @@ public class SniffActivity extends Activity {
                                 byte[] body2 = bo2.toByteArray();
                                 final String jstr = new String(body2, "UTF-8");
                                 dumpFc2Debug("MASTERURL head: " + jstr.substring(0, Math.min(300, jstr.length())));
+                                String qn = "直播";
+                                java.util.regex.Matcher qm = java.util.regex.Pattern.compile("\"current_qn\":(\\d+)").matcher(jstr);
+                                if (qm.find()) {
+                                    long q = Long.parseLong(qm.group(1));
+                                    qn = q >= 30000 ? "杜比" : q >= 25000 ? "4K" : q >= 10000 ? "原画" : q >= 400 ? "蓝光" : q >= 250 ? "超清" : q >= 150 ? "高清" : "流畅";
+                                }
+                                final String qTitle = "B站直播·" + qn;
                                 java.util.ArrayList<String> urls = new java.util.ArrayList<String>();
                                 java.util.regex.Matcher mm = java.util.regex.Pattern
                                         .compile("https?:\\/\\/[^\"\\\\\\s,]+")
@@ -319,7 +326,7 @@ public class SniffActivity extends Activity {
                                 }
                                 for (final String su : urls) {
                                     runOnUiThread(new Runnable() { public void run() {
-                                        try { if (recordKeys.add("bili#" + su)) addRecord(su, "B站直播"); } catch (Throwable ignored) {}
+                                        try { if (recordKeys.add("bili#" + su)) addRecord(su, qTitle); } catch (Throwable ignored) {}
                                     }});
                                 }
                                 dumpFc2Debug("MASTERURL: " + urls.size() + " urls");
@@ -400,6 +407,20 @@ public class SniffActivity extends Activity {
                 } catch (Exception ignored) {
                 }
                 return null;
+            }
+
+            private boolean biliDesktopSet = false;
+
+            @Override
+            public void onPageStarted(WebView view, String url, android.graphics.Bitmap favicon) {
+                // B站手机UA会导致房间初始化失败，全程桌面UA
+                if (url != null && url.contains("bilibili.com") && !biliDesktopSet) {
+                    biliDesktopSet = true;
+                    view.getSettings().setUserAgentString("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/130.0.0.0 Safari/537.36");
+                    view.stopLoading();
+                    view.loadUrl(url);
+                    return;
+                }
             }
 
             @Override
