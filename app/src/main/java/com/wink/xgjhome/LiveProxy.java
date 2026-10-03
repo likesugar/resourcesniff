@@ -153,6 +153,8 @@ public class LiveProxy {
                 // 通用中转：u=原始地址（m3u8 内容递归改写；分片流式转发）
                 try {
                     String raw = URLDecoder.decode(queryParam(path, "u"), "UTF-8");
+                    // 本地录制文件：直接流式回放（支持 Range），不走上游
+                    if (raw.startsWith("file://")) { serveLocal(s, raw.substring(7), reqLine); return; }
                     HttpURLConnection oc = (HttpURLConnection) new URL(raw).openConnection();
                     oc.setConnectTimeout(8000);
                     oc.setReadTimeout(8000);
@@ -339,6 +341,48 @@ public class LiveProxy {
             }
         } catch (Exception ignored) {}
         return "";
+    }
+
+
+    /** 本地文件流式服务（支持单段Range，供局域网回放录制文件） */
+    private static void serveLocal(Socket s, String path, String reqLine) {
+        try {
+            java.io.File f = new java.io.File(path);
+            if (!f.exists() || !f.isFile()) { writeResp(s, "404 Not Found", "text/plain", "file not found".getBytes()); return; }
+            long len = f.length(), start = 0, end = len - 1;
+            String range = null;
+            java.io.BufferedReader br = new java.io.BufferedReader(new java.io.InputStreamReader(s.getInputStream()));
+            String ln;
+            while ((ln = br.readLine()) != null && !ln.isEmpty()) if (ln.toLowerCase().startsWith("range:")) range = ln;
+            boolean partial = false;
+            if (range != null && range.contains("bytes=")) {
+                try {
+                    String spec = range.substring(range.indexOf('=') + 1).trim();
+                    int dash = spec.indexOf('-');
+                    start = Long.parseLong(spec.substring(0, dash).trim());
+                    if (dash < spec.length() - 1) end = Long.parseLong(spec.substring(dash + 1).trim());
+                    if (end >= len) end = len - 1;
+                    partial = start <= end;
+                } catch (Throwable ignored) { }
+            }
+            java.io.InputStream in = new java.io.FileInputStream(f);
+            if (partial) { in.skip(start); }
+            else { start = 0; }
+            String head = (partial ? "HTTP/1.1 206 Partial Content\r\n" : "HTTP/1.1 200 OK\r\n")
+                + "Content-Type: video/mp2t\r\n"
+                + "Accept-Ranges: bytes\r\n"
+                + (partial ? "Content-Range: bytes " + start + "-" + end + "/" + len + "\r\n" : "")
+                + "Content-Length: " + (end - start + 1) + "\r\nConnection: close\r\n\r\n";
+            OutputStream os = s.getOutputStream();
+            os.write(head.getBytes());
+            byte[] buf = new byte[64 * 1024];
+            long remain = end - start + 1;
+            int n;
+            while (remain > 0 && (n = in.read(buf, 0, (int)Math.min(buf.length, remain))) > 0) {
+                os.write(buf, 0, n); remain -= n;
+            }
+            in.close(); os.flush();
+        } catch (Throwable e) { try { writeResp(s, "404 Not Found", "text/plain", "file err".getBytes()); } catch (Throwable ignored) {} }
     }
 
     private static void writeResp(Socket s, String status, String type, byte[] body) {

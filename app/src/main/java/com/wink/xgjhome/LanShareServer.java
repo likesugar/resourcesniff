@@ -65,6 +65,40 @@ public class LanShareServer {
         // 打开链接：302 到手机中转（代拉流，带正确 Referer）
         if (path.startsWith("/open?u=")) {
             String u = java.net.URLDecoder.decode(path.substring(8), "UTF-8");
+            // 本地录制文件：直接由手机回放（带Range），不302到中转
+            if (u.startsWith("file://")) {
+                java.io.File f = new java.io.File(u.substring(7));
+                OutputStream os = s.getOutputStream();
+                if (!f.exists()) {
+                    os.write(("HTTP/1.1 404 Not Found\r\nContent-Type: text/plain\r\nConnection: close\r\nContent-Length: 14\r\n\r\nfile not found").getBytes());
+                    os.flush(); return;
+                }
+                String range = null; String l2;
+                java.io.BufferedReader br = new java.io.BufferedReader(new java.io.InputStreamReader(s.getInputStream()));
+                while ((l2 = br.readLine()) != null && !l2.isEmpty()) if (l2.toLowerCase().startsWith("range:")) range = l2;
+                long len = f.length(), start = 0, end = len - 1; boolean partial = false;
+                if (range != null && range.contains("bytes=")) {
+                    try {
+                        String spec = range.substring(range.indexOf('=') + 1).trim();
+                        int dash = spec.indexOf('-');
+                        start = Long.parseLong(spec.substring(0, dash).trim());
+                        if (dash < spec.length() - 1) end = Long.parseLong(spec.substring(dash + 1).trim());
+                        if (end >= len) end = len - 1;
+                        partial = start <= end;
+                    } catch (Throwable ignored) { }
+                }
+                String head = (partial ? "HTTP/1.1 206 Partial Content\r\n" : "HTTP/1.1 200 OK\r\n")
+                    + "Content-Type: video/mp2t\r\nAccept-Ranges: bytes\r\n"
+                    + (partial ? "Content-Range: bytes " + start + "-" + end + "/" + len + "\r\n" : "")
+                    + "Content-Length: " + (end - start + 1) + "\r\nConnection: close\r\n\r\n";
+                os.write(head.getBytes());
+                java.io.InputStream fin = new java.io.FileInputStream(f);
+                if (partial) fin.skip(start);
+                byte[] buf = new byte[64 * 1024]; long remain = end - start + 1; int n;
+                while (remain > 0 && (n = fin.read(buf, 0, (int)Math.min(buf.length, remain))) > 0) { os.write(buf, 0, n); remain -= n; }
+                fin.close(); os.flush();
+                return;
+            }
             String me = localIp();
             OutputStream os = s.getOutputStream();
             os.write(("HTTP/1.1 302 Found\r\nLocation: http://" + me + ":8123/relay?u="
