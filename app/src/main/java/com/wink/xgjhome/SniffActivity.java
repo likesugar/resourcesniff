@@ -34,7 +34,7 @@ import java.util.regex.Pattern;
 public class SniffActivity extends Activity {
 
     private static final Pattern MEDIA = Pattern.compile(
-        "\\.(m3u8|mp4|flv|mkv|avi|ts|webm|mp3|m4a|aac|flac|mov|m4s|fmp4)(\\?|$)|\\.ts\\?|/stream/|media-worker|/live-bvc/|live-bvc", Pattern.CASE_INSENSITIVE);
+        "\\.(m3u8|mp4|flv|mkv|avi|ts|webm|mp3|m4a|aac|flac|mov)(\\?|$)|\\.ts\\?|/stream/|media-worker", Pattern.CASE_INSENSITIVE);
     private static final Pattern URL_IN_TEXT = Pattern.compile(
         "(https?://|www\\.)[\\w\\-./?:#=&%+~@!$'*;,\\[\\]]+", Pattern.CASE_INSENSITIVE);
 
@@ -89,10 +89,6 @@ public class SniffActivity extends Activity {
         bottomPanel = findViewById(R.id.bottom_panel);
         layoutRecords = findViewById(R.id.layout_records);
         fab = findViewById(R.id.btn_toggle_top);
-        fab.setElevation(100f);
-        findViewById(R.id.btnScanMedia).setOnClickListener(new View.OnClickListener() {
-            public void onClick(View v) { scanPageMedia(); }
-        });
         btnSwitchUa = findViewById(R.id.btn_switch_ua);
         Button btnGo = findViewById(R.id.btn_go);
         Button btnRecords = findViewById(R.id.btn_records);
@@ -135,25 +131,6 @@ public class SniffActivity extends Activity {
             @android.webkit.JavascriptInterface
             public void onWsUrl(String u) {
                 // 已改为窃听页面自身连接的回包（onHlsJson），不再自建连接避免多连接踢线
-            }
-
-            @android.webkit.JavascriptInterface
-            public void onGenericMedia(String url, String why) {
-                if (url == null || url.length() < 12) return;
-                String tag = (why == null ? "" : why);
-                String ext = "";
-                int dot = url.lastIndexOf('.');
-                if (dot > 0) { ext = url.substring(dot); int q = ext.indexOf('?'); if (q > 0) ext = ext.substring(0, q); }
-                String t;
-                if (tag.contains("mpegurl")) t = "嗅探·m3u8";
-                else if (tag.contains("mp2t")) t = "嗅探·ts";
-                else if (tag.contains("fmp4") || tag.contains("dash")) t = "嗅探·fmp4";
-                else if (tag.contains("video/mp4")) t = "嗅探·mp4";
-                else if (!ext.isEmpty()) t = "嗅探·" + ext.substring(1);
-                else t = "嗅探·媒体";
-                final String tt = t;
-                final String u = url;
-                main.post(new Runnable() { public void run() { try { addRecord(u, tt); } catch (Throwable ignored) {} } });
             }
 
             @android.webkit.JavascriptInterface
@@ -325,21 +302,7 @@ public class SniffActivity extends Activity {
             }
 
             @Override
-            public void onPageStarted(WebView view, String url, android.graphics.Bitmap favicon) {
-                // cat-catch 式嗅探：页面开始即注入，抢在媒体请求前挂钩
-                try {
-                    String cc = readAsset("catcatch.js");
-                    if (cc != null) view.evaluateJavascript(cc, null);
-                } catch (Throwable ignored) {}
-            }
-
-            @Override
             public void onPageFinished(WebView view, String url) {
-                // cat-catch 式通用媒体嗅探：全站注入
-                try {
-                    String cc = readAsset("catcatch.js");
-                    if (cc != null) view.evaluateJavascript(cc, null);
-                } catch (Throwable ignored) {}
                 if (url != null && (url.contains("douyin.com") || url.contains("iesdouyin"))) {
                     injectDouyinScript();
                 }
@@ -416,7 +379,6 @@ public class SniffActivity extends Activity {
                 } else if (event.getAction() == MotionEvent.ACTION_UP) {
                     if (Math.abs(event.getX() - x0) < 12 && Math.abs(event.getY() - y0) < 12) {
                         fab.setVisibility(fab.getVisibility() == View.VISIBLE ? View.GONE : View.VISIBLE);
-                        if (fab.getVisibility() == View.VISIBLE) { fab.setElevation(100f); fab.bringToFront(); }
                     }
                 }
                 return false;
@@ -1137,42 +1099,6 @@ public class SniffActivity extends Activity {
             isMobileUa = true;
         }
         webView.reload();
-    }
-
-    /** 主动识别：扫页面 video/audio/currentSrc + 性能资源表，命中即入记录（cat-catch 式） */
-    void scanPageMedia() {
-        String js = "(function(){var out=[];try{document.querySelectorAll('video,audio,source').forEach(function(v){var s=v.currentSrc||v.src;if(s&&s.indexOf('data:')!==0&&s.indexOf('blob:')!==0)out.push(s);});}catch(e){}"
-                + "try{performance.getEntriesByType('resource').forEach(function(e){out.push(e.name);});}catch(e){}"
-                + "return JSON.stringify(out);})()";
-        try {
-            webView.evaluateJavascript(js, new android.webkit.ValueCallback<String>() {
-                public void onReceiveValue(String v) {
-                    if (v == null || v.length() < 4) return;
-                    try {
-                        String raw = v.trim();
-                        if (raw.startsWith("\"")) raw = new org.json.JSONTokener(raw).nextValue().toString();  // 双重编码解包
-                        org.json.JSONArray arr = new org.json.JSONArray(raw);
-                        int added = 0;
-                        for (int i = 0; i < arr.length(); i++) {
-                            String u = arr.optString(i);
-                            if (u == null || u.length() < 12) continue;
-                            String l = u.toLowerCase();
-                            if (!l.matches(".*\\.(ts|m4s|mp4|webm|flv|m3u8|mpd|aac|mp3|ogg|mov|mkv|fmp4)(\\?|#|$).*") && !l.contains("live-bvc")) continue;
-                            if (l.contains("bilivideo") || l.contains("upos-") || l.contains("127.0.0.1:8123")) continue;
-                            String ext = ""; int dot = u.lastIndexOf('.');
-                            if (dot > 0) { ext = u.substring(dot); int q = ext.indexOf('?'); if (q > 0) ext = ext.substring(0, q); }
-                            addRecord(u, "识别·" + (ext.isEmpty() ? "媒体" : ext.substring(1)));
-                            added++;
-                        }
-                        Toast.makeText(SniffActivity.this, added > 0 ? "识别到 " + added + " 条媒体" : "本页未发现媒体流", Toast.LENGTH_SHORT).show();
-                    } catch (Throwable t) {
-                        Toast.makeText(SniffActivity.this, "识别失败: " + t, Toast.LENGTH_SHORT).show();
-                    }
-                }
-            });
-        } catch (Throwable t) {
-            Toast.makeText(this, "识别失败: " + t, Toast.LENGTH_SHORT).show();
-        }
     }
 
     void toggleRecords() {
