@@ -525,8 +525,22 @@ public class SniffActivity extends Activity {
             }
         });
 
-        // 弹窗带入的输入
+        // 弹窗带入的输入 / 系统分享进入
         String pre = getIntent().getStringExtra("input");
+        if (pre == null || pre.length() == 0) {
+            String act = getIntent().getAction();
+            if ("android.intent.action.SEND".equals(act) || "android.intent.action.SEND_MULTIPLE".equals(act)) {
+                pre = getIntent().getStringExtra("android.intent.extra.TEXT");
+                if (pre == null) pre = "";
+                if (pre.startsWith("http")) pre = pre.trim();
+                else {
+                    // 分享文本里抽第一个链接
+                    java.util.regex.Matcher m = java.util.regex.Pattern.compile("https?://\\S+").matcher(pre);
+                    if (m.find()) pre = m.group();
+                    else pre = "";
+                }
+            }
+        }
         if (pre != null && pre.length() > 0) {
             etUrl.setText(pre);
             openInputUrl();
