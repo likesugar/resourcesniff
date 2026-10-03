@@ -20,6 +20,7 @@ public class RecManager {
         volatile long bytes = 0;
         volatile boolean finishNow = false;
         volatile String state = null;   // null=暂停录制 / 转换MP4中 / 转换失败
+        volatile boolean savedToHistory = false;  // 已写入历史记录（下载页去重用）
         int notifId;
         volatile long secs = 0;
         volatile long startTs = 0;
@@ -384,6 +385,7 @@ public class RecManager {
                     job.file.delete();
                     job.state = null;
                     HistoryStore.add(sCtx, "视频", job.name, out.toString());
+                    job.savedToHistory = true;
                 } else job.state = "转换失败";
                 tmp.delete();
             } catch (Throwable e) {
@@ -616,6 +618,7 @@ public class RecManager {
                     mp4.renameTo(new java.io.File(job.file, mp4Name));
                     job.state = "已保存: files/录制合并/" + mp4Name.replace(".mp4", "") + "/" + mp4Name;
                     HistoryStore.add(sCtx, "录制", mp4Name, "file://" + new java.io.File(job.file, mp4Name).getAbsolutePath());
+                    job.savedToHistory = true;
                 } else job.state = "合并失败";
                 stoppedJobs.put(job.id, job);
             } catch (Throwable e) {

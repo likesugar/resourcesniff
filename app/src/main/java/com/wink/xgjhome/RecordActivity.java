@@ -178,7 +178,10 @@ public class RecordActivity extends Activity {
         // key -> [type(0录制/1下载), job, live]
         final java.util.LinkedHashMap<String, Object[]> meta = new java.util.LinkedHashMap<String, Object[]>();
         for (RecManager.RecJob j : RecManager.recJobs.values()) meta.put("R" + j.id, new Object[]{0, j, (Boolean) j.active});
-        for (RecManager.RecJob j : RecManager.stoppedJobs.values()) if (!meta.containsKey("R" + j.id)) meta.put("R" + j.id, new Object[]{0, j, Boolean.FALSE});
+        for (RecManager.RecJob j : RecManager.stoppedJobs.values()) {
+            if (j.savedToHistory) continue;   // 已入历史记录，卡片去重（避免两条相同）
+            if (!meta.containsKey("R" + j.id)) meta.put("R" + j.id, new Object[]{0, j, Boolean.FALSE});
+        }
         for (DlManager.DlJob j : DlManager.jobs()) meta.put("D" + j.id, new Object[]{1, j, Boolean.FALSE});
         if (hist != null) for (int i = 0; i < hist.size(); i++) meta.put("H" + i, new Object[]{2, hist.get(i), Boolean.FALSE});
 
@@ -233,11 +236,13 @@ public class RecordActivity extends Activity {
                 addRow(list, j, live, infoRef);
                 row = (LinearLayout) list.getChildAt(list.getChildCount() - 1);
                 final RecManager.RecJob fj = j;
-                rowUpdaters.put(key, new Runnable() { public void run() { if (infoRef.get() != null) infoRef.get().setText(buildInfo(fj, live)); } });
+                rowUpdaters.put(key, new Runnable() { public void run() { if (infoRef.get() != null) infoRef.get().setText(buildInfo(fj, fj.active)); } });
             } else if ((Integer) m[0] == 1) {
                 final DlManager.DlJob j = (DlManager.DlJob) m[1];
                 addDlRow(list, j, infoRef);
                 row = (LinearLayout) list.getChildAt(list.getChildCount() - 1);
+                final TextView infoDl = infoRef.get();
+                rowUpdaters.put(key, new Runnable() { public void run() { if (infoDl != null) infoDl.setText(dlInfo(j)); } });
             } else {
                 final HistoryStore.Item it = (HistoryStore.Item) m[1];
                 final int hidx = Integer.parseInt(key.substring(1));
