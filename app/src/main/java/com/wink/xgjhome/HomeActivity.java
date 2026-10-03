@@ -8,6 +8,7 @@ import android.widget.LinearLayout;
 import android.os.Build;
 import android.os.Bundle;
 import android.view.View;
+import android.graphics.Typeface;
 import android.widget.TextView;
 
 
@@ -66,6 +67,18 @@ public class HomeActivity extends Activity {
         if (hasFocus) applyImmersive();
     }
 
+    private void restylePill(TextView[] segs, int sel) {
+        float dm = getResources().getDisplayMetrics().density;
+        for (int i = 0; i < segs.length; i++) {
+            android.graphics.drawable.GradientDrawable bg = new android.graphics.drawable.GradientDrawable();
+            bg.setCornerRadius(50 * dm);
+            bg.setColor(i == sel ? 0xFFE7EDFD : 0xFFF2F4F8);
+            segs[i].setBackground(bg);
+            segs[i].setTextColor(i == sel ? 0xFF315CDE : 0xFF8A919E);
+            segs[i].setTypeface(i == sel ? Typeface.DEFAULT_BOLD : Typeface.DEFAULT);
+        }
+    }
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -107,6 +120,59 @@ public class HomeActivity extends Activity {
                 startActivity(new Intent(HomeActivity.this, RecordActivity.class));
             }
         });
+        // 底部胶囊导航（样式=资源下载页顶部chips）：全部/视频/录制/进行中/已完成 → 跳资源下载页
+        try {
+            final String[] pillTabs = {"全部", "视频", "录制", "进行中", "已完成"};
+            final TextView[] pillSegs = new TextView[5];
+            float dm = getResources().getDisplayMetrics().density;
+            LinearLayout pill = new LinearLayout(this);
+            pill.setOrientation(LinearLayout.HORIZONTAL);
+            android.graphics.drawable.GradientDrawable pillBg = new android.graphics.drawable.GradientDrawable();
+            pillBg.setCornerRadius(50 * dm);
+            pillBg.setColor(0xFFFFFFFF);
+            pill.setBackground(pillBg);
+            pill.setPadding(12, 12, 12, 12);
+            pill.setElevation(8f);
+            android.widget.FrameLayout flRoot = (android.widget.FrameLayout) findViewById(R.id.toolRoot);
+            android.widget.FrameLayout.LayoutParams plp = new android.widget.FrameLayout.LayoutParams(
+                    android.widget.FrameLayout.LayoutParams.WRAP_CONTENT, android.widget.FrameLayout.LayoutParams.WRAP_CONTENT,
+                    android.view.Gravity.BOTTOM | android.view.Gravity.CENTER_HORIZONTAL);
+            plp.bottomMargin = (int)(18 * dm);
+            pill.setLayoutParams(plp);
+            for (int i = 0; i < 5; i++) {
+                final int idx = i;
+                TextView tv = new TextView(this);
+                tv.setText(pillTabs[i]);
+                tv.setTextSize(14);
+                tv.setGravity(android.view.Gravity.CENTER);
+                tv.setPadding(0, 24, 0, 24);
+                LinearLayout.LayoutParams sp = new LinearLayout.LayoutParams((int)(76 * dm), (int)(44 * dm));
+                if (i < 4) sp.rightMargin = (int)(6 * dm);
+                tv.setLayoutParams(sp);
+                tv.setOnClickListener(new View.OnClickListener() {
+                    public void onClick(View v) {
+                        restylePill(pillSegs, idx);
+                        Intent i2 = new Intent(HomeActivity.this, RecordActivity.class);
+                        i2.putExtra("tab", idx);
+                        startActivity(i2);
+                    }
+                });
+                pillSegs[i] = tv;
+                pill.addView(tv);
+            }
+            restylePill(pillSegs, 0);
+            flRoot.addView(pill);
+            android.view.View sv = findViewById(R.id.toolRoot).findViewWithTag("scroll");
+            if (sv == null) {
+                android.view.ViewGroup vg = (android.view.ViewGroup) findViewById(R.id.toolColumn);
+                for (int i2 = 0; i2 < vg.getChildCount(); i2++) {
+                    android.view.View ch = vg.getChildAt(i2);
+                    if (ch instanceof android.widget.ScrollView) { sv = ch; break; }
+                }
+            }
+            if (sv != null) sv.setPadding(sv.getPaddingLeft(), sv.getPaddingTop(), sv.getPaddingRight(), (int)(86 * dm));
+        } catch (Throwable t) { }
+
         findViewById(R.id.cardVideoDl).setOnClickListener(new View.OnClickListener() {
             public void onClick(View v) {
                 try { startActivity(new Intent(HomeActivity.this, com.daxiaamu.dbdown.MainActivity.class)); }

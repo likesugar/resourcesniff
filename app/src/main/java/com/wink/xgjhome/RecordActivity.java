@@ -25,7 +25,7 @@ public class RecordActivity extends Activity {
     private TextView tvEmpty;
     private TextView[] tabBtns;
     private View[] tabLines;
-    private int curTab = 0;  // 0全部 1视频 2录制 3下载
+    private int curTab = 0;  // 0全部 1视频 2录制 3进行中 4已完成
     private java.util.ArrayList<HistoryStore.Item> hist;
 
     private void restyleTabs() {
@@ -52,6 +52,7 @@ public class RecordActivity extends Activity {
         DlManager.init(this);
         try { getWindow().getDecorView().setSystemUiVisibility(View.SYSTEM_UI_FLAG_HIDE_NAVIGATION); } catch (Throwable ignored) {}
         hist = HistoryStore.load(this);
+        curTab = Math.max(0, Math.min(4, getIntent().getIntExtra("tab", 0)));
         FrameLayout root = new FrameLayout(this);
         root.setBackgroundColor(Color.BLACK);
 
@@ -142,40 +143,6 @@ public class RecordActivity extends Activity {
         sv.addView(col);
         root.addView(sv);
 
-        // 底部胶囊导航（对齐"视频下载"）：首页 / 下载
-        LinearLayout pill = new LinearLayout(this);
-        pill.setOrientation(LinearLayout.HORIZONTAL);
-        android.graphics.drawable.GradientDrawable pillBg = new android.graphics.drawable.GradientDrawable();
-        pillBg.setCornerRadius(50 * dmv());
-        pillBg.setColor(0xD9FFFFFF);
-        pill.setBackground(pillBg);
-        pill.setPadding(14, 14, 14, 14);
-        FrameLayout.LayoutParams plp = new FrameLayout.LayoutParams(-2, -2, Gravity.BOTTOM | Gravity.CENTER_HORIZONTAL);
-        plp.bottomMargin = (int)(18 * dmv());
-        pill.setLayoutParams(plp);
-        String[] pillTabs = {"首页", "下载"};
-        final TextView[] segs = new TextView[2];
-        for (int i = 0; i < 2; i++) {
-            final int pi = i;
-            TextView tv = new TextView(this);
-            tv.setText(pillTabs[i]);
-            tv.setTextSize(15);
-            tv.setGravity(Gravity.CENTER);
-            tv.setPadding(0, 26, 0, 26);
-            LinearLayout.LayoutParams sp = new LinearLayout.LayoutParams((int)(118 * dmv()), (int)(50 * dmv()));
-            if (i == 0) sp.rightMargin = (int)(6 * dmv());
-            tv.setLayoutParams(sp);
-            tv.setOnClickListener(new View.OnClickListener() {
-                public void onClick(View v) {
-                    restylePill(segs, pi);
-                    if (pi == 0) finish();  // 首页 → 回小工具首页
-                }
-            });
-            segs[i] = tv;
-            pill.addView(tv);
-        }
-        restylePill(segs, 1);
-        root.addView(pill);
         setContentView(root);
 
         // 视频下载式刷新：数据变化驱动（DlManager/RecManager 回调），不再用定时轮询
@@ -184,17 +151,6 @@ public class RecordActivity extends Activity {
     }
 
     private float dmv() { return getResources().getDisplayMetrics().density; }
-    private void restylePill(TextView[] segs, int sel) {
-        for (int i = 0; i < 2; i++) {
-            android.graphics.drawable.GradientDrawable bg = new android.graphics.drawable.GradientDrawable();
-            bg.setCornerRadius(50 * dmv());
-            bg.setColor(i == sel ? 0xFF315CDE : 0x00000000);
-            segs[i].setBackground(bg);
-            segs[i].setTextColor(i == sel ? Color.WHITE : 0xFF8A919E);
-            segs[i].setTypeface(i == sel ? Typeface.DEFAULT_BOLD : Typeface.DEFAULT);
-        }
-    }
-
     @Override
     protected void onResume() { super.onResume(); rebuild(); }
 
