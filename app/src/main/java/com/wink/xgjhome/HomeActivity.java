@@ -112,11 +112,6 @@ public class HomeActivity extends Activity {
                 startActivity(i);
             }
         });
-        findViewById(R.id.cardDownload).setOnClickListener(new View.OnClickListener() {
-            public void onClick(View v) {
-                startActivity(new Intent(HomeActivity.this, RecordActivity.class));
-            }
-        });
         findViewById(R.id.cardVideoDl).setOnClickListener(new View.OnClickListener() {
             public void onClick(View v) {
                 try { startActivity(new Intent(HomeActivity.this, com.daxiaamu.dbdown.MainActivity.class)); }
@@ -125,15 +120,14 @@ public class HomeActivity extends Activity {
                 }
             }
         });
-        findViewById(R.id.cardSettings).setOnClickListener(new View.OnClickListener() {
+        findViewById(R.id.cardLan).setOnClickListener(new View.OnClickListener() {
+            public void onClick(View v) { showLanDialog(); }
+        });
+        findViewById(R.id.cardTheme).setOnClickListener(new View.OnClickListener() {
             public void onClick(View v) {
-                try {
-                    Intent i = new Intent(HomeActivity.this, com.daxiaamu.dbdown.MainActivity.class);
-                    i.putExtra("settings", true);
-                    startActivity(i);
-                } catch (Throwable t) {
-                    android.widget.Toast.makeText(HomeActivity.this, "打开失败: " + t, android.widget.Toast.LENGTH_LONG).show();
-                }
+                boolean dark = getSharedPreferences("settings", MODE_PRIVATE).getBoolean("dark", false);
+                getSharedPreferences("settings", MODE_PRIVATE).edit().putBoolean("dark", !dark).apply();
+                applyTheme();
             }
         });
         findViewById(R.id.lanToggle).setOnClickListener(new View.OnClickListener() {
