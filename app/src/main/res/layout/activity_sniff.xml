@@ -15,6 +15,7 @@
     <!-- 右下角浮动按钮（36dp，点击屏幕出现，再点隐藏；切换顶部栏） -->
     <FrameLayout
         android:id="@+id/btn_toggle_top"
+        android:elevation="24dp"
         android:layout_width="36dp"
         android:layout_height="36dp"
         android:layout_gravity="bottom|end"
@@ -133,6 +134,12 @@
         android:orientation="vertical"
         android:background="#191a1a3e"
         android:visibility="gone">
+
+        <TextView android:id="@+id/btnScanMedia"
+            android:layout_width="match_parent" android:layout_height="wrap_content"
+            android:gravity="center" android:padding="10dp"
+            android:text="🔍 识别本页媒体" android:textColor="#FFFFFF" android:textSize="15sp"
+            android:background="#33000000" android:clickable="true" android:focusable="true"/>
 
         <ScrollView
             android:id="@+id/scroll_records"

@@ -89,6 +89,10 @@ public class SniffActivity extends Activity {
         bottomPanel = findViewById(R.id.bottom_panel);
         layoutRecords = findViewById(R.id.layout_records);
         fab = findViewById(R.id.btn_toggle_top);
+        fab.setElevation(100f);
+        findViewById(R.id.btnScanMedia).setOnClickListener(new View.OnClickListener() {
+            public void onClick(View v) { scanPageMedia(); }
+        });
         btnSwitchUa = findViewById(R.id.btn_switch_ua);
         Button btnGo = findViewById(R.id.btn_go);
         Button btnRecords = findViewById(R.id.btn_records);
@@ -395,6 +399,7 @@ public class SniffActivity extends Activity {
                 } else if (event.getAction() == MotionEvent.ACTION_UP) {
                     if (Math.abs(event.getX() - x0) < 12 && Math.abs(event.getY() - y0) < 12) {
                         fab.setVisibility(fab.getVisibility() == View.VISIBLE ? View.GONE : View.VISIBLE);
+                        if (fab.getVisibility() == View.VISIBLE) { fab.setElevation(100f); fab.bringToFront(); }
                     }
                 }
                 return false;
@@ -1115,6 +1120,40 @@ public class SniffActivity extends Activity {
             isMobileUa = true;
         }
         webView.reload();
+    }
+
+    /** 主动识别：扫页面 video/audio/currentSrc + 性能资源表，命中即入记录（cat-catch 式） */
+    void scanPageMedia() {
+        String js = "(function(){var out=[];try{document.querySelectorAll('video,audio,source').forEach(function(v){var s=v.currentSrc||v.src;if(s&&s.indexOf('data:')!==0&&s.indexOf('blob:')!==0)out.push(s);});}catch(e){}"
+                + "try{performance.getEntriesByType('resource').forEach(function(e){out.push(e.name);});}catch(e){}"
+                + "return JSON.stringify(out);})()";
+        try {
+            webView.evaluateJavascript(js, new android.webkit.ValueCallback<String>() {
+                public void onReceiveValue(String v) {
+                    if (v == null || v.length() < 4) return;
+                    try {
+                        org.json.JSONArray arr = new org.json.JSONArray(v);
+                        int added = 0;
+                        for (int i = 0; i < arr.length(); i++) {
+                            String u = arr.optString(i);
+                            if (u == null || u.length() < 12) continue;
+                            String l = u.toLowerCase();
+                            if (!l.matches(".*\\.(ts|m4s|mp4|webm|flv|m3u8|mpd|aac|mp3|ogg|mov|mkv)(\\?|#|$).*")) continue;
+                            if (l.contains("bilivideo") || l.contains("upos-") || l.contains("127.0.0.1:8123")) continue;
+                            String ext = ""; int dot = u.lastIndexOf('.');
+                            if (dot > 0) { ext = u.substring(dot); int q = ext.indexOf('?'); if (q > 0) ext = ext.substring(0, q); }
+                            addRecord(u, "识别·" + (ext.isEmpty() ? "媒体" : ext.substring(1)));
+                            added++;
+                        }
+                        Toast.makeText(SniffActivity.this, added > 0 ? "识别到 " + added + " 条媒体" : "本页未发现媒体流", Toast.LENGTH_SHORT).show();
+                    } catch (Throwable t) {
+                        Toast.makeText(SniffActivity.this, "识别失败: " + t, Toast.LENGTH_SHORT).show();
+                    }
+                }
+            });
+        } catch (Throwable t) {
+            Toast.makeText(this, "识别失败: " + t, Toast.LENGTH_SHORT).show();
+        }
     }
 
     void toggleRecords() {
