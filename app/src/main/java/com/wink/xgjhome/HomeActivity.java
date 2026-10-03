@@ -7,9 +7,7 @@ import android.widget.EditText;
 import android.widget.LinearLayout;
 import android.os.Build;
 import android.os.Bundle;
-import android.view.Gravity;
 import android.view.View;
-import android.graphics.Typeface;
 import android.widget.TextView;
 
 
@@ -104,16 +102,20 @@ public class HomeActivity extends Activity {
         findViewById(R.id.cardPlayer).setOnClickListener(new View.OnClickListener() {
             public void onClick(View v) { showSniffDialog(); }
         });
-        findViewById(R.id.cardShortcut).setOnClickListener(new View.OnClickListener() {
+        findViewById(R.id.pillHome).setOnClickListener(new View.OnClickListener() {
+            public void onClick(View v) { }  // 已在首页
+        });
+        findViewById(R.id.pillDl).setOnClickListener(new View.OnClickListener() {
             public void onClick(View v) {
-                try { startActivity(new Intent(HomeActivity.this, ShortcutActivity.class)); }
-                catch (Throwable t) {
-                    android.widget.Toast.makeText(HomeActivity.this, "打开失败: " + t, android.widget.Toast.LENGTH_LONG).show();
-                }
+                Intent i = new Intent(HomeActivity.this, RecordActivity.class);
+                i.putExtra("tab", 0);
+                startActivity(i);
             }
         });
         findViewById(R.id.cardDownload).setOnClickListener(new View.OnClickListener() {
-            public void onClick(View v) { startActivity(new Intent(HomeActivity.this, RecordActivity.class)); }
+            public void onClick(View v) {
+                startActivity(new Intent(HomeActivity.this, RecordActivity.class));
+            }
         });
         findViewById(R.id.cardVideoDl).setOnClickListener(new View.OnClickListener() {
             public void onClick(View v) {
@@ -134,14 +136,15 @@ public class HomeActivity extends Activity {
                 }
             }
         });
-        findViewById(R.id.pillHome).setOnClickListener(new View.OnClickListener() {
-            public void onClick(View v) { }  // 已在首页
+        findViewById(R.id.lanToggle).setOnClickListener(new View.OnClickListener() {
+            public void onClick(View v) { showLanDialog(); }
         });
-        findViewById(R.id.pillDl).setOnClickListener(new View.OnClickListener() {
+        findViewById(R.id.cardShortcut).setOnClickListener(new View.OnClickListener() {
             public void onClick(View v) {
-                Intent i = new Intent(HomeActivity.this, RecordActivity.class);
-                i.putExtra("tab", 0);
-                startActivity(i);
+                try { startActivity(new Intent(HomeActivity.this, ShortcutActivity.class)); }
+                catch (Throwable t) {
+                    android.widget.Toast.makeText(HomeActivity.this, "打开失败: " + t, android.widget.Toast.LENGTH_LONG).show();
+                }
             }
         });
 

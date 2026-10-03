@@ -26,6 +26,7 @@
             android:exported="false"
             android:configChanges="orientation|screenSize|screenLayout|keyboardHidden"/>
 
+        <activity android:name=".BiliLoginActivity" android:exported="false"/>
         <activity android:name=".SniffActivity"
             android:exported="false"
             android:configChanges="orientation|screenSize|screenLayout|keyboardHidden"/>

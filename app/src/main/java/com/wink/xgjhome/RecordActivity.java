@@ -21,6 +21,7 @@ import android.widget.Toast;
 public class RecordActivity extends Activity {
 
     private Handler handler;
+    private Runnable tick;
     private LinearLayout list;
     private TextView tvEmpty;
     private TextView[] tabBtns;
@@ -34,7 +35,7 @@ public class RecordActivity extends Activity {
             // 圆角筛选chip样式（对齐"视频下载"页 全部/进行中/已完成）
             android.graphics.drawable.GradientDrawable bg = new android.graphics.drawable.GradientDrawable();
             bg.setCornerRadius(50 * getResources().getDisplayMetrics().density);
-            bg.setColor(sel ? 0xFFE7EDFD : 0xFFF2F4F8);
+            bg.setColor(sel ? 0x1A315CDE : 0x0F1A2430);
             tabBtns[i].setBackground(bg);
             tabBtns[i].setTextColor(sel ? 0xFF315CDE : 0xFF8A919E);
             tabBtns[i].setTypeface(sel ? Typeface.DEFAULT_BOLD : Typeface.DEFAULT);
@@ -54,7 +55,7 @@ public class RecordActivity extends Activity {
         hist = HistoryStore.load(this);
         curTab = Math.max(0, Math.min(4, getIntent().getIntExtra("tab", 0)));
         FrameLayout root = new FrameLayout(this);
-        root.setBackgroundColor(Color.BLACK);
+        root.setBackgroundColor(0xFFF7F8FA);
 
         ScrollView sv = new ScrollView(this);
         sv.setFillViewport(true);
@@ -107,7 +108,7 @@ public class RecordActivity extends Activity {
         LinearLayout tabBar = new LinearLayout(this);
         tabBar.setOrientation(LinearLayout.HORIZONTAL);
         tabBar.setPadding(0, 0, 0, 16);
-        final String[] tabs = {"全部", "视频", "录制", "下载"};
+        final String[] tabs = {"全部", "视频", "录制", "进行中", "已完成"};
         tabBtns = new TextView[tabs.length];
         tabLines = new View[tabs.length];
         for (int i = 0; i < tabs.length; i++) {
@@ -143,14 +144,14 @@ public class RecordActivity extends Activity {
         sv.addView(col);
         root.addView(sv);
 
-        // 底部胶囊导航（FloatingTabs 移植）：半透明胶囊 + 蓝色滑块 + 首页/下载
+        // 底部胶囊导航（DBdown FloatingTabs 样式）：首页 / 下载
         try {
             float dm = getResources().getDisplayMetrics().density;
             final int TAB_W = (int)(118 * dm), TAB_H = (int)(50 * dm), INSET = (int)(7 * dm);
             android.widget.FrameLayout capsule = new android.widget.FrameLayout(this);
             android.graphics.drawable.GradientDrawable capBg = new android.graphics.drawable.GradientDrawable();
             capBg.setCornerRadius(50 * dm);
-            capBg.setColor(0x8CFFFFFF);
+            capBg.setColor(0x66FFFFFF);
             capsule.setBackground(capBg);
             capsule.setElevation(4 * dm);
             android.widget.FrameLayout.LayoutParams clp = new android.widget.FrameLayout.LayoutParams(
@@ -158,17 +159,15 @@ public class RecordActivity extends Activity {
                     android.view.Gravity.BOTTOM | android.view.Gravity.CENTER_HORIZONTAL);
             clp.bottomMargin = (int)(18 * dm);
             capsule.setLayoutParams(clp);
-
             final android.widget.FrameLayout thumb = new android.widget.FrameLayout(this);
             android.graphics.drawable.GradientDrawable thBg = new android.graphics.drawable.GradientDrawable();
             thBg.setCornerRadius(50 * dm);
-            thBg.setColor(0xFF4666DB);
+            thBg.setColor(0xA64B6ADF);
             thumb.setBackground(thBg);
             android.widget.FrameLayout.LayoutParams tlp = new android.widget.FrameLayout.LayoutParams(TAB_W, TAB_H);
             tlp.leftMargin = INSET;
             thumb.setLayoutParams(tlp);
             capsule.addView(thumb);
-
             LinearLayout labels = new LinearLayout(this);
             labels.setOrientation(LinearLayout.HORIZONTAL);
             capsule.addView(labels, new android.widget.FrameLayout.LayoutParams(-1, -1));
@@ -184,7 +183,7 @@ public class RecordActivity extends Activity {
                 tv.setOnClickListener(new View.OnClickListener() {
                     public void onClick(View v) {
                         restylePill(thumb, segs, idx, INSET, TAB_W);
-                        if (idx == 0) finish();  // 首页 → 回小工具首页
+                        if (idx == 0) finish();  // 首页 → 回首页
                     }
                 });
                 segs[i] = tv;
@@ -193,14 +192,18 @@ public class RecordActivity extends Activity {
             restylePill(thumb, segs, 1, INSET, TAB_W);
             root.addView(capsule);
         } catch (Throwable t) { }
-                setContentView(root);
 
-        // 视频下载式刷新：数据变化驱动（DlManager/RecManager 回调），不再用定时轮询
-        DlManager.onProgress = new Runnable() { public void run() { runOnUiThread(new Runnable() { public void run() { rebuild(); } }); } };
-        RecManager.onProgress = DlManager.onProgress;
+        setContentView(root);
+
+        handler = new Handler();
+        tick = new Runnable() {
+            public void run() {
+                rebuild();
+                handler.postDelayed(this, 1500);
+            }
+        };
     }
 
-    private float dmv() { return getResources().getDisplayMetrics().density; }
     private void restylePill(android.widget.FrameLayout thumb, TextView[] segs, int sel, int inset, int tabW) {
         android.widget.FrameLayout.LayoutParams lp = (android.widget.FrameLayout.LayoutParams) thumb.getLayoutParams();
         lp.leftMargin = inset + sel * tabW;
@@ -212,7 +215,10 @@ public class RecordActivity extends Activity {
     }
 
     @Override
-    protected void onResume() { super.onResume(); rebuild(); }
+    protected void onResume() { super.onResume(); handler.post(tick); }
+
+    @Override
+    protected void onPause() { super.onPause(); handler.removeCallbacks(tick); }
 
     private static String fmtDur(long s) {
         return String.format(java.util.Locale.US, "%02d:%02d:%02d", s / 3600, s / 60 % 60, s % 60);
@@ -234,7 +240,7 @@ public class RecordActivity extends Activity {
         for (DlManager.DlJob j : DlManager.jobs()) meta.put("D" + j.id, new Object[]{1, j, Boolean.FALSE});
         if (hist != null) for (int i = 0; i < hist.size(); i++) meta.put("H" + i, new Object[]{2, hist.get(i), Boolean.FALSE});
 
-        // 分类：kind(视频/录制) + state(进行中/已完成)，chips=全部/视频/录制/进行中/已完成
+        // 分类：kind(视频/录制) + state(进行中/已完成)
         java.util.HashMap<String, String> cat = new java.util.HashMap<String, String>();
         java.util.HashMap<String, String> st = new java.util.HashMap<String, String>();
         for (java.util.Map.Entry<String, Object[]> e : meta.entrySet()) {
@@ -254,7 +260,6 @@ public class RecordActivity extends Activity {
             }
         }
         String want = new String[]{"全部", "视频", "录制", "进行中", "已完成"}[curTab];
-        String wantSt = curTab == 3 ? "进行中" : (curTab == 4 ? "已完成" : null);
 
         // 稳定顺序
         java.util.ArrayList<String> order = new java.util.ArrayList<String>(rowOrder);
@@ -266,8 +271,8 @@ public class RecordActivity extends Activity {
         java.util.ArrayList<String> shown = new java.util.ArrayList<String>();
         for (String k : order) {
             String w = new String[]{"全部", "视频", "录制", "进行中", "已完成"}[curTab];
-            String kind = cat.get(k), state = st.get(k);
-            boolean show = w.equals("全部") || (state != null && w.equals(state)) || (state == null && w.equals(kind));
+            String state = st.get(k);
+            boolean show = w.equals("全部") || (state != null && w.equals(state)) || (state == null && w.equals(cat.get(k)));
             if (show) shown.add(k);
         }
         tvEmpty.setVisibility(shown.isEmpty() ? View.VISIBLE : View.GONE);
@@ -323,7 +328,7 @@ public class RecordActivity extends Activity {
         LinearLayout.LayoutParams tp = new LinearLayout.LayoutParams(140, 90);
         tp.rightMargin = 24;
         thumb.setLayoutParams(tp);
-        thumb.setBackgroundColor(0xFF1E242E);
+        thumb.setBackgroundColor(0x661E242E);
         TextView play = new TextView(this);
         play.setText("⇣");
         play.setTextColor(0xFF8A919E);
@@ -372,7 +377,7 @@ public class RecordActivity extends Activity {
         LinearLayout.LayoutParams tp = new LinearLayout.LayoutParams(140, 90);
         tp.rightMargin = 24;
         thumb.setLayoutParams(tp);
-        thumb.setBackgroundColor(0xFF1E242E);
+        thumb.setBackgroundColor(0x661E242E);
         TextView play = new TextView(this);
         play.setText("▶");
         play.setTextColor(0xFF8A919E);
@@ -508,7 +513,7 @@ public class RecordActivity extends Activity {
         LinearLayout.LayoutParams tp = new LinearLayout.LayoutParams(140, 90);
         tp.rightMargin = 24;
         thumb.setLayoutParams(tp);
-        thumb.setBackgroundColor(0xFF1E242E);
+        thumb.setBackgroundColor(0x661E242E);
         TextView play = new TextView(this);
         play.setText("▶");
         play.setTextColor(0xFF8A919E);
