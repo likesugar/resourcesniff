@@ -740,6 +740,7 @@ public class SniffActivity extends Activity {
             if (ll.contains("doppiocdn.net") && ll.contains(".m3u8")) {
                 android.net.Uri uu = android.net.Uri.parse(url);
                 String key = "sc#" + uu.getHost() + uu.getPath();
+                dumpDiag("SC HIT: " + key);
                 if (recordKeys.add(key)) {
                     String cu = url.replaceAll("(&|\\?)_HLS_msn=\\d+", "").replaceAll("(&|\\?)_HLS_part=\\d+", "");
                     java.util.regex.Matcher pm2 = java.util.regex.Pattern.compile("_(\\d+p)\\.m3u8").matcher(url);
