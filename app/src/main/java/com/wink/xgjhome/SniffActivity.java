@@ -1132,7 +1132,9 @@ public class SniffActivity extends Activity {
                 public void onReceiveValue(String v) {
                     if (v == null || v.length() < 4) return;
                     try {
-                        org.json.JSONArray arr = new org.json.JSONArray(v);
+                        String raw = v.trim();
+                        if (raw.startsWith("\"")) raw = new org.json.JSONTokener(raw).nextValue().toString();  // 双重编码解包
+                        org.json.JSONArray arr = new org.json.JSONArray(raw);
                         int added = 0;
                         for (int i = 0; i < arr.length(); i++) {
                             String u = arr.optString(i);
