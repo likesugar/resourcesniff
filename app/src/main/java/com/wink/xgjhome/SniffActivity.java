@@ -188,6 +188,7 @@ public class SniffActivity extends Activity {
 
             @Override
             public WebResourceResponse shouldInterceptRequest(WebView view, WebResourceRequest request) {
+                try { maybeRecordGeneric(request.getUrl().toString()); } catch (Throwable ignored) {}
                 try {
                     if (!"GET".equalsIgnoreCase(request.getMethod())) return null;
                     Uri u = request.getUrl();
@@ -583,6 +584,42 @@ public class SniffActivity extends Activity {
     private String douyinLiveUrl = null;        // 当前解析的直播间地址
     private final android.os.Handler main = new android.os.Handler(android.os.Looper.getMainLooper());
     private static final String DY_LIVE_COOKIE = "enter_pc_once=1; hevc_supported=true; ttwid=1%7COnZEYGAxHABx6WRfArV8V0vfh1qUfP8AU2WYpG2ybdU%7C1754493043%7C867b28541b24aca9aec6379357aa2bff731e159fa7a804a767f575c8ff886639; __ac_nonce=06893707d00e64c4488d5; __ac_signature=_02B4Z6wo00f01m0zFcQAAIDDRDeLuhFSmo5tExFAAPPu88; odin_tt=e0bcb4ad345d3ed6915b71cab9469cb459681b743f65d870cb52329adfa8792b80633cf01c31edd9cf4874b743daacc7b789efd1727202b7ed3f6e7059ce43a72f3358995fc8367000f0b42103a78d1b; passport_csrf_token=4d713363889176dba46a4d28394acf2f";
+
+    // ===== cat-catch webRequest 语义：全量请求统计识别媒体流 =====
+    private static final java.util.HashMap<String, long[]> REQ_STATS = new java.util.HashMap<String, long[]>();
+    private static final java.util.regex.Pattern ASSET_EXT = java.util.regex.Pattern.compile(
+            "\\.(js|css|png|jpe?g|gif|webp|ico|woff2?|svg|ttf|eot|html?|xml|json)(\\?|$)", java.util.regex.Pattern.CASE_INSENSITIVE);
+
+    void maybeRecordGeneric(final String url) {
+        try {
+            if (url == null || url.length() < 20) return;
+            if (url.contains("127.0.0.1:8123") || url.contains("/log/")) return;
+            String l = url.toLowerCase();
+            int q = l.indexOf('?');
+            String base = q > 0 ? l.substring(0, q) : l;
+            if (ASSET_EXT.matcher(base).find()) return;
+            if (isMediaUrl(url)) { recordGeneric(url); return; }
+            // 同一 base 反复请求(分段流/Range流) → 判定为媒体流，记录实际地址
+            long now = System.currentTimeMillis();
+            long[] st;
+            synchronized (REQ_STATS) {
+                if (REQ_STATS.size() > 800) REQ_STATS.clear();
+                st = REQ_STATS.get(base);
+                if (st == null) { REQ_STATS.put(base, new long[]{1, now}); return; }
+                st[0]++;
+            }
+            if (st[0] == 4) recordGeneric(url);
+        } catch (Throwable ignored) {}
+    }
+
+    void recordGeneric(final String url) {
+        if (!recordKeys.add(url)) return;
+        foundUrls.add(url);
+        final String page = webView.getTitle();
+        runOnUiThread(new Runnable() { public void run() {
+            try { addRecord(url, page == null ? "" : page); } catch (Throwable ignored) {}
+        }});
+    }
 
     /** 对应 DK shouldInterceptRequest 的抖音判定段 */
     void maybeRecordDouyin(final String url) {
