@@ -53,9 +53,6 @@ public class SniffActivity extends Activity {
 
     private final ArrayList<String> foundUrls = new ArrayList<>();
     private volatile boolean diagActive = false;
-    public static volatile int webRecState = 0;   // 0=停止 1=录制中
-    public static volatile String webRecFile = null;
-    private static final int REQ_WEBREC = 7721;
     private static void dumpDiag(String st) {
         try {
             java.io.File dir = sDumpCtx.getExternalFilesDir(null).getParentFile();
@@ -104,10 +101,6 @@ public class SniffActivity extends Activity {
         layoutRecords = findViewById(R.id.layout_records);
         fab = findViewById(R.id.btn_toggle_top);
         fab.setElevation(100f);
-        TextView btnRecWeb = findViewById(R.id.btnRecWeb);
-        if (btnRecWeb != null) btnRecWeb.setOnClickListener(new View.OnClickListener() {
-            public void onClick(View v) { toggleWebRec(); }
-        });
         btnSwitchUa = findViewById(R.id.btn_switch_ua);
         Button btnGo = findViewById(R.id.btn_go);
         Button btnRecords = findViewById(R.id.btn_records);
@@ -1338,38 +1331,6 @@ public class SniffActivity extends Activity {
             isMobileUa = true;
         }
         webView.reload();
-    }
-
-    /** 录制网页（screenity 式）：MediaProjection 屏幕捕获开关 */
-    void toggleWebRec() {
-        if (webRecState == 1) {
-            Intent i = new Intent(this, ScreenRecService.class);
-            i.setAction(ScreenRecService.ACTION_STOP);
-            startService(i);
-            Toast.makeText(this, "录制已停止，已保存到 记录", Toast.LENGTH_SHORT).show();
-            return;
-        }
-        try {
-            android.media.projection.MediaProjectionManager mpm = (android.media.projection.MediaProjectionManager) getSystemService(Context.MEDIA_PROJECTION_SERVICE);
-            startActivityForResult(mpm.createScreenCaptureIntent(), REQ_WEBREC);
-        } catch (Throwable t) {
-            Toast.makeText(this, "无法启动录屏: " + t, Toast.LENGTH_SHORT).show();
-        }
-    }
-
-    @Override
-    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
-        if (requestCode == REQ_WEBREC && resultCode == RESULT_OK && data != null) {
-            Intent i = new Intent(this, ScreenRecService.class);
-            i.setAction(ScreenRecService.ACTION_START);
-            i.putExtra(ScreenRecService.EXTRA_CODE, resultCode);
-            i.putExtra(ScreenRecService.EXTRA_DATA, data);
-            if (android.os.Build.VERSION.SDK_INT >= 26) startForegroundService(i); else startService(i);
-            Toast.makeText(this, "开始录制网页画面…", Toast.LENGTH_SHORT).show();
-        } else if (requestCode == REQ_WEBREC) {
-            Toast.makeText(this, "未授权录屏", Toast.LENGTH_SHORT).show();
-        }
-        super.onActivityResult(requestCode, resultCode, data);
     }
 
     void toggleRecords() {
