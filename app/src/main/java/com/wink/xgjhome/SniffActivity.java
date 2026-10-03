@@ -140,12 +140,20 @@ public class SniffActivity extends Activity {
             @android.webkit.JavascriptInterface
             public void onGenericMedia(String url, String why) {
                 if (url == null || url.length() < 12) return;
+                String tag = (why == null ? "" : why);
                 String ext = "";
                 int dot = url.lastIndexOf('.');
                 if (dot > 0) { ext = url.substring(dot); int q = ext.indexOf('?'); if (q > 0) ext = ext.substring(0, q); }
-                final String t = "嗅探·" + (ext.isEmpty() ? "媒体" : ext.substring(1));
+                String t;
+                if (tag.contains("mpegurl")) t = "嗅探·m3u8";
+                else if (tag.contains("mp2t")) t = "嗅探·ts";
+                else if (tag.contains("fmp4") || tag.contains("dash")) t = "嗅探·fmp4";
+                else if (tag.contains("video/mp4")) t = "嗅探·mp4";
+                else if (!ext.isEmpty()) t = "嗅探·" + ext.substring(1);
+                else t = "嗅探·媒体";
+                final String tt = t;
                 final String u = url;
-                main.post(new Runnable() { public void run() { try { addRecord(u, t); } catch (Throwable ignored) {} } });
+                main.post(new Runnable() { public void run() { try { addRecord(u, tt); } catch (Throwable ignored) {} } });
             }
 
             @android.webkit.JavascriptInterface
@@ -314,6 +322,15 @@ public class SniffActivity extends Activity {
                 } catch (Exception ignored) {
                 }
                 return null;
+            }
+
+            @Override
+            public void onPageStarted(WebView view, String url, android.graphics.Bitmap favicon) {
+                // cat-catch 式嗅探：页面开始即注入，抢在媒体请求前挂钩
+                try {
+                    String cc = readAsset("catcatch.js");
+                    if (cc != null) view.evaluateJavascript(cc, null);
+                } catch (Throwable ignored) {}
             }
 
             @Override
