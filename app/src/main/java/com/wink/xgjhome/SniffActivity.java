@@ -91,9 +91,6 @@ public class SniffActivity extends Activity {
         layoutRecords = findViewById(R.id.layout_records);
         fab = findViewById(R.id.btn_toggle_top);
         fab.setElevation(100f);
-        findViewById(R.id.btnScanMedia).setOnClickListener(new View.OnClickListener() {
-            public void onClick(View v) { scanPageMedia(); }
-        });
         btnSwitchUa = findViewById(R.id.btn_switch_ua);
         Button btnGo = findViewById(R.id.btn_go);
         Button btnRecords = findViewById(R.id.btn_records);
@@ -325,6 +322,7 @@ public class SniffActivity extends Activity {
                                         .matcher(jstr);
                                 while (mm.find()) {
                                     String cand = mm.group().replace("\\/", "/");
+                                    if (cand.contains("gotcha")) continue;  // 过滤P2P/PCDN线路
                                     if (cand.contains("live-bvc") || cand.contains(".m3u8") || cand.contains(".flv")) urls.add(cand);
                                 }
                                 for (final String su : urls) {
@@ -378,7 +376,11 @@ public class SniffActivity extends Activity {
                                             java.util.regex.Matcher mm = java.util.regex.Pattern
                                                     .compile("https?:\\/\\/[^\"\\\\\\s]+(?:live-bvc|\\.m3u8|\\.flv)[^\"\\\\\\s]*")
                                                     .matcher(jstr);
-                                            while (mm.find()) urls.add(mm.group().replace("\\/", "/"));
+                                            while (mm.find()) {
+                                                String g = mm.group().replace("\\/", "/");
+                                                if (g.contains("gotcha")) continue;  // 过滤P2P/PCDN线路
+                                                urls.add(g);
+                                            }
                                         }
                                         for (final String su : urls) {
                                             if (su.contains("live-bvc") || su.contains(".m3u8") || su.contains(".flv")) {
@@ -1265,40 +1267,6 @@ public class SniffActivity extends Activity {
             isMobileUa = true;
         }
         webView.reload();
-    }
-
-    /** 强力抓取：主动扫当前页面 video/audio 真实地址 + 资源表 + 反复请求流，命中即入记录 */
-    void scanPageMedia() {
-        String js = "(function(){var out=[];try{document.querySelectorAll('video,audio,source').forEach(function(v){var s=v.currentSrc||v.src;if(s&&s.indexOf('data:')!==0&&s.indexOf('blob:')!==0)out.push(s);});}catch(e){}"
-                + "try{performance.getEntriesByType('resource').forEach(function(e){out.push(e.name);});}catch(e){}"
-                + "return JSON.stringify(out);})()";
-        try {
-            webView.evaluateJavascript(js, new android.webkit.ValueCallback<String>() {
-                public void onReceiveValue(String v) {
-                    if (v == null || v.length() < 4) return;
-                    try {
-                        String raw = v.trim();
-                        if (raw.startsWith("\"")) raw = new org.json.JSONTokener(raw).nextValue().toString();
-                        org.json.JSONArray arr = new org.json.JSONArray(raw);
-                        int added = 0;
-                        for (int i = 0; i < arr.length(); i++) {
-                            String u = arr.optString(i);
-                            if (u == null || u.length() < 12) continue;
-                            String l = u.toLowerCase();
-                            if (!l.matches(".*\\.(ts|m4s|mp4|webm|flv|m3u8|mpd|aac|mp3|ogg|mov|mkv)(\\?|#|$).*") && !l.contains("live-bvc")) continue;
-                            if (l.contains("bilivideo") || l.contains("upos-") || l.contains("127.0.0.1:8123")) continue;
-                            recordGeneric(u);
-                            added++;
-                        }
-                        Toast.makeText(SniffActivity.this, added > 0 ? "抓取到 " + added + " 条媒体" : "本页未发现媒体流", Toast.LENGTH_SHORT).show();
-                    } catch (Throwable t) {
-                        Toast.makeText(SniffActivity.this, "抓取失败: " + t, Toast.LENGTH_SHORT).show();
-                    }
-                }
-            });
-        } catch (Throwable t) {
-            Toast.makeText(this, "抓取失败: " + t, Toast.LENGTH_SHORT).show();
-        }
     }
 
     void toggleRecords() {

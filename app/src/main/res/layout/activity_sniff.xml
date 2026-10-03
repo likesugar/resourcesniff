@@ -135,12 +135,6 @@
         android:background="#191a1a3e"
         android:visibility="gone">
 
-        <TextView android:id="@+id/btnScanMedia"
-            android:layout_width="match_parent" android:layout_height="wrap_content"
-            android:gravity="center" android:padding="10dp"
-            android:text="⚡ 强力抓取" android:textColor="#FFFFFF" android:textSize="15sp"
-            android:background="#33000000" android:clickable="true" android:focusable="true"/>
-
         <ScrollView
             android:id="@+id/scroll_records"
             android:layout_width="match_parent"
