@@ -184,6 +184,11 @@ public class VideoDlActivity extends Activity {
             java.util.regex.Matcher bm = java.util.regex.Pattern.compile("bilibili[.]com/video/(BV[0-9A-Za-z]{8,12})").matcher(u);
             if (bm.find()) u = "https://www.bilibili.com/video/" + bm.group(1) + "/";
         } catch (Throwable ignored) {}
+        // 抖音URL归一化: 任意形态 -> www.douyin.com/video/<id>
+        try {
+            java.util.regex.Matcher dm = java.util.regex.Pattern.compile("douyin\\.com/(?:share/)?(?:note|video)/(\\d+)").matcher(u);
+            if (dm.find()) u = "https://www.douyin.com/video/" + dm.group(1);
+        } catch (Throwable ignored) {}
         // b23.tv 短链先原生跟随302
         final String fu0 = u;
         if (fu0.contains("b23.tv")) {
@@ -276,13 +281,15 @@ public class VideoDlActivity extends Activity {
                             // B站: 两段下载(视频+音频), 用 ffmpeg-kit 合并, 免 35M ffmpeg CLI
                             req.addOption("-f", "bv*[ext=mp4]/bv*");
                         } else {
-                            req.addOption("-f", "b/bv*+ba/b");
+                            // 抖音等: 单流取最高档
+                            req.addOption("-f", "b");
                         }
                         req.addOption("--no-update");
                         req.addOption("--user-agent", st[0]);
                         req.addOption("--add-headers", "Referer: " + st[1]);
                         if (st[2].equals("1")) req.addOption("--cookies", cookies().getAbsolutePath());
                         req.addOption("-o", out.getAbsolutePath());
+                        req.addOption("--restrict-filenames");
                         req.addOption("--no-playlist"); req.addOption("--no-mtime");
                         // 进度监视：轮询 .part 文件大小
                         new Thread(new Runnable() { public void run() {
@@ -324,6 +331,7 @@ public class VideoDlActivity extends Activity {
                             ra.addOption("--add-headers", "Referer: " + st[1]);
                             if (st[2].equals("1")) ra.addOption("--cookies", cookies().getAbsolutePath());
                             ra.addOption("-o", out.getAbsolutePath());
+                            ra.addOption("--restrict-filenames");
                             ra.addOption("--no-playlist"); ra.addOption("--no-mtime");
                             java.util.Set<String> before2 = new java.util.HashSet<String>();
                             for (File f0 : cache.listFiles()) if (f0.getName().startsWith("vdl_")) before2.add(f0.getName());
