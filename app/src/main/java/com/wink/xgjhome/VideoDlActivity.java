@@ -30,6 +30,7 @@ public class VideoDlActivity extends Activity {
 
     static class Task {
         String url, title = "解析中…", size = "", res = "";
+        long expect = 0;               // 预期总字节数(视频+音频)
         int percent = -1;            // -1解析中/等待 0-100下载中 100完成 -2失败
         String err; Uri saved; File out;
     }
@@ -247,6 +248,15 @@ public class VideoDlActivity extends Activity {
                             String[] ls = mr.getOut().trim().split("\n");
                             JSONObject j = new JSONObject(ls[ls.length - 1]);
                             tk.title = j.optString("title", tk.title);
+                            try {
+                                org.json.JSONArray rf = j.optJSONArray("requested_formats");
+                                if (rf != null) for (int fi = 0; fi < rf.length(); fi++) {
+                                    JSONObject fo = rf.getJSONObject(fi);
+                                    long fs = fo.optLong("filesize");
+                                    if (fs <= 0) fs = fo.optLong("filesize_approx");
+                                    tk.expect += fs;
+                                }
+                            } catch (Throwable ignored) {}
                             if (j.optLong("filesize") > 0) tk.size = fmtMB(j.optLong("filesize"));
                             else if (j.optLong("filesize_approx") > 0) tk.size = "~" + fmtMB(j.optLong("filesize_approx"));
                             int w = j.optInt("width"), h = j.optInt("height"), fps = j.optInt("fps", 0);
@@ -281,15 +291,19 @@ public class VideoDlActivity extends Activity {
                                     long mx = 0;
                                     File cache2 = getExternalCacheDir() != null ? getExternalCacheDir() : getCacheDir();
                                     for (File f2 : cache2.listFiles()) {
-                                        if (f2.getName().startsWith("vdl_") && f2.getName().endsWith(".part") && f2.length() > mx) mx = f2.length();
+                                        if (f2.getName().startsWith("vdl_") && !before.contains(f2.getName())) mx += f2.length();
                                     }
                                     if (mx > 0) {
                                         tk.size = fmtMB(mx);
-                                        if (tk.percent < 1) tk.percent = 1;
+                                        if (tk.expect > 0) {
+                                            int pc = (int)(1 + 98L * mx / tk.expect);
+                                            if (pc > 99) pc = 99;
+                                            if (pc > tk.percent) tk.percent = pc;
+                                        } else if (tk.percent < 1) tk.percent = 1;
                                         runUi(new Runnable() { public void run() { render(); }});
                                     }
                                 } catch (Throwable ignored) {}
-                                try { Thread.sleep(1500); } catch (Throwable e) { return; }
+                                try { Thread.sleep(1200); } catch (Throwable e) { return; }
                             }
                         }}).start();
                         com.yausername.youtubedl_android.YoutubeDL.getInstance().execute(req);
@@ -321,7 +335,7 @@ public class VideoDlActivity extends Activity {
                                     if (afile == null || f.lastModified() > afile.lastModified()) afile = f;
                             if (afile != null) {
                                 String m = new File(cache, "vdl_m_" + System.currentTimeMillis() + ".mp4").getAbsolutePath();
-                                com.arthenica.ffmpegkit.FFmpegKit.execute("-y -i \"" + vfile.getAbsolutePath() + "\" -i \"" + afile.getAbsolutePath() + "\" -c copy -movflags +faststart \"" + m + "\"");
+                                com.arthenica.ffmpegkit.FFmpegKit.execute("-y -i \"" + vfile.getAbsolutePath() + "\" -i \"" + afile.getAbsolutePath() + "\" -c copy -avoid_negative_ts make_zero -movflags +faststart \"" + m + "\"");
                                 File mf = new File(m);
                                 if (mf.length() > 1024) done = mf;
                             }
@@ -564,24 +578,19 @@ public class VideoDlActivity extends Activity {
     }
 
     private Uri store(File f, String name) throws Exception {
-        try {
-            ContentValues cv = new ContentValues();
-            cv.put(android.provider.MediaStore.Video.Media.DISPLAY_NAME, name + ".mp4");
-            cv.put(android.provider.MediaStore.Video.Media.MIME_TYPE, "video/mp4");
-            if (Build.VERSION.SDK_INT >= 29)
-                cv.put(android.provider.MediaStore.Video.Media.RELATIVE_PATH, "Movies/资源嗅探");
-            Uri uri = getContentResolver().insert(android.provider.MediaStore.Video.Media.EXTERNAL_CONTENT_URI, cv);
-            if (uri != null) {
-                java.io.OutputStream os = getContentResolver().openOutputStream(uri);
-                java.io.FileInputStream fis = new java.io.FileInputStream(f);
-                byte[] b = new byte[65536]; int r;
-                while ((r = fis.read(b)) > 0) os.write(b, 0, r);
-                fis.close(); os.close();
-                f.delete();
-                return uri;
-            }
-        } catch (Throwable ignored) {}
-        return Uri.fromFile(f);
+        File dir = new File(getExternalFilesDir(null), "视频下载");
+        if (!dir.exists()) dir.mkdirs();
+        String fn = name.endsWith(".mp4") ? name : name + ".mp4";
+        File dst = new File(dir, fn);
+        int dup = 1;
+        while (dst.exists()) dst = new File(dir, name + "(" + (dup++) + ").mp4");
+        java.io.FileOutputStream fos = new java.io.FileOutputStream(dst);
+        java.io.FileInputStream fis = new java.io.FileInputStream(f);
+        byte[] b = new byte[65536]; int r;
+        while ((r = fis.read(b)) > 0) fos.write(b, 0, r);
+        fis.close(); fos.close();
+        f.delete();
+        return Uri.fromFile(dst);
     }
 
     private int dp2(int v) { return dp(v); }
