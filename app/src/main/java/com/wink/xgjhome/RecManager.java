@@ -53,6 +53,12 @@ public class RecManager {
                         j.active = false;
                         j.paused = true;
                         j.state = null;   // 显示"暂停录制", 可继续/结束
+                        // 补算已落盘大小, 避免显示为空
+                        try {
+                            long b = 0;
+                            if (j.file.isDirectory()) for (java.io.File f : j.file.listFiles()) if (f.getName().startsWith("seg")) b += f.length();
+                            j.bytes = b;
+                        } catch (Throwable ignored) {}
                         stoppedJobs.put(j.id, j);
                     } catch (Throwable ignored) {}
                 }
@@ -366,8 +372,9 @@ public class RecManager {
 
     /** 继续：同一路重新拉流，追加写入同一文件 */
     public static void recContinue(int jid) {
-        RecJob job = stoppedJobs.get(jid);
-        if (job == null) return;
+        try {
+            RecJob job = stoppedJobs.get(jid);
+            if (job == null) return;
         if (job.file != null && job.file.isDirectory()) {
             stoppedJobs.remove(job.id);
             job.active = true;
@@ -382,7 +389,15 @@ public class RecManager {
             startWatchdog(job);  // 续录重启看门狗，大小才会刷新
             return;
         }
-        startPull(job, true);
+            startPull(job, true);
+        } catch (Throwable e) {
+            try {
+                java.io.File d = sCtx.getExternalFilesDir(null);
+                java.io.FileWriter fw = new java.io.FileWriter(new java.io.File(d, "网页诊断.txt"), true);
+                fw.write("\n==== REC continue err " + new java.util.Date() + " jid=" + jid + " ====" + android.util.Log.getStackTraceString(e) + "\n");
+                fw.close();
+            } catch (Throwable ignored) {}
+        }
     }
 
     /** 结束录制：合并转封装成 mp4（后台执行），完成后从列表移除 */
