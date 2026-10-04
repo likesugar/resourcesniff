@@ -23,18 +23,7 @@ public class HomeActivity extends Activity {
         ((android.view.ViewGroup) findViewById(R.id.toolRoot)).addView(
             new CapsuleBottomBar(this, dark, new CapsuleBottomBar.OnItem() {
                 public void onItem(int idx) {
-                    if (idx == 1) {
-                        String clip = clipUrl();
-                        if (clip != null) {
-                            Intent i = new Intent(HomeActivity.this, NativePlayerActivity.class);
-                            i.putExtra("url", clip);
-                            i.putExtra("title", "播放");
-                            i.putExtra("kernel", "native");
-                            startActivity(i);
-                        } else {
-                            showPlayChoice();
-                        }
-                    }
+                    if (idx == 1) showPlayChoice();
                 }
             }));
         findViewById(R.id.toolColumn).setBackgroundColor(dark ? 0xFF000000 : 0xFFEEF4FF);

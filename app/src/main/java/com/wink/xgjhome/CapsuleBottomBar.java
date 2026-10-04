@@ -58,7 +58,7 @@ public class CapsuleBottomBar extends FrameLayout {
         LinearLayout row = new LinearLayout(c);
         row.setOrientation(LinearLayout.HORIZONTAL);
         capsule.addView(row, new FrameLayout.LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT));
-        String[] labels = {"🏠 首页", "📡 播放"};
+        String[] labels = {"🏠 首页", "📡 播放器"};
         for (int i = 0; i < 2; i++) {
             final int idx = i;
             TextView t = new TextView(c);
