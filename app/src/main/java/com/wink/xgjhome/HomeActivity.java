@@ -130,6 +130,9 @@ public class HomeActivity extends Activity {
         findViewById(R.id.cardAppSettings).setOnClickListener(new View.OnClickListener() {
             public void onClick(View v) { startActivity(new Intent(HomeActivity.this, SettingsActivity.class)); }
         });
+        findViewById(R.id.lanToggle).setOnClickListener(new View.OnClickListener() {
+            public void onClick(View v) { showLanDialog(); }
+        });
         findViewById(R.id.cardShortcut).setOnClickListener(new View.OnClickListener() {
             public void onClick(View v) {
                 try { startActivity(new Intent(HomeActivity.this, ShortcutActivity.class)); }
