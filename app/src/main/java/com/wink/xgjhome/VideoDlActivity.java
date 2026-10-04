@@ -250,6 +250,17 @@ public class VideoDlActivity extends Activity {
             } catch (Throwable e) {
                 tk.percent = -2;
                 tk.err = e.getMessage() == null ? e.toString() : e.getMessage();
+                try {
+                    java.io.StringWriter sw = new java.io.StringWriter();
+                    e.printStackTrace(new java.io.PrintWriter(sw));
+                    String full = sw.toString();
+                    for (String fn : new String[]{"网页诊断.txt", "fc2_debug.txt"}) {
+                        java.io.File dir = getExternalFilesDir(null) != null ? getExternalFilesDir(null).getParentFile() : getFilesDir();
+                        java.io.FileWriter fw = new java.io.FileWriter(new java.io.File(dir, fn), true);
+                        fw.write("\n==== VDL " + new java.util.Date() + " url=" + tk.url + " ====\n" + full + "\n");
+                        fw.close();
+                    }
+                } catch (Throwable ignored) {}
                 runUi(new Runnable() { public void run() { render(); }});
             }
         }}).start();
