@@ -596,6 +596,7 @@ public class SniffActivity extends Activity {
             }
         }
         if (!url.startsWith("http")) url = "https://" + url;
+        if (YtResolver.isYt(url)) { YtResolver.handle(this, url); return; }  // YouTube: NewPipeExtractor 解析→封装→进记录
         if (url.contains("v.douyin.com")) { resolveDouyinShort(url); return; }  // 抖音短链原生解析302直达房间
         if (isDyLiveUrl(url)) dyAutoPcClick();
         webView.loadUrl(url);
