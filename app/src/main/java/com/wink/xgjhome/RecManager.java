@@ -38,12 +38,12 @@ public class RecManager {
         // 进程被杀(手动/系统)后重启: 遗留录制任务自动转为暂停, 文件保留可续录
         try {
             android.content.SharedPreferences sp = sCtx.getSharedPreferences("rec_live", 0);
-            String raw = sp.getString("jobs", "");
-            if (raw != null && raw.length() > 2) {
-                org.json.JSONArray arr = new org.json.JSONArray(raw);
-                for (int i = 0; i < arr.length(); i++) {
+            java.util.Set<String> paths = sp.getStringSet("jobs_set", null);
+            if (paths != null && !paths.isEmpty()) {
+                for (String path : paths) {
                     try {
-                        org.json.JSONObject o = arr.getJSONObject(i);
+                        org.json.JSONObject o = new org.json.JSONObject(sp.getString("job:" + path, "{}"));
+                        if (!o.has("file")) continue;
                         RecJob j = new RecJob();
                         j.id = ++recSeq;
                         j.notifId = 9000 + j.id;
