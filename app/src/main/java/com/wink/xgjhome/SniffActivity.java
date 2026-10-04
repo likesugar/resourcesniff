@@ -114,8 +114,10 @@ public class SniffActivity extends Activity {
 
         WebSettings ws = webView.getSettings();
         ws.setJavaScriptEnabled(true);
-        ws.setUserAgentString(UA_MOBILE); // 手机UA：抖音直播流按移动端下发
-        isMobileUa = true;
+        ws.setUserAgentString(UA_PC); // 首屏默认抖音直播页，直接电脑UA避免先手机后电脑闪切
+        isMobileUa = false;
+        btnSwitchUa.setText("切手机UA");
+        btnSwitchUa.setBackgroundColor(0x4D3742fa);
         ws.setDomStorageEnabled(true);
         ws.setMediaPlaybackRequiresUserGesture(false);
         ws.setMixedContentMode(WebSettings.MIXED_CONTENT_ALWAYS_ALLOW);
@@ -557,6 +559,7 @@ public class SniffActivity extends Activity {
         } else {
             // 自动检测剪贴板：有新链接则直接进入嗅探（同一条链接只自动进一次）
             try {
+                if (!getSharedPreferences("settings", MODE_PRIVATE).getBoolean("clipboard", true)) throw new Exception("off");
                 android.content.ClipboardManager cm = (android.content.ClipboardManager) getSystemService(Context.CLIPBOARD_SERVICE);
                 if (cm != null && cm.hasPrimaryClip() && cm.getPrimaryClip() != null && cm.getPrimaryClip().getItemCount() > 0) {
                     CharSequence cs = cm.getPrimaryClip().getItemAt(0).getText();
