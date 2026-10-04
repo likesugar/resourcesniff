@@ -26,32 +26,16 @@ public class RecordActivity extends Activity {
     private TextView tvEmpty;
     private TextView[] tabBtns;
     private View[] tabLines;
-    private LinearLayout[] tabChips;
     private int curTab = 0;  // 0全部 1视频 2录制 3下载
     private java.util.ArrayList<HistoryStore.Item> hist;
 
     private void restyleTabs() {
         for (int i = 0; i < tabBtns.length; i++) {
             boolean sel = i == curTab;
-            android.graphics.drawable.GradientDrawable g = new android.graphics.drawable.GradientDrawable();
-            g.setCornerRadius(dp2(20));
-            if (sel) g.setColor(0xFF3A3450);
-            else { g.setColor(0xFF161A20); g.setStroke(1, 0xFF2A3142); }
-            tabChips[i].setBackground(g);
             tabBtns[i].setTextColor(sel ? Color.WHITE : 0xFF8A919E);
             tabBtns[i].setTypeface(sel ? Typeface.DEFAULT_BOLD : Typeface.DEFAULT);
+            tabLines[i].setBackgroundColor(sel ? 0xFF3D7BFF : 0x00000000);
         }
-    }
-
-    static String platformEmoji(String u) {
-        if (u == null) return "🌐";
-        String l = u.toLowerCase();
-        if (l.contains("douyin") || l.contains("iesdouyin") || l.contains("amemv")) return "🎵";
-        if (l.contains("bilibili") || l.contains("b23.tv") || l.contains("bilivideo")) return "📺";
-        if (l.contains("youtube") || l.contains("youtu.be") || l.contains("googlevideo")) return "▶";
-        if (l.contains("stripchat") || l.contains("doppiocdn")) return "FemaleSign".equals("x") ? "" : "💜";
-        if (l.contains("kuaishou")) return "⚡";
-        return "🌐";
     }
 
     private int dp2(int v) { return Math.round(v * getResources().getDisplayMetrics().density); }
@@ -81,7 +65,7 @@ public class RecordActivity extends Activity {
         head.setGravity(Gravity.CENTER_VERTICAL);
         head.setPadding(0, 0, 0, 20);
         TextView title = new TextView(this);
-        title.setText("视频下载");
+        title.setText("下载");
         title.setTextSize(22);
         title.setTypeface(Typeface.DEFAULT_BOLD);
         title.setTextColor(Color.WHITE);
@@ -115,29 +99,8 @@ public class RecordActivity extends Activity {
             }
         });
         head.addView(recNow);
-        TextView trash = new TextView(this);
-        trash.setText("🗑");
-        trash.setTextSize(18);
-        trash.setPadding(16, 8, 8, 8);
-        trash.setOnClickListener(new View.OnClickListener() {
-            public void onClick(View v) {
-                HistoryStore.clearAll(RecordActivity.this);
-                RecManager.stoppedJobs.clear();
-                rebuild();
-                Toast.makeText(RecordActivity.this, "已清空记录", Toast.LENGTH_SHORT).show();
-            }
-        });
-        head.addView(trash);
-        TextView gear = new TextView(this);
-        gear.setText("⚙");
-        gear.setTextSize(18);
-        gear.setPadding(8, 8, 8, 8);
-        gear.setOnClickListener(new View.OnClickListener() {
-            public void onClick(View v) { startActivity(new Intent(RecordActivity.this, SettingsActivity.class)); }
-        });
-        head.addView(gear);
         col.addView(head);
-        // 粘贴视频链接条（图1 DBdown 风格）
+        // 粘贴视频链接条：YouTube 走 yt-dlp(Seal 同款引擎)，其他走直连/HLS
         final android.widget.EditText pasteEt = new android.widget.EditText(this);
         pasteEt.setHint("🔗 粘贴视频链接");
         pasteEt.setSingleLine(true);
@@ -173,10 +136,14 @@ public class RecordActivity extends Activity {
             public void onClick(View v) {
                 String u = pasteEt.getText().toString().trim();
                 if (!u.startsWith("http")) { Toast.makeText(RecordActivity.this, "请输入有效链接", Toast.LENGTH_SHORT).show(); return; }
-                DlManager.start(u);
+                if (YtResolver.isYt(u)) {
+                    YtResolver.handle(RecordActivity.this, u);
+                } else {
+                    DlManager.start(u);
+                    Toast.makeText(RecordActivity.this, "已开始下载", Toast.LENGTH_SHORT).show();
+                }
                 pasteEt.setText("");
                 rebuild();
-                Toast.makeText(RecordActivity.this, "已开始下载", Toast.LENGTH_SHORT).show();
             }
         });
         pasteRow.addView(go);
@@ -186,9 +153,8 @@ public class RecordActivity extends Activity {
         LinearLayout tabBar = new LinearLayout(this);
         tabBar.setOrientation(LinearLayout.HORIZONTAL);
         tabBar.setPadding(0, 0, 0, 16);
-        final String[] tabs = {"全部", "进行中", "已完成"};
+        final String[] tabs = {"全部", "视频", "录制", "下载"};
         tabBtns = new TextView[tabs.length];
-        tabChips = new LinearLayout[tabs.length];
         tabLines = new View[tabs.length];
         for (int i = 0; i < tabs.length; i++) {
             final int idx = i;
@@ -199,18 +165,18 @@ public class RecordActivity extends Activity {
             tc.setLayoutParams(tlp);
             TextView tb = new TextView(this);
             tb.setText(tabs[i]);
-            tb.setTextSize(14);
+            tb.setTextSize(15);
             tb.setGravity(Gravity.CENTER);
-            tb.setPadding(dp2(22), dp2(9), dp2(22), dp2(9));
-            LinearLayout.LayoutParams chipLp = new LinearLayout.LayoutParams(-2, -2);
-            chipLp.rightMargin = dp2(10);
-            tc.setLayoutParams(chipLp);
+            tb.setPadding(0, 16, 0, 12);
             tb.setOnClickListener(new View.OnClickListener() {
                 public void onClick(View v) { curTab = idx; restyleTabs(); rebuild(); }
             });
+            View line = new View(this);
+            line.setBackgroundColor(0x00000000);
             tc.addView(tb, new LinearLayout.LayoutParams(-1, -2));
+            tc.addView(line, new LinearLayout.LayoutParams(-1, 4));
             tabBtns[i] = tb;
-            tabChips[i] = tc;
+            tabLines[i] = line;
             tabBar.addView(tc);
         }
         restyleTabs();
@@ -282,7 +248,7 @@ public class RecordActivity extends Activity {
                 cat.put(e.getKey(), live ? "下载" : "录制");
             }
         }
-        final int chip = curTab;  // 0全部 1进行中 2已完成
+        String want = new String[]{"全部", "视频", "录制", "下载"}[curTab];
 
         // 稳定顺序
         java.util.ArrayList<String> order = new java.util.ArrayList<String>(rowOrder);
@@ -292,19 +258,7 @@ public class RecordActivity extends Activity {
 
         // 当前tab要显示的
         java.util.ArrayList<String> shown = new java.util.ArrayList<String>();
-        for (String k : order) {
-            if (chip == 0) { shown.add(k); continue; }
-            String c = cat.get(k);
-            boolean busy = false;
-            Object[] mm = meta.get(k);
-            if (mm != null && (Integer) mm[0] == 0) busy = (Boolean) mm[2];
-            else if (mm != null && (Integer) mm[0] == 1) {
-                DlManager.DlJob dj = (DlManager.DlJob) mm[1];
-                busy = dj.active || dj.paused;
-            }
-            if (chip == 1 && busy) shown.add(k);
-            else if (chip == 2 && !busy) shown.add(k);
-        }
+        for (String k : order) if (want.equals("全部") || want.equals(cat.get(k))) shown.add(k);
         tvEmpty.setVisibility(shown.isEmpty() ? View.VISIBLE : View.GONE);
 
         // 已显示行 == 当前应显示行 → 只刷文字
@@ -422,7 +376,7 @@ public class RecordActivity extends Activity {
         mp.weight = 1;
         mid.setLayoutParams(mp);
         TextView tvName = new TextView(this);
-        tvName.setText(platformEmoji(it.path) + " " + it.title);
+        tvName.setText(it.title);
         tvName.setTextColor(Color.WHITE);
         tvName.setTextSize(16);
         tvName.setTypeface(Typeface.DEFAULT_BOLD);

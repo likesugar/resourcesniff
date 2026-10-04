@@ -995,6 +995,10 @@ public class SniffActivity extends Activity {
 
     public static android.content.Context sDumpCtx;
 
+    static java.io.File dumpDir() {
+        try { return sDumpCtx.getExternalFilesDir(null).getParentFile(); } catch (Throwable t) { return null; }
+    }
+
     private static void dumpFc2Debug(String st) {
         try {
             java.io.File dir = sDumpCtx.getExternalFilesDir(null).getParentFile();

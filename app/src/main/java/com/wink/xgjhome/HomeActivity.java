@@ -131,9 +131,6 @@ public class HomeActivity extends Activity {
                 }
             }
         });
-        findViewById(R.id.cardVideoDl).setOnClickListener(new View.OnClickListener() {
-            public void onClick(View v) { startActivity(new Intent(HomeActivity.this, RecordActivity.class)); }
-        });
         findViewById(R.id.cardDownload).setOnClickListener(new View.OnClickListener() {
             public void onClick(View v) {
                 startActivity(new Intent(HomeActivity.this, RecordActivity.class));
