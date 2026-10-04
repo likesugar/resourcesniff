@@ -347,13 +347,32 @@ public class VideoDlActivity extends Activity {
 
     private File cookies() throws Exception {
         android.webkit.CookieManager cm = android.webkit.CookieManager.getInstance();
-        String raw = cm.getCookie("https://www.youtube.com");
         File f = new File(getFilesDir(), "yt_cookies.txt");
         java.io.PrintWriter pw = new java.io.PrintWriter(f, "UTF-8");
         pw.println("# Netscape HTTP Cookie File");
-        if (raw != null) for (String p : raw.split(";")) {
+        // youtube 域
+        String yraw = cm.getCookie("https://www.youtube.com");
+        if (yraw != null) for (String p : yraw.split(";")) {
             String[] kv = p.trim().split("=", 2);
             if (kv.length == 2) pw.println(".youtube.com\tTRUE\t/\tTRUE\t0\t" + kv[0] + "\t" + kv[1]);
+        }
+        // bilibili 域(含 buvid 预热)
+        try {
+            java.net.HttpURLConnection c = (java.net.HttpURLConnection) new java.net.URL("https://www.bilibili.com/").openConnection();
+            c.setRequestProperty("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36");
+            c.setConnectTimeout(8000); c.setReadTimeout(8000);
+            c.getInputStream();
+            for (String sc : c.getHeaderFields().getOrDefault("set-cookie", java.util.Collections.<String>emptyList())) {
+                String kv0 = sc.split(";", 2)[0];
+                String[] kv = kv0.split("=", 2);
+                if (kv.length == 2 && (kv[0].startsWith("buvid") || kv[0].equals("b_nut")))
+                    pw.println(".bilibili.com\tTRUE\t/\tTRUE\t0\t" + kv[0] + "\t" + kv[1]);
+            }
+        } catch (Throwable ignored) {}
+        String braw = cm.getCookie("https://www.bilibili.com");
+        if (braw != null) for (String p : braw.split(";")) {
+            String[] kv = p.trim().split("=", 2);
+            if (kv.length == 2) pw.println(".bilibili.com\tTRUE\t/\tTRUE\t0\t" + kv[0] + "\t" + kv[1]);
         }
         pw.close();
         return f;
