@@ -53,7 +53,7 @@ public class VideoDlActivity extends Activity {
         LinearLayout col = new LinearLayout(this);
         col.setOrientation(LinearLayout.VERTICAL);
         int pad = dp(18);
-        col.setPadding(pad, pad + dp(24), pad, pad);
+        col.setPadding(pad, dp(6), pad, pad);
         root.addView(col, new FrameLayout.LayoutParams(-1, -1));
 
         // 头部：视频下载 + 🗑 + ⚙
@@ -72,10 +72,12 @@ public class VideoDlActivity extends Activity {
         head.addView(iconBtn("⚙", new OnClickListener() { public void onClick(View v) {
             startActivity(new Intent(VideoDlActivity.this, SettingsActivity.class));
         }}));
+        title.setOnClickListener(new OnClickListener() { public void onClick(View v) { showInputDialog(); }});
         col.addView(head);
 
-        // 粘贴视频链接 pill
-        LinearLayout pillRow = new LinearLayout(this);
+        // 粘贴视频链接 pill(点击标题弹出)
+        final LinearLayout pillRow = new LinearLayout(this);
+        pillRow.setVisibility(android.view.View.GONE);
         pillRow.setOrientation(LinearLayout.HORIZONTAL);
         pillRow.setGravity(Gravity.CENTER_VERTICAL);
         GradientDrawable pb = new GradientDrawable();
@@ -170,12 +172,59 @@ public class VideoDlActivity extends Activity {
         }
     }
 
-    private void submit() {
-        String u = input.getText().toString().trim();
+    private void showInputDialog() {
+        final LinearLayout box = new LinearLayout(this);
+        box.setOrientation(LinearLayout.HORIZONTAL);
+        box.setGravity(Gravity.CENTER_VERTICAL);
+        GradientDrawable pb = new GradientDrawable();
+        pb.setCornerRadius(dp(24)); pb.setColor(dark ? 0xFF181E2A : 0xFFFFFFFF);
+        if (!dark) pb.setStroke(dp(1), 0xFFE4EAF5);
+        box.setBackground(pb);
+        int p2 = dp(6);
+        box.setPadding(dp(18), dp(14), p2, dp(14));
+        TextView link = new TextView(this);
+        link.setText("🔗"); link.setTextSize(16);
+        box.addView(link);
+        input = new EditText(this);
+        input.setHint("粘贴视频链接");
+        input.setBackground(null);
+        input.setSingleLine(true);
+        input.setTextSize(15);
+        input.setTextColor(dark ? 0xFFE8ECF4 : 0xFF1F2329);
+        input.setHintTextColor(dark ? 0xFF6B7684 : 0xFF9AA3AE);
+        input.setPadding(dp(10), 0, 0, 0);
+        box.addView(input, new LinearLayout.LayoutParams(0, -2, 1f));
+        try {
+            android.content.ClipboardManager cm = (android.content.ClipboardManager) getSystemService(CLIPBOARD_SERVICE);
+            if (cm != null && cm.getPrimaryClip() != null && cm.getPrimaryClip().getItemAt(0) != null && cm.getPrimaryClip().getItemAt(0).getText() != null) {
+                String cu = cm.getPrimaryClip().getItemAt(0).getText().toString().trim();
+                java.util.regex.Matcher m = java.util.regex.Pattern.compile("https?://\\S+").matcher(cu);
+                if (m.find()) input.setText(m.group());
+            }
+        } catch (Throwable ignored) {}
+        TextView go = new TextView(this);
+        go.setText("→"); go.setTextSize(20);
+        go.setTextColor(dark ? 0xFFB4C5FF : 0xFF315CDE);
+        go.setPadding(dp(12), 0, dp(6), 0);
+        final android.app.AlertDialog dlg = new android.app.AlertDialog.Builder(this).create();
+        go.setOnClickListener(new OnClickListener() { public void onClick(View v) {
+            String u = input.getText().toString().trim();
+            if (u.length() > 0) { dlg.dismiss(); submit(u); }
+        }});
+        box.addView(go);
+        dlg.setView(box, dp(18), dp(24), dp(18), dp(6));
+        dlg.show();
+        if (dlg.getWindow() != null) dlg.getWindow().setBackgroundDrawableResource(android.R.color.transparent);
+    }
+
+    private void submit() { submit(null); }
+
+    private void submit(String urlIn) {
+        String u = urlIn != null ? urlIn : input.getText().toString().trim();
         java.util.regex.Matcher m = java.util.regex.Pattern.compile("https?://\\S+").matcher(u);
         if (m.find()) u = m.group(); else { Toast.makeText(this, "请输入有效链接", Toast.LENGTH_SHORT).show(); return; }
         for (Task t : TASKS) if (t.url.equals(u) && t.percent < 100 && t.percent != -2) { Toast.makeText(this, "该链接已在队列", Toast.LENGTH_SHORT).show(); return; }
-        input.setText("");
+        if (urlIn == null) input.setText("");
         final Task tk = new Task(); tk.url = u;
         TASKS.add(0, tk);
         render();
@@ -542,15 +591,16 @@ public class VideoDlActivity extends Activity {
                 }});
                 r3.addView(play);
                 TextView share = new TextView(this);
-                share.setText("⤴"); share.setTextSize(20); share.setTextColor(0xFF8A94A6);
+                share.setText("▶"); share.setTextSize(20); share.setTextColor(0xFFE8ECF4);
                 share.setOnClickListener(new OnClickListener() { public void onClick(View v) {
                     try {
-                        Intent sh = new Intent(Intent.ACTION_SEND);
-                        sh.setType("video/mp4");
-                        sh.putExtra(Intent.EXTRA_STREAM, tk.saved);
+                        java.io.File vf = new java.io.File(tk.saved.getPath());
+                        android.net.Uri cu = androidx.core.content.FileProvider.getUriForFile(VideoDlActivity.this, getPackageName() + ".fp", vf);
+                        Intent sh = new Intent(Intent.ACTION_VIEW);
+                        sh.setDataAndType(cu, "video/mp4");
                         sh.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
-                        startActivity(Intent.createChooser(sh, "分享视频"));
-                    } catch (Throwable e) { }
+                        startActivity(sh);
+                    } catch (Throwable e) { Toast.makeText(VideoDlActivity.this, "没有可用的播放器", Toast.LENGTH_SHORT).show(); }
                 }});
                 r3.addView(share);
             }
