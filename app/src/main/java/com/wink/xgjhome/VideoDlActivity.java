@@ -37,6 +37,44 @@ public class VideoDlActivity extends Activity {
 
     private static final ArrayList<Task> TASKS = new ArrayList<Task>();
 
+    // ---------- 任务持久化(重进不丢) ----------
+    static void saveTasks(android.content.Context c) {
+        try {
+            org.json.JSONArray arr = new org.json.JSONArray();
+            synchronized (TASKS) {
+                for (Task t : TASKS) {
+                    if (t.percent != 100 && t.percent != -2) continue;
+                    org.json.JSONObject o = new org.json.JSONObject();
+                    o.put("url", t.url); o.put("title", t.title);
+                    o.put("size", t.size); o.put("res", t.res);
+                    o.put("percent", t.percent); o.put("err", t.err == null ? "" : t.err);
+                    o.put("saved", t.saved == null ? "" : t.saved.toString());
+                    arr.put(o);
+                }
+            }
+            c.getSharedPreferences("vdl_tasks", 0).edit().putString("list", arr.toString()).apply();
+        } catch (Throwable ignored) {}
+    }
+
+    static void loadTasks(android.content.Context c) {
+        try {
+            String raw = c.getSharedPreferences("vdl_tasks", 0).getString("list", "");
+            if (raw == null || raw.length() < 2) return;
+            org.json.JSONArray arr = new org.json.JSONArray(raw);
+            for (int i = arr.length() - 1; i >= 0; i--) {
+                org.json.JSONObject o = arr.getJSONObject(i);
+                Task t = new Task();
+                t.url = o.optString("url"); t.title = o.optString("title", "已完成");
+                t.size = o.optString("size"); t.res = o.optString("res");
+                t.percent = o.optInt("percent", 100);
+                t.err = o.optString("err", "");
+                String sv = o.optString("saved", "");
+                if (sv.length() > 0) t.saved = android.net.Uri.parse(sv);
+                synchronized (TASKS) { TASKS.add(0, t); }
+            }
+        } catch (Throwable ignored) {}
+    }
+
     private LinearLayout list;
     private int chip = 0;           // 0全部 1进行中 2已完成
     private LinearLayout[] chips;
@@ -48,6 +86,7 @@ public class VideoDlActivity extends Activity {
     @Override
     protected void onCreate(Bundle b) {
         super.onCreate(b);
+        loadTasks(this);
         FrameLayout root = new FrameLayout(this);
         root.setBackgroundColor(dark ? 0xFF10141C : 0xFFF2F6FF);
         LinearLayout col = new LinearLayout(this);
@@ -67,6 +106,7 @@ public class VideoDlActivity extends Activity {
         head.addView(title, new LinearLayout.LayoutParams(0, -2, 1f));
         head.addView(iconBtn("🗑", new OnClickListener() { public void onClick(View v) {
             for (int i = TASKS.size() - 1; i >= 0; i--) if (TASKS.get(i).percent >= 100 || TASKS.get(i).percent == -2) TASKS.remove(i);
+            saveTasks(VideoDlActivity.this);
             render();
         }}));
         head.addView(iconBtn("⚙", new OnClickListener() { public void onClick(View v) {
@@ -149,6 +189,10 @@ public class VideoDlActivity extends Activity {
         ScrollView sv = new ScrollView(this);
         sv.setFillViewport(true);
         setContentView(root);
+        // 入口交互与资源嗅探一致: 进入即弹输入窗
+        String autoUrl = getIntent() != null ? getIntent().getStringExtra("url") : null;
+        if (autoUrl != null && autoUrl.length() > 0) { submit(autoUrl); }
+        else showInputDialog();
         render();
     }
 
@@ -419,6 +463,7 @@ public class VideoDlActivity extends Activity {
                         if (done == null || done.length() < 1024) throw new Exception("未生成视频文件");
                         tk.out = done;
                         tk.saved = store(done, safeName(tk.title));
+                        saveTasks(VideoDlActivity.this);
                         tk.percent = 100;
                         runUi(new Runnable() { public void run() { render(); }});
                         return;  // 成功收工
@@ -436,6 +481,7 @@ public class VideoDlActivity extends Activity {
             } catch (Throwable e) {
                 tk.percent = -2;
                 tk.err = e.getMessage() == null ? e.toString() : e.getMessage();
+                saveTasks(VideoDlActivity.this);
                 try {
                     java.io.StringWriter sw = new java.io.StringWriter();
                     e.printStackTrace(new java.io.PrintWriter(sw));

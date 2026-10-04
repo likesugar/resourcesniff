@@ -124,7 +124,7 @@ public class HomeActivity extends Activity {
             public void onClick(View v) { startActivity(new Intent(HomeActivity.this, RecordActivity.class)); }
         });
         findViewById(R.id.cardVideoDl).setOnClickListener(new View.OnClickListener() {
-            public void onClick(View v) { startActivity(new Intent(HomeActivity.this, VideoDlActivity.class)); }
+            public void onClick(View v) { startActivity(new Intent(HomeActivity.this, VideoDlActivity.class).putExtra("auto_dialog", true)); }
         });
 
         findViewById(R.id.cardAppSettings).setOnClickListener(new View.OnClickListener() {
