@@ -18,6 +18,14 @@ public class HomeActivity extends Activity {
     private void applyTheme() {
         boolean dark = getSharedPreferences("settings", MODE_PRIVATE).getBoolean("dark", false);
         findViewById(R.id.toolRoot).setBackgroundColor(dark ? 0xFF000000 : 0xFFEEF4FF);
+        // 底部胶囊导航（SmoothBottomBar 风格）
+        ((android.view.ViewGroup) findViewById(R.id.toolRoot)).addView(
+            new CapsuleBottomBar(this, dark, new CapsuleBottomBar.OnItem() {
+                public void onItem(int idx) {
+                    if (idx == 1) startActivity(new Intent(HomeActivity.this, SniffActivity.class)
+                            .addFlags(Intent.FLAG_ACTIVITY_REORDER_TO_FRONT));
+                }
+            }));
         findViewById(R.id.toolColumn).setBackgroundColor(dark ? 0xFF000000 : 0xFFEEF4FF);
         ((TextView) findViewById(R.id.themeToggle)).setText(dark ? "☀️" : "🌙");
         applyTraversal((android.view.ViewGroup) findViewById(R.id.toolColumn), dark);
