@@ -612,11 +612,27 @@ public class SniffActivity extends Activity {
         }
         if (!url.startsWith("http")) url = "https://" + url;
         if (url.contains("v.douyin.com")) { resolveDouyinShort(url); return; }  // 抖音短链原生解析302直达房间
+        if (url.contains("live.douyin.com") && isMobileUa) dyPcSwapLater();
         webView.loadUrl(url);
     }
 
     static final String UA_PC = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36";
     private String dyPcDoneUrl = null;   // 该URL已手机→电脑无缝切换过，防循环
+
+    /** 兜底：onPageFinished 不回调时 3s 后定时切电脑UA */
+    void dyPcSwapLater() {
+        new android.os.Handler(android.os.Looper.getMainLooper()).postDelayed(new Runnable() { public void run() {
+            if (!isMobileUa) return;
+            String cur = webView.getUrl();
+            if (cur == null || !cur.contains("live.douyin.com") || cur.equals(dyPcDoneUrl)) return;
+            dyPcDoneUrl = cur;
+            isMobileUa = false;
+            webView.getSettings().setUserAgentString(UA_PC);
+            btnSwitchUa.setText("切手机UA");
+            btnSwitchUa.setBackgroundColor(0x4D3742fa);
+            webView.loadUrl(cur);
+        }}, 3000);
+    }
 
     /** 抖音短链(v.douyin.com)原生跟随302，直达直播间地址 */
     void resolveDouyinShort(final String shortUrl) {
