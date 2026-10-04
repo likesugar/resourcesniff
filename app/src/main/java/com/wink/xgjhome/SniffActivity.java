@@ -545,6 +545,27 @@ public class SniffActivity extends Activity {
             etUrl.setText(pre);
             openInputUrl();
         } else {
+            // 自动检测剪贴板：有新链接则直接进入嗅探（同一条链接只自动进一次）
+            try {
+                android.content.ClipboardManager cm = (android.content.ClipboardManager) getSystemService(Context.CLIPBOARD_SERVICE);
+                if (cm != null && cm.hasPrimaryClip() && cm.getPrimaryClip() != null && cm.getPrimaryClip().getItemCount() > 0) {
+                    CharSequence cs = cm.getPrimaryClip().getItemAt(0).getText();
+                    String clip = cs == null ? "" : cs.toString().trim();
+                    java.util.regex.Matcher m2 = java.util.regex.Pattern.compile("https?://\\S+").matcher(clip);
+                    if (m2.find()) {
+                        String url = m2.group();
+                        android.content.SharedPreferences sp = getSharedPreferences("settings", MODE_PRIVATE);
+                        String seen = sp.getString("clip_seen", "");
+                        if (!url.equals(seen)) {
+                            sp.edit().putString("clip_seen", url).apply();
+                            etUrl.setText(url);
+                            openInputUrl();
+                            Toast.makeText(this, "检测到剪贴板链接，已打开", Toast.LENGTH_SHORT).show();
+                            return;
+                        }
+                    }
+                }
+            } catch (Throwable ignored) {}
             webView.loadUrl("https://live.douyin.com/");
         }
     }
