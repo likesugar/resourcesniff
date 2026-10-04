@@ -614,9 +614,10 @@ public class SniffActivity extends Activity {
         new android.os.Handler(android.os.Looper.getMainLooper()).postDelayed(new Runnable() { public void run() {
             try {
                 if (isFinishing() || isDestroyed() || webView == null || btnSwitchUa == null) return;
-                if (!isMobileUa) return;
+                if (!isMobileUa) { try { dumpFc2Debug("DYPC: skip, already pc"); } catch (Throwable ignored) {} return; }
                 String cur = webView.getUrl();
-                if (cur == null || !cur.contains("live.douyin.com")) return;
+                if (cur == null || !cur.contains("live.douyin.com")) { try { dumpFc2Debug("DYPC: skip, url=" + cur); } catch (Throwable ignored) {} return; }
+                try { dumpFc2Debug("DYPC: auto click, url=" + cur); } catch (Throwable ignored) {}
                 btnSwitchUa.performClick();   // = 手动点"切电脑UA"
             } catch (Throwable ignored) {}
         }}, 3000);
@@ -1374,6 +1375,7 @@ public class SniffActivity extends Activity {
 
     void switchUa() {
         webView.getSettings().setCacheMode(WebSettings.LOAD_NO_CACHE);  // 换UA必须绕过缓存,否则reload吐旧缓存页面
+        try { dumpFc2Debug("UASWITCH: mobile=" + isMobileUa + " url=" + webView.getUrl() + " ua=" + webView.getSettings().getUserAgentString()); } catch (Throwable ignored) {}
         if (isMobileUa) {
             webView.getSettings().setUserAgentString("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36");
             btnSwitchUa.setText("切手机UA");
