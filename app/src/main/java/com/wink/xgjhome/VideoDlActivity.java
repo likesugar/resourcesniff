@@ -189,9 +189,9 @@ public class VideoDlActivity extends Activity {
             java.util.regex.Matcher dm = java.util.regex.Pattern.compile("douyin\\.com/(?:share/)?(?:note|video)/(\\d+)").matcher(u);
             if (dm.find()) u = "https://www.douyin.com/video/" + dm.group(1);
         } catch (Throwable ignored) {}
-        // b23.tv 短链先原生跟随302
+        // 短链(b23.tv / v.douyin.com)先原生跟随302
         final String fu0 = u;
-        if (fu0.contains("b23.tv")) {
+        if (fu0.contains("b23.tv") || fu0.contains("v.douyin.com")) {
             new Thread(new Runnable() { public void run() {
                 String real = fu0;
                 try {
