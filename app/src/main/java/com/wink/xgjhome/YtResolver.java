@@ -104,6 +104,7 @@ public final class YtResolver {
 
     private static void initPipe() throws Exception {
         if (inited) return;
+        try { System.setProperty("java.net.preferIPv4Stack", "true"); } catch (Throwable ignored) {}  // 部分网络IPv6被污染
         NewPipe.init(new Downloader() {
             public Response execute(Request request) throws java.io.IOException {
                 HttpURLConnection c = (HttpURLConnection) new URL(request.url()).openConnection();
@@ -205,7 +206,7 @@ public final class YtResolver {
                 .put("context", ctx)
                 .put("videoId", vid)
                 .put("contentCheckOk", true).put("racyCheckOk", true);
-        HttpURLConnection c = (HttpURLConnection) new URL("https://youtubei.googleapis.com/youtubei/v1/player?key=AIzaSyB-63vPrdThhKuerbB2N_l7Kwwcxj6yUAc").openConnection();
+        HttpURLConnection c = (HttpURLConnection) new URL("https://www.youtube.com/youtubei/v1/player?key=AIzaSyB-63vPrdThhKuerbB2N_l7Kwwcxj6yUAc").openConnection();
         c.setRequestMethod("POST"); c.setDoOutput(true); c.setConnectTimeout(15000); c.setReadTimeout(20000);
         c.setRequestProperty("User-Agent", UA_IOS);
         c.setRequestProperty("Content-Type", "application/json");
