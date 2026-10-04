@@ -257,9 +257,17 @@ public class VideoDlActivity extends Activity {
                             tk.percent = 0;  // 元数据失败继续下
                         }
                         // 2) 下载
+                        boolean isBili = tk.url.contains("bilibili.com");
+                        final java.util.Set<String> before = new java.util.HashSet<String>();
+                        for (File f0 : cache.listFiles()) if (f0.getName().startsWith("vdl_")) before.add(f0.getName());
                         com.yausername.youtubedl_android.YoutubeDLRequest req =
                                 new com.yausername.youtubedl_android.YoutubeDLRequest(tk.url);
-                        req.addOption("-f", "b/bv*+ba/b");
+                        if (isBili) {
+                            // B站: 两段下载(视频+音频), 用 ffmpeg-kit 合并, 免 35M ffmpeg CLI
+                            req.addOption("-f", "bv*[ext=mp4]/bv*");
+                        } else {
+                            req.addOption("-f", "b/bv*+ba/b");
+                        }
                         req.addOption("--no-update");
                         req.addOption("--user-agent", st[0]);
                         req.addOption("--add-headers", "Referer: " + st[1]);
@@ -284,13 +292,46 @@ public class VideoDlActivity extends Activity {
                                 try { Thread.sleep(1500); } catch (Throwable e) { return; }
                             }
                         }}).start();
-                        com.yausername.youtubedl_android.YoutubeDLResponse resp =
-                                com.yausername.youtubedl_android.YoutubeDL.getInstance().execute(req);
-                        // 3) 找产物
+                        com.yausername.youtubedl_android.YoutubeDL.getInstance().execute(req);
                         File done = null;
-                        for (File f : cache.listFiles()) {
-                            if (f.getName().startsWith("vdl_")) {
-                                if (done == null || f.lastModified() > done.lastModified()) done = f;
+                        if (isBili) {
+                            java.util.List<File> news = new java.util.ArrayList<File>();
+                            for (File f : cache.listFiles())
+                                if (f.getName().startsWith("vdl_") && !before.contains(f.getName()) && f.length() > 1024) news.add(f);
+                            File vfile = null;
+                            for (File f : news) if (vfile == null || f.lastModified() > vfile.lastModified()) vfile = f;
+                            if (vfile == null) throw new Exception("B站视频流下载失败");
+                            // 音频段
+                            com.yausername.youtubedl_android.YoutubeDLRequest ra =
+                                    new com.yausername.youtubedl_android.YoutubeDLRequest(tk.url);
+                            ra.addOption("-f", "ba[ext=m4a]/ba/b");
+                            ra.addOption("--no-update");
+                            ra.addOption("--user-agent", st[0]);
+                            ra.addOption("--add-headers", "Referer: " + st[1]);
+                            if (st[2].equals("1")) ra.addOption("--cookies", cookies().getAbsolutePath());
+                            ra.addOption("-o", out.getAbsolutePath());
+                            ra.addOption("--no-playlist"); ra.addOption("--no-mtime");
+                            java.util.Set<String> before2 = new java.util.HashSet<String>();
+                            for (File f0 : cache.listFiles()) if (f0.getName().startsWith("vdl_")) before2.add(f0.getName());
+                            before2.add(vfile.getName());
+                            com.yausername.youtubedl_android.YoutubeDL.getInstance().execute(ra);
+                            File afile = null;
+                            for (File f : cache.listFiles())
+                                if (f.getName().startsWith("vdl_") && !before2.contains(f.getName()) && f.length() > 1024)
+                                    if (afile == null || f.lastModified() > afile.lastModified()) afile = f;
+                            if (afile != null) {
+                                String m = new File(cache, "vdl_m_" + System.currentTimeMillis() + ".mp4").getAbsolutePath();
+                                com.arthenica.ffmpegkit.FFmpegKit.execute("-y -i \"" + vfile.getAbsolutePath() + "\" -i \"" + afile.getAbsolutePath() + "\" -c copy -movflags +faststart \"" + m + "\"");
+                                File mf = new File(m);
+                                if (mf.length() > 1024) done = mf;
+                            }
+                            if (done == null) done = vfile;  // 合并失败退回纯视频
+                            for (File f : news) if (f != done) f.delete();
+                        } else {
+                            for (File f : cache.listFiles()) {
+                                if (f.getName().startsWith("vdl_")) {
+                                    if (done == null || f.lastModified() > done.lastModified()) done = f;
+                                }
                             }
                         }
                         if (done == null || done.length() < 1024) throw new Exception("未生成视频文件");
