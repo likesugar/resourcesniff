@@ -114,7 +114,16 @@ public final class YtResolver {
                     for (String v : e.getValue()) { c.setRequestProperty(e.getKey(), v); if ("User-Agent".equalsIgnoreCase(e.getKey())) hasUa = true; }
                 }
                 if (!hasUa) c.setRequestProperty("User-Agent", UA);
-                c.setRequestProperty("Cookie", "CONSENT=YES+cb; SOCS=CAI");
+                String ck = "CONSENT=YES+cb; SOCS=CAI";
+                String login = ytCookies();
+                if (login != null && !login.isEmpty()) ck += "; " + login;
+                c.setRequestProperty("Cookie", ck);
+                String auth = sapisidHash("https://www.youtube.com");
+                if (auth != null) {
+                    c.setRequestProperty("Authorization", auth);
+                    c.setRequestProperty("X-Origin", "https://www.youtube.com");
+                    c.setRequestProperty("Origin", "https://www.youtube.com");
+                }
                 if (request.dataToSend() != null && request.dataToSend().length > 0) {
                     c.setRequestMethod("POST"); c.setDoOutput(true);
                     c.setRequestProperty("Content-Type", "application/json");
@@ -129,6 +138,39 @@ public final class YtResolver {
             }
         });
         inited = true;
+    }
+
+
+    // ---------- 登录态桥接（设置页网页登录的 Cookie → 解析请求） ----------
+    private static String ytCookies() {
+        try {
+            android.webkit.CookieManager cm = android.webkit.CookieManager.getInstance();
+            return cm == null ? null : cm.getCookie("https://www.youtube.com");
+        } catch (Throwable t) { return null; }
+    }
+
+    private static String sapisid() {
+        String ck = ytCookies();
+        if (ck == null) return null;
+        for (String p : ck.split(";")) {
+            String t = p.trim();
+            if (t.startsWith("SAPISID=") && t.length() > 8) return t.substring(8);
+        }
+        return null;
+    }
+
+    private static String sapisidHash(String origin) {
+        try {
+            String sid = sapisid();
+            if (sid == null) return null;
+            long t = System.currentTimeMillis() / 1000L;
+            String src = t + " " + sid + " " + origin;
+            java.security.MessageDigest md = java.security.MessageDigest.getInstance("SHA-1");
+            byte[] d = md.digest(src.getBytes("UTF-8"));
+            StringBuilder sb = new StringBuilder();
+            for (byte x : d) sb.append(String.format("%02x", x));
+            return "SAPISIDHASH " + t + "_" + sb;
+        } catch (Throwable e) { return null; }
     }
 
     // ---------- 候选挑选 + 下载封装 ----------
@@ -196,26 +238,51 @@ public final class YtResolver {
     }
 
     // ---------- IOS 官方客户端兜底（DBdown 同款思路：IOS 常不被风控） ----------
+    private static String[] clientUA = {UA_IOS, "com.google.android.youtube/19.44.38 (Linux; U; Android 13; zh_CN) gzip", UA};
+    private static String[] clientName = {CLS_IOS, "ANDROID", "WEB"};
+    private static String[] clientVer = {VER_IOS, "19.44.38", "2.20241126.01.00"};
+
     private static JSONObject iosPlayer(String vid) throws Exception {
-        JSONObject ctx = new JSONObject()
-                .put("client", new JSONObject()
-                        .put("clientName", CLS_IOS).put("clientVersion", VER_IOS)
-                        .put("deviceModel", "iPhone16,2")
-                        .put("osName", "iOS").put("osVersion", "18.1.0.22B83"));
+        JSONObject resp = null; String lastStatus = "?";
+        for (int i = 0; i < 3; i++) {
+            try { resp = playerOnce(vid, i); } catch (Throwable e) { dump("client " + clientName[i] + " netfail " + e); continue; }
+            JSONObject ps = resp.optJSONObject("playabilityStatus");
+            lastStatus = ps != null ? ps.optString("status", "?") : "?";
+            dump("client " + clientName[i] + " status=" + lastStatus);
+            if ("OK".equals(lastStatus)) return resp;
+        }
+        throw new Exception("客户端不可用(" + lastStatus + ")");
+    }
+
+    private static JSONObject playerOnce(String vid, int ci) throws Exception {
+        JSONObject cl = new JSONObject()
+                .put("clientName", clientName[ci]).put("clientVersion", clientVer[ci])
+                .put("deviceModel", ci == 0 ? "iPhone16,2" : (ci == 1 ? "sargo" : ""))
+                .put("osName", ci == 0 ? "iOS" : (ci == 1 ? "Android" : "Windows"))
+                .put("osVersion", ci == 0 ? "18.1.0.22B83" : (ci == 1 ? "13" : "10.0"));
+        if (ci == 1) cl.put("androidSdkVersion", 33);
         JSONObject body = new JSONObject()
-                .put("context", ctx)
+                .put("context", new JSONObject().put("client", cl))
                 .put("videoId", vid)
                 .put("contentCheckOk", true).put("racyCheckOk", true);
         HttpURLConnection c = (HttpURLConnection) new URL("https://www.youtube.com/youtubei/v1/player?key=AIzaSyB-63vPrdThhKuerbB2N_l7Kwwcxj6yUAc").openConnection();
         c.setRequestMethod("POST"); c.setDoOutput(true); c.setConnectTimeout(15000); c.setReadTimeout(20000);
-        c.setRequestProperty("User-Agent", UA_IOS);
+        c.setRequestProperty("User-Agent", clientUA[ci]);
         c.setRequestProperty("Content-Type", "application/json");
         c.setRequestProperty("X-Goog-Api-Format-Version", "2");
+        String auth = sapisidHash("https://www.youtube.com");
+        if (auth != null) {
+            c.setRequestProperty("Authorization", auth);
+            c.setRequestProperty("X-Origin", "https://www.youtube.com");
+            c.setRequestProperty("Origin", "https://www.youtube.com");
+        }
+        String ck = ytCookies();
+        if (ck != null && !ck.isEmpty()) c.setRequestProperty("Cookie", ck);
         OutputStream os = c.getOutputStream(); os.write(body.toString().getBytes("UTF-8")); os.close();
         InputStream in = c.getResponseCode() < 400 ? c.getInputStream() : c.getErrorStream();
         StringBuilder sb = new StringBuilder();
         if (in != null) { byte[] b = new byte[8192]; int r; while ((r = in.read(b)) > 0) sb.append(new String(b, 0, r, "UTF-8")); in.close(); }
-        dump("IOS status=" + c.getResponseCode() + " body=" + sb.substring(0, Math.min(400, sb.length())));
+        dump("player " + clientName[ci] + " http=" + c.getResponseCode() + " body=" + sb.substring(0, Math.min(300, sb.length())));
         return new JSONObject(sb.toString());
     }
 
