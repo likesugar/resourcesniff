@@ -38,20 +38,20 @@ public class CapsuleBottomBar extends FrameLayout {
         capsule.setOrientation(LinearLayout.HORIZONTAL);
         capsule.setGravity(Gravity.CENTER);
         GradientDrawable bg = new GradientDrawable();
-        bg.setCornerRadius(dp(26));
+        bg.setCornerRadius(dp(19));
         bg.setColor(barBg);
         if (!dark) bg.setStroke(dp(1), 0xFFE4EAF5);
         capsule.setBackground(bg);
         capsule.setElevation(dp(8));
         LayoutParams clp = new LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT,
                 Gravity.BOTTOM | Gravity.CENTER_HORIZONTAL);
-        clp.bottomMargin = dp(18);
+        clp.bottomMargin = dp(12);
         addView(capsule, clp);
 
         // 滑动胶囊指示器
         pill = new View(c);
         GradientDrawable pg = new GradientDrawable();
-        pg.setCornerRadius(dp(22));
+        pg.setCornerRadius(dp(15));
         pg.setColor(pillBg);
         pill.setBackground(pg);
         row = new LinearLayout(c);
@@ -68,9 +68,9 @@ public class CapsuleBottomBar extends FrameLayout {
             final int idx = i;
             TextView t = new TextView(c);
             t.setText(labels[i]);
-            t.setTextSize(14);
+            t.setTextSize(12);
             t.setGravity(Gravity.CENTER);
-            t.setPadding(dp(26), dp(10), dp(26), dp(10));
+            t.setPadding(dp(16), dp(6), dp(16), dp(6));
             t.setTextColor(i == active ? activeTx : inactiveTx);
             row.addView(t, new LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT,
                     LinearLayout.LayoutParams.MATCH_PARENT));

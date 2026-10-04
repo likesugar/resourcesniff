@@ -93,17 +93,7 @@ public class SniffActivity extends Activity {
         try { LiveProxy.start(); } catch (Throwable ignored) {}   // 本地中转必须常驻，FC2/B站记录才能播/录/下
         DlManager.init(this);
         setContentView(R.layout.activity_sniff);
-        // 底部胶囊导航（SmoothBottomBar 风格）：当前为播放器页
-        boolean darkNav = getSharedPreferences("settings", MODE_PRIVATE).getBoolean("dark", false);
-        ((android.view.ViewGroup) findViewById(R.id.sniffRoot)).addView(
-            new CapsuleBottomBar(this, darkNav, new CapsuleBottomBar.OnItem() {
-                public void onItem(int idx) {
-                    if (idx == 0) {
-                        startActivity(new Intent(SniffActivity.this, HomeActivity.class)
-                                .addFlags(Intent.FLAG_ACTIVITY_REORDER_TO_FRONT));
-                    }
-                }
-            }), new android.widget.FrameLayout.LayoutParams(-2, -2));
+
 
         webView = findViewById(R.id.webview);
         etUrl = findViewById(R.id.et_url);
