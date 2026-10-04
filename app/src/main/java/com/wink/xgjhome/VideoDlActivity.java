@@ -178,6 +178,33 @@ public class VideoDlActivity extends Activity {
         final Task tk = new Task(); tk.url = u;
         TASKS.add(0, tk);
         render();
+        // b23.tv 短链先原生跟随302
+        final String fu0 = u;
+        if (fu0.contains("b23.tv")) {
+            new Thread(new Runnable() { public void run() {
+                String real = fu0;
+                try {
+                    java.net.HttpURLConnection c = (java.net.HttpURLConnection) new java.net.URL(fu0).openConnection();
+                    c.setInstanceFollowRedirects(false);
+                    c.setRequestProperty("User-Agent", "Mozilla/5.0 (Linux; Android 13) Chrome/120 Mobile");
+                    int code = c.getResponseCode();
+                    String loc = c.getHeaderField("Location");
+                    int hops = 0;
+                    while (loc != null && hops < 5) {
+                        real = loc.startsWith("http") ? loc : new java.net.URL(new java.net.URL(real), loc).toString();
+                        java.net.HttpURLConnection c2 = (java.net.HttpURLConnection) new java.net.URL(real).openConnection();
+                        c2.setInstanceFollowRedirects(false);
+                        c2.setRequestProperty("User-Agent", "Mozilla/5.0 (Linux; Android 13) Chrome/120 Mobile");
+                        code = c2.getResponseCode();
+                        loc = c2.getHeaderField("Location");
+                        hops++;
+                    }
+                } catch (Throwable ignored) {}
+                final String fu = real;
+                runUi(new Runnable() { public void run() { tk.url = fu; runTask(tk); }});
+            }}).start();
+            return;
+        }
         runTask(tk);
     }
 
@@ -206,6 +233,7 @@ public class VideoDlActivity extends Activity {
                             meta.addOption("--dump-json");
                             meta.addOption("--no-playlist");
                             meta.addOption("--no-update");
+                            if (si == 0) meta.addOption("--verbose");
                             meta.addOption("--user-agent", st[0]);
                             meta.addOption("--add-headers", "Referer: " + st[1]);
                             if (st[2].equals("1")) meta.addOption("--cookies", cookies().getAbsolutePath());
@@ -295,6 +323,16 @@ public class VideoDlActivity extends Activity {
                 runUi(new Runnable() { public void run() { render(); }});
             }
         }}).start();
+    }
+
+    private void vdump(String st) {
+        try {
+            java.io.File dir = getExternalFilesDir(null) != null ? getExternalFilesDir(null).getParentFile() : getFilesDir();
+            java.io.FileWriter fw = new java.io.FileWriter(new java.io.File(dir, "fc2_debug.txt"), true);
+            fw.write(new java.text.SimpleDateFormat("HH:mm:ss", java.util.Locale.US).format(new java.util.Date())
+                    + " YT: " + st + "\n----------------\n");
+            fw.close();
+        } catch (Throwable ignored) {}
     }
 
     private void ensureEngine() throws Exception {
