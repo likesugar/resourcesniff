@@ -210,7 +210,9 @@ public class VideoDlActivity extends Activity {
                 File out = new File(cache, "vdl_%(id)s.%(ext)s");
                 com.yausername.youtubedl_android.YoutubeDLRequest req =
                         new com.yausername.youtubedl_android.YoutubeDLRequest(tk.url);
-                req.addOption("-f", "b[ext=mp4]/bv*[ext=mp4]+ba[ext=m4a]/b");  // 精简引擎无ffmpeg:优先自带音轨合并流
+                req.addOption("-f", "b/bv*+ba/b");  // 优先已合并格式
+                req.addOption("--user-agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36");
+                req.addOption("--add-headers", "Referer: " + tk.url);
                 req.addOption("--cookies", cookies().getAbsolutePath());
                 req.addOption("-o", out.getAbsolutePath());
                 req.addOption("--no-playlist"); req.addOption("--no-mtime");
