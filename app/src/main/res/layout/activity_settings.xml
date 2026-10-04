@@ -162,18 +162,7 @@
                     android:text="→" android:textSize="20sp" android:id="@+id/arrow"/>
             </LinearLayout>
 
-            <LinearLayout android:id="@+id/cardAbout"
-                android:layout_width="match_parent" android:layout_height="wrap_content"
-                android:orientation="vertical"
-                android:background="@drawable/bg_card"
-                android:padding="20dp"
-                android:layout_marginTop="18dp">
-                <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
-                    android:text="关于" android:textSize="18sp" android:textStyle="bold" android:id="@+id/tvAboutTitle"/>
-                <TextView android:layout_width="match_parent" android:layout_height="wrap_content"
-                    android:text="Stripchat 直播支持后台静音拉流录制（灭屏可录）。嗅探页捕获到 Stripchat·画质 行后，菜单选「直播录制」即可，录制中可在下载页暂停/继续/结束合并进记录。"
-                    android:textSize="14sp" android:id="@+id/tvAboutText" android:paddingTop="8dp"/>
-            </LinearLayout>
+            
         </LinearLayout>
     </ScrollView>
 </LinearLayout>

@@ -66,15 +66,6 @@ public class SettingsActivity extends Activity {
                 getSharedPreferences("settings", MODE_PRIVATE).edit().putBoolean("clipboard", on).apply();
             }
         });
-        findViewById(R.id.cardAbout).setOnClickListener(new View.OnClickListener() {
-            public void onClick(View v) {
-                new android.app.AlertDialog.Builder(SettingsActivity.this)
-                    .setTitle("关于")
-                    .setMessage("Stripchat 直播支持后台静音拉流录制（灭屏可录）。\n\n用法：嗅探页打开直播间 → 捕获到「Stripchat·画质」行 → 菜单选「直播录制」→ 下载页管理，结束合并后进记录。\n\n其他平台：抖音/B站直播同样支持后台录制。")
-                    .setPositiveButton("完成", null)
-                    .show();
-            }
-        });
         findViewById(R.id.cardNotify).setOnClickListener(new View.OnClickListener() {
             public void onClick(View v) {
                 try {
@@ -133,14 +124,14 @@ public class SettingsActivity extends Activity {
         int accent = color(0xFFB4C5FF, 0xFF315CDE);
         int div = color(0xFF2A3142, 0xFFEDEFF3);
         findViewById(R.id.settingsRoot).setBackgroundColor(bg);
-        int[] titles = {R.id.tvTitle, R.id.t1, R.id.t2, R.id.t3, R.id.t4, R.id.t5, R.id.t6, R.id.tvAboutTitle};
+        int[] titles = {R.id.tvTitle, R.id.t1, R.id.t2, R.id.t3, R.id.t4, R.id.t5, R.id.t6};
         for (int id : titles) ((TextView) findViewById(id)).setTextColor(title);
         int[] subs = {R.id.label1, R.id.label2, R.id.biliState, R.id.dyState, R.id.ytState,
-                R.id.desc1, R.id.desc2, R.id.desc3, R.id.desc4, R.id.desc5, R.id.desc6, R.id.tvAboutText};
+                R.id.desc1, R.id.desc2, R.id.desc3, R.id.desc4, R.id.desc5, R.id.desc6};
         for (int id : subs) ((TextView) findViewById(id)).setTextColor(sub);
         int[] accents = {R.id.biliAction, R.id.dyAction, R.id.ytAction, R.id.btnClearAll, R.id.arrow, R.id.btnBack};
         for (int id : accents) ((TextView) findViewById(id)).setTextColor(accent);
-        int[] cards = {R.id.card1, R.id.card2, R.id.card3, R.id.cardNotify, R.id.cardAbout};
+        int[] cards = {R.id.card1, R.id.card2, R.id.card3, R.id.cardNotify};
         for (int id : cards) findViewById(id).setBackgroundColor(card);
         int[] divs = {R.id.div1, R.id.div2, R.id.div3};
         for (int id : divs) findViewById(id).setBackgroundColor(div);
