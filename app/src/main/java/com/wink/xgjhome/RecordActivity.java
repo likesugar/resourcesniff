@@ -100,54 +100,6 @@ public class RecordActivity extends Activity {
         });
         head.addView(recNow);
         col.addView(head);
-        // 粘贴视频链接条：YouTube 走 yt-dlp(Seal 同款引擎)，其他走直连/HLS
-        final android.widget.EditText pasteEt = new android.widget.EditText(this);
-        pasteEt.setHint("🔗 粘贴视频链接");
-        pasteEt.setSingleLine(true);
-        pasteEt.setTextSize(14);
-        pasteEt.setTextColor(Color.WHITE);
-        pasteEt.setHintTextColor(0xFF7C8694);
-        android.graphics.drawable.GradientDrawable pb = new android.graphics.drawable.GradientDrawable();
-        pb.setCornerRadius(dp2(24));
-        pb.setColor(0xFF161A20);
-        pb.setStroke(1, 0xFF2A3142);
-        pasteEt.setBackground(pb);
-        pasteEt.setPadding(dp2(18), dp2(12), dp2(12), dp2(12));
-        try {
-            android.content.ClipboardManager cm = (android.content.ClipboardManager) getSystemService(Context.CLIPBOARD_SERVICE);
-            if (cm != null && cm.getPrimaryClip() != null && cm.getPrimaryClip().getItemAt(0) != null
-                    && cm.getPrimaryClip().getItemAt(0).getText() != null) {
-                String cu = cm.getPrimaryClip().getItemAt(0).getText().toString().trim();
-                java.util.regex.Matcher pm = java.util.regex.Pattern.compile("https?://\\S+").matcher(cu);
-                if (pm.find()) pasteEt.setText(pm.group());
-            }
-        } catch (Throwable ignored) {}
-        LinearLayout pasteRow = new LinearLayout(this);
-        pasteRow.setOrientation(LinearLayout.HORIZONTAL);
-        pasteRow.setGravity(Gravity.CENTER_VERTICAL);
-        pasteRow.setPadding(0, 8, 0, 4);
-        pasteRow.addView(pasteEt, new LinearLayout.LayoutParams(0, -2, 1f));
-        TextView go = new TextView(this);
-        go.setText("➜");
-        go.setTextSize(18);
-        go.setTextColor(0xFF8A919E);
-        go.setPadding(dp2(12), 0, dp2(6), 0);
-        go.setOnClickListener(new View.OnClickListener() {
-            public void onClick(View v) {
-                String u = pasteEt.getText().toString().trim();
-                if (!u.startsWith("http")) { Toast.makeText(RecordActivity.this, "请输入有效链接", Toast.LENGTH_SHORT).show(); return; }
-                if (YtResolver.isYt(u)) {
-                    YtResolver.handle(RecordActivity.this, u);
-                } else {
-                    DlManager.start(u);
-                    Toast.makeText(RecordActivity.this, "已开始下载", Toast.LENGTH_SHORT).show();
-                }
-                pasteEt.setText("");
-                rebuild();
-            }
-        });
-        pasteRow.addView(go);
-        col.addView(pasteRow);
 
         // 扁平化顶部导航栏：全部/视频/录制/下载
         LinearLayout tabBar = new LinearLayout(this);

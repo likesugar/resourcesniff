@@ -36,6 +36,10 @@
                 <ScrollView android:id="@+id/platScroll"
                     android:layout_width="match_parent" android:layout_height="240dp"
                     android:scrollbars="none" android:overScrollMode="never">
+                <ScrollView android:id="@+id/platScroll"
+                    android:layout_width="match_parent" android:layout_height="240dp"
+                    android:scrollbars="none" android:overScrollMode="never">
+                    <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical">
                 <!-- 哔哩哔哩 -->
                 <LinearLayout
                     android:layout_width="match_parent" android:layout_height="wrap_content"
@@ -93,6 +97,9 @@
 
                 <View android:layout_width="match_parent" android:layout_height="1dp"
                     android:background="@color/divider" android:layout_marginTop="16dp" android:layout_marginBottom="16dp" android:id="@+id/divCust"/>
+                    </LinearLayout>
+                </ScrollView>
+
                 </ScrollView>
 
                 <LinearLayout

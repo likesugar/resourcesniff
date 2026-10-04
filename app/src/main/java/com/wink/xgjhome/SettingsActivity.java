@@ -155,7 +155,7 @@ public class SettingsActivity extends Activity {
                     name.setTextColor(color(0xFFE8ECF4, 0xFF1F2329));
                     mid.addView(name);
                     android.widget.TextView st = new android.widget.TextView(this);
-                    st.setText("PC版登录".equals("") ? "" : (p2[2].equals("pc") ? "PC版登录" : "手机版登录")); st.setTextSize(14);
+                    st.setText(p2[2].equals("pc") ? "PC" : "手机"); st.setTextSize(14);
                     st.setTextColor(color(0xFF8A94A6, 0xFF8A94A6)); st.setPadding(0, dp8 / 2, 0, 0);
                     mid.addView(st);
                     row.addView(mid);
@@ -199,7 +199,7 @@ public class SettingsActivity extends Activity {
             int n = 0;
             String listN = getSharedPreferences("settings", MODE_PRIVATE).getString("custom_sites", "");
             for (String e2 : listN.split("\u0002")) if (e2.length() > 0) n++;
-            st2.setText(n > 0 ? "已添加 " + n + " 个，列表超出3个可上下滑动" : "添加自定义网站登录");
+            st2.setText(n > 0 ? "已配置 " + n + " 个" : "未配置");
             ac.setText("添加");
         } catch (Throwable ignored) {}
         refresh();
