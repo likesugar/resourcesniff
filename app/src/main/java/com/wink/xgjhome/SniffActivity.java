@@ -580,7 +580,7 @@ public class SniffActivity extends Activity {
                 if (!isDyLiveUrl(cur)) return;
                 btnSwitchUa.performClick();   // 走手动按钮同一路径：切UA+刷新
             } catch (Throwable ignored) {}
-        }}, 3000);
+        }}, 300);
     }
 
     void openInputUrl() {
