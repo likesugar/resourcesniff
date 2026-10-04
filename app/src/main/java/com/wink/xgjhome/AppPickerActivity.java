@@ -26,6 +26,7 @@ public class AppPickerActivity extends Activity {
     private boolean showSystem = false;
     private boolean loaded = false;
     private boolean hideNoActs = true;    // 隐藏无可列出活动的包
+    private boolean actsScanned = false;  // 活动数是否已扫描（点开"无活动:显"才扫）
     private boolean onlyExported = false; // 仅可直启(exported)活动
     private String searchText = "";
     private android.content.pm.PackageManager pm;
@@ -89,6 +90,24 @@ public class AppPickerActivity extends Activity {
             hideNoActs = !hideNoActs;
             tg2.setText(hideNoActs ? "无活动:隐" : "无活动:显");
             tg2.setTextColor(hideNoActs ? 0xFF3D7BFF : 0xFF8A919E);
+            if (!hideNoActs && !actsScanned) {
+                tg2.setText("扫描中…");
+                new Thread(new Runnable() { public void run() {
+                    for (android.content.pm.PackageInfo pi : all) {
+                        if (actCount.containsKey(pi.packageName)) continue;
+                        try {
+                            android.content.pm.ActivityInfo[] acts = pm.getPackageInfo(pi.packageName, android.content.pm.PackageManager.GET_ACTIVITIES).activities;
+                            actCount.put(pi.packageName, acts == null ? 0 : acts.length);
+                        } catch (Throwable t) { actCount.put(pi.packageName, 0); }
+                    }
+                    actsScanned = true;
+                    runOnUiThread(new Runnable() { public void run() {
+                        tg2.setText("无活动:显");
+                        applyFilter();
+                    }});
+                } }).start();
+                return;
+            }
             applyFilter();
         }});
         row2.addView(tg2);
@@ -136,12 +155,8 @@ public class AppPickerActivity extends Activity {
 
     private void loadApps() {
         try { all = pm.getInstalledPackages(0); } catch (Throwable e) { all = new java.util.ArrayList<android.content.pm.PackageInfo>(); }
-        // 后台预取：图标缓存 + 每包活动数
+        // 后台预取：仅图标缓存（活动数点开"无活动:显"才扫描，列表秒出）
         for (android.content.pm.PackageInfo pi : all) {
-            try {
-                android.content.pm.ActivityInfo[] acts = pm.getPackageInfo(pi.packageName, android.content.pm.PackageManager.GET_ACTIVITIES).activities;
-                actCount.put(pi.packageName, acts == null ? 0 : acts.length);
-            } catch (Throwable t) { actCount.put(pi.packageName, 0); }
             try { iconCache.put(pi.packageName, iconToBmp(pi)); } catch (Throwable t) { }
         }
         java.util.Collections.sort(all, new java.util.Comparator<android.content.pm.PackageInfo>() {

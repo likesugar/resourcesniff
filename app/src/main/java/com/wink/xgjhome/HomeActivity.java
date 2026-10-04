@@ -101,7 +101,7 @@ public class HomeActivity extends Activity {
         // 复刻壳：卡片 → 嗅探弹窗；剪贴板有链接则直接进嗅探
         findViewById(R.id.cardPlayer).setOnClickListener(new View.OnClickListener() {
             public void onClick(View v) {
-                String clip = clipUrl();
+                String clip = getSharedPreferences("settings", MODE_PRIVATE).getBoolean("clipboard", true) ? clipUrl() : null;
                 if (clip != null) {
                     Intent i = new Intent(HomeActivity.this, SniffActivity.class);
                     i.putExtra("input", clip);
