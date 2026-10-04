@@ -491,6 +491,16 @@ public class RecManager {
 
     static volatile int bgGen = 0;  // 会话代号：旧会话回调不作数
 
+    static void dump(String st) {
+        try {
+            java.io.File dir = sCtx.getExternalFilesDir(null).getParentFile();
+            java.io.FileWriter fw = new java.io.FileWriter(new java.io.File(dir, "fc2_debug.txt"), true);
+            fw.write(new java.text.SimpleDateFormat("HH:mm:ss", java.util.Locale.US).format(new java.util.Date())
+                    + " REC: " + st + "\n----------------\n");
+            fw.close();
+        } catch (Throwable ignored) {}
+    }
+
     static void startBgSession(final RecJob job) {
         final int gen = ++bgGen;
         bgCancel = false;
@@ -500,8 +510,10 @@ public class RecManager {
             java.io.File[] fs = job.file.listFiles();
             if (fs != null) for (java.io.File f : fs) if (f.getName().startsWith("seg")) segN++;
         } catch (Throwable ignored) {}
+        String lu = job.url == null ? "" : job.url.toLowerCase();
+        String ref = (lu.contains("doppiocdn") || lu.contains("stripchat")) ? "https://zh.stripchatgirls.com/" : "https://live.douyin.com/";
         String[] args = { "-y", "-user_agent", BG_UA,
-            "-headers", "Referer: https://live.douyin.com/\r\n",
+            "-headers", "Referer: " + ref + "\r\n",
             "-i", job.url, "-c", "copy",
             "-f", "segment", "-segment_time", "30", "-reset_timestamps", "1",
             "-segment_start_number", String.valueOf(segN),
@@ -509,6 +521,11 @@ public class RecManager {
         bgSession = com.arthenica.ffmpegkit.FFmpegKit.executeWithArgumentsAsync(args,
             new com.arthenica.ffmpegkit.FFmpegSessionCompleteCallback() {
                 public void apply(com.arthenica.ffmpegkit.FFmpegSession st) {
+                    try {
+                        String logs = st.getAllLogsAsString();
+                        dump("BG sess rc=" + st.getReturnCode() + " state=" + st.getState()
+                            + " tail=" + (logs.length() > 600 ? logs.substring(logs.length() - 600) : logs));
+                    } catch (Throwable ignored) {}
                     if (gen != bgGen || bgCancel) return;  // 旧会话/已暂停：直接作废
                     if (job.active) {
                         try { Thread.sleep(1000); } catch (Throwable e) { }
