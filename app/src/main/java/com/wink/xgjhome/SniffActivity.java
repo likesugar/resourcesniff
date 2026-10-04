@@ -610,13 +610,17 @@ public class SniffActivity extends Activity {
     }
 
     /** 抖音直播：手机版加载完成后自动"点击"切电脑UA按钮（3s兜底，只点一次） */
+    static boolean isDyLiveUrl(String u) {
+        return u != null && (u.contains("live.douyin.com") || u.contains("webcast.amemv.com"));
+    }
+
     void dyAutoPcClick() {
         new android.os.Handler(android.os.Looper.getMainLooper()).postDelayed(new Runnable() { public void run() {
             try {
                 if (isFinishing() || isDestroyed() || webView == null || btnSwitchUa == null) return;
                 if (!isMobileUa) { try { dumpFc2Debug("DYPC: skip, already pc"); } catch (Throwable ignored) {} return; }
                 String cur = webView.getUrl();
-                if (cur == null || !cur.contains("live.douyin.com")) { try { dumpFc2Debug("DYPC: skip, url=" + cur); } catch (Throwable ignored) {} return; }
+                if (!isDyLiveUrl(cur)) { try { dumpFc2Debug("DYPC: skip, url=" + cur); } catch (Throwable ignored) {} return; }
                 try { dumpFc2Debug("DYPC: auto click, url=" + cur); } catch (Throwable ignored) {}
                 btnSwitchUa.performClick();   // = 手动点"切电脑UA"
             } catch (Throwable ignored) {}
@@ -645,7 +649,7 @@ public class SniffActivity extends Activity {
             dumpFc2Debug("DYRESOLVE final: " + cur);
             final String fu = cur;
             runOnUiThread(new Runnable() { public void run() {
-                try { webView.loadUrl(fu); } catch (Throwable ignored) {}
+                try { if (isMobileUa) dyAutoPcClick(); webView.loadUrl(fu); } catch (Throwable ignored) {}
             }});
         }}).start();
     }
