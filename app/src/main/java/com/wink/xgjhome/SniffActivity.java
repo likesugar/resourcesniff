@@ -445,6 +445,7 @@ public class SniffActivity extends Activity {
 
             @Override
             public void onPageFinished(WebView view, String url) {
+                webView.getSettings().setCacheMode(WebSettings.LOAD_DEFAULT);  // 页面完成后恢复默认缓存
                 if (url != null && (url.contains("douyin.com") || url.contains("iesdouyin"))) {
                     injectDouyinScript();
                 }
@@ -1372,6 +1373,7 @@ public class SniffActivity extends Activity {
     }
 
     void switchUa() {
+        webView.getSettings().setCacheMode(WebSettings.LOAD_NO_CACHE);  // 换UA必须绕过缓存,否则reload吐旧缓存页面
         if (isMobileUa) {
             webView.getSettings().setUserAgentString("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36");
             btnSwitchUa.setText("切手机UA");
