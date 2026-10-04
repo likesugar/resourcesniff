@@ -510,10 +510,8 @@ public class RecManager {
             java.io.File[] fs = job.file.listFiles();
             if (fs != null) for (java.io.File f : fs) if (f.getName().startsWith("seg")) segN++;
         } catch (Throwable ignored) {}
-        String lu = job.url == null ? "" : job.url.toLowerCase();
-        String ref = (lu.contains("doppiocdn") || lu.contains("stripchat")) ? "https://zh.stripchatgirls.com/" : "https://live.douyin.com/";
         String[] args = { "-y", "-user_agent", BG_UA,
-            "-headers", "Referer: " + ref + "\r\n",
+            "-headers", "Referer: https://live.douyin.com/\r\n",
             "-i", job.url, "-c", "copy",
             "-f", "segment", "-segment_time", "30", "-reset_timestamps", "1",
             "-segment_start_number", String.valueOf(segN),
