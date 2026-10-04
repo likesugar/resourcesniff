@@ -72,6 +72,7 @@ public class LoginWebActivity extends Activity {
             }
             @Override
             public void onPageFinished(WebView view, String url) {
+                CookieHosts.add(getApplicationContext(), url);
                 // 抖音：手机版新会话常被甩到无登录入口的 /home，自动切电脑版重载（DBdown 同款兜底）
                 if (douyin && !desktopFallback[0] && url.startsWith("https://www.douyin.com/home")) {
                     desktopFallback[0] = true;

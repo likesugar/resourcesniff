@@ -444,6 +444,7 @@ public class SniffActivity extends Activity {
 
             @Override
             public void onPageFinished(WebView view, String url) {
+                CookieHosts.add(getApplicationContext(), url);
                 if (url != null && (url.contains("douyin.com") || url.contains("iesdouyin"))) {
                     injectDouyinScript();
                 }
