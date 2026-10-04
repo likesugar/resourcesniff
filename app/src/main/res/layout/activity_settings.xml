@@ -88,6 +88,24 @@
                         android:text="网页登录" android:textSize="16sp" android:padding="8dp"/>
                 </LinearLayout>
 
+                <View android:layout_width="match_parent" android:layout_height="1dp"
+                    android:background="@color/divider" android:layout_marginTop="16dp" android:layout_marginBottom="16dp" android:id="@+id/divCust"/>
+                <LinearLayout
+                    android:layout_width="match_parent" android:layout_height="wrap_content"
+                    android:orientation="horizontal" android:gravity="center_vertical">
+                    <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content"
+                        android:layout_weight="1" android:orientation="vertical">
+                        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+                            android:text="自定义平台" android:textSize="18sp" android:textStyle="bold" android:id="@+id/tCust"/>
+                        <TextView android:id="@+id/custState"
+                            android:layout_width="wrap_content" android:layout_height="wrap_content"
+                            android:text="未配置" android:textSize="14sp" android:paddingTop="4dp"/>
+                    </LinearLayout>
+                    <TextView android:id="@+id/custAction"
+                        android:layout_width="wrap_content" android:layout_height="wrap_content"
+                        android:text="配置" android:textSize="16sp" android:padding="8dp"/>
+                </LinearLayout>
+
                 <TextView android:layout_width="match_parent" android:layout_height="wrap_content"
                     android:text="登录后使用账号可访问的画质与资源。会员、地区和平台验证限制仍以网站为准。"
                     android:textSize="14sp" android:id="@+id/desc1"

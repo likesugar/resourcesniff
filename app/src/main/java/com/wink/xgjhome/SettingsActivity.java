@@ -89,7 +89,89 @@ public class SettingsActivity extends Activity {
         findViewById(R.id.btnBack).setOnClickListener(new View.OnClickListener() {
             public void onClick(View v) { finish(); }
         });
+
+        // ---------- 自定义平台 ----------
+        refreshCust();
+        findViewById(R.id.custAction).setOnClickListener(new View.OnClickListener() {
+            public void onClick(View v) {
+                String conf = getSharedPreferences("settings", MODE_PRIVATE).getString("custom_site", "");
+                if (conf.length() > 0) {
+                    // 已配置：直接登录
+                    try {
+                        String[] p2 = conf.split("\\u0001", -1);
+                        Intent i = new Intent(SettingsActivity.this, LoginWebActivity.class);
+                        i.putExtra("url", p2[1]);
+                        i.putExtra("uamode", p2.length > 2 ? p2[2] : "mobile");
+                        startActivity(i);
+                    } catch (Throwable t) { Toast.makeText(SettingsActivity.this, "打开失败", Toast.LENGTH_SHORT).show(); }
+                } else {
+                    showCustConfig();
+                }
+            }
+        });
+        findViewById(R.id.custState).setOnClickListener(new View.OnClickListener() {
+            public void onClick(View v) { showCustConfig(); }
+        });
         if (Build.VERSION.SDK_INT >= 21) getWindow().setStatusBarColor(dark ? 0xFF11151D : 0xFFEEF4FF);
+    }
+
+    private void refreshCust() {
+        try {
+            String conf = getSharedPreferences("settings", MODE_PRIVATE).getString("custom_site", "");
+            TextView st = (TextView) findViewById(R.id.custState);
+            TextView ac = (TextView) findViewById(R.id.custAction);
+            if (conf.length() > 0) {
+                String[] p2 = conf.split("\\u0001", -1);
+                st.setText("已配置：" + p2[0] + "（" + (p2.length > 2 && p2[2].equals("pc") ? "PC" : "手机") + "版登录）");
+                ac.setText("网页登录");
+            } else {
+                st.setText("未配置");
+                ac.setText("配置");
+            }
+        } catch (Throwable ignored) {}
+        refresh();  // 原有登录态刷新
+    }
+
+    private void showCustConfig() {
+        String conf = getSharedPreferences("settings", MODE_PRIVATE).getString("custom_site", "");
+        String preName = "", preUrl = "", preMode = "mobile";
+        if (conf.length() > 0) { String[] p2 = conf.split("\\u0001", -1); preName = p2[0]; preUrl = p2[1]; preMode = p2.length > 2 ? p2[2] : "mobile"; }
+        android.widget.LinearLayout box = new android.widget.LinearLayout(this);
+        box.setOrientation(android.widget.LinearLayout.VERTICAL);
+        int pad = (int) (18 * getResources().getDisplayMetrics().density);
+        box.setPadding(pad, pad / 2, pad, 0);
+        final android.widget.EditText etName = new android.widget.EditText(this);
+        etName.setHint("网站名字"); etName.setSingleLine(true); etName.setText(preName);
+        box.addView(etName);
+        final android.widget.EditText etUrl = new android.widget.EditText(this);
+        etUrl.setHint("登录页 https://…"); etUrl.setSingleLine(true); etUrl.setText(preUrl);
+        box.addView(etUrl);
+        final android.widget.RadioGroup rg = new android.widget.RadioGroup(this);
+        rg.setOrientation(android.widget.RadioGroup.HORIZONTAL);
+        android.widget.RadioButton rbM = new android.widget.RadioButton(this);
+        rbM.setText("手机版"); rbM.setId(101); rbM.setChecked(!preMode.equals("pc"));
+        android.widget.RadioButton rbP = new android.widget.RadioButton(this);
+        rbP.setText("PC版"); rbP.setId(102); rbP.setChecked(preMode.equals("pc"));
+        rg.addView(rbM); rg.addView(rbP);
+        box.addView(rg);
+        new android.app.AlertDialog.Builder(this)
+            .setTitle("自定义平台")
+            .setView(box)
+            .setPositiveButton("保存", new android.content.DialogInterface.OnClickListener() {
+                public void onClick(android.content.DialogInterface d, int w) {
+                    String n = etName.getText().toString().trim();
+                    String u = etUrl.getText().toString().trim();
+                    if (n.length() == 0 || !u.startsWith("http")) {
+                        Toast.makeText(SettingsActivity.this, "名字与登录页URL必填", Toast.LENGTH_SHORT).show();
+                        return;
+                    }
+                    String mode = rg.getCheckedRadioButtonId() == 102 ? "pc" : "mobile";
+                    getSharedPreferences("settings", MODE_PRIVATE).edit()
+                        .putString("custom_site", n + "\u0001" + u + "\u0001" + mode).apply();
+                    refreshCust();
+                    Toast.makeText(SettingsActivity.this, "已保存，点「网页登录」登录", Toast.LENGTH_SHORT).show();
+                }
+            }).setNegativeButton("取消", null).show();
     }
 
     private void openWeb(int idx) {
@@ -138,7 +220,7 @@ public class SettingsActivity extends Activity {
         int[] subs = {R.id.label1, R.id.label2, R.id.biliState, R.id.dyState, R.id.ytState,
                 R.id.desc1, R.id.desc2, R.id.desc3, R.id.desc4, R.id.desc5, R.id.desc6, R.id.tvAboutText2};
         for (int id : subs) ((TextView) findViewById(id)).setTextColor(sub);
-        int[] accents = {R.id.biliAction, R.id.dyAction, R.id.ytAction, R.id.btnClearAll, R.id.arrow, R.id.btnBack};
+        int[] accents = {R.id.biliAction, R.id.dyAction, R.id.ytAction, R.id.btnClearAll, R.id.arrow, R.id.btnBack, R.id.custAction};
         for (int id : accents) ((TextView) findViewById(id)).setTextColor(accent);
         int[] cards = {R.id.card1, R.id.card2, R.id.card3, R.id.cardNotify, R.id.cardAbout2};
         for (int id : cards) findViewById(id).setBackgroundColor(card);
