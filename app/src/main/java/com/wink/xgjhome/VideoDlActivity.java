@@ -222,6 +222,11 @@ public class VideoDlActivity extends Activity {
     private void runTask(final Task tk) {
         new Thread(new Runnable() { public void run() {
             try {
+                // 归一化放在这里: 短链302解析后再进 runTask 时也能生效
+                try {
+                    java.util.regex.Matcher dm = java.util.regex.Pattern.compile("douyin\\.com/(?:share/)?(?:note|video)/(\\d+)").matcher(tk.url);
+                    if (dm.find()) tk.url = "https://www.douyin.com/video/" + dm.group(1);
+                } catch (Throwable ignored) {}
                 ensureEngine();
                 File cache = getExternalCacheDir() != null ? getExternalCacheDir() : getCacheDir();
                 File out = new File(cache, "vdl_%(id)s.%(ext)s");
@@ -360,7 +365,6 @@ public class VideoDlActivity extends Activity {
                         tk.out = done;
                         tk.saved = store(done, safeName(tk.title));
                         tk.percent = 100;
-                        HistoryStore.add(VideoDlActivity.this, "视频", safeName(tk.title), tk.saved.toString());
                         runUi(new Runnable() { public void run() { render(); }});
                         return;  // 成功收工
                     } catch (Throwable e) {
