@@ -596,7 +596,6 @@ public class SniffActivity extends Activity {
             }
         }
         if (!url.startsWith("http")) url = "https://" + url;
-        if (YtResolver.isYt(url)) { YtResolver.handle(this, url); return; }  // YouTube: yt-dlp(Seal同款引擎)解析进记录
         if (url.contains("v.douyin.com")) { resolveDouyinShort(url); return; }  // 抖音短链原生解析302直达房间
         if (isDyLiveUrl(url)) dyAutoPcClick();
         webView.loadUrl(url);
@@ -1010,10 +1009,6 @@ public class SniffActivity extends Activity {
     }
 
     public static android.content.Context sDumpCtx;
-
-    static java.io.File dumpDir() {
-        try { return sDumpCtx.getExternalFilesDir(null).getParentFile(); } catch (Throwable t) { return null; }
-    }
 
     private static void dumpFc2Debug(String st) {
         try {
