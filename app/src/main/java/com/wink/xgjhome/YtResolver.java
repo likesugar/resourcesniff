@@ -114,10 +114,14 @@ public final class YtResolver {
                     for (String v : e.getValue()) { c.setRequestProperty(e.getKey(), v); if ("User-Agent".equalsIgnoreCase(e.getKey())) hasUa = true; }
                 }
                 if (!hasUa) c.setRequestProperty("User-Agent", UA);
-                String ck = "CONSENT=YES+cb; SOCS=CAI";
-                String login = ytCookies();
-                if (login != null && !login.isEmpty()) ck += "; " + login;
-                c.setRequestProperty("Cookie", ck);
+                boolean hasCk = false;
+                if (request.headers() != null) for (String k : request.headers().keySet()) if ("Cookie".equalsIgnoreCase(k)) hasCk = request.headers().get(k) != null && !request.headers().get(k).isEmpty();
+                if (!hasCk) {
+                    String ck = "CONSENT=YES+cb; SOCS=CAI";
+                    String login = ytCookies();
+                    if (login != null && !login.isEmpty()) ck += "; " + login;
+                    c.setRequestProperty("Cookie", ck);
+                }
                 String auth = sapisidHash("https://www.youtube.com");
                 if (auth != null) {
                     c.setRequestProperty("Authorization", auth);
@@ -238,9 +242,16 @@ public final class YtResolver {
     }
 
     // ---------- IOS 官方客户端兜底（DBdown 同款思路：IOS 常不被风控） ----------
-    private static String[] clientUA = {UA_IOS, "com.google.android.youtube/19.44.38 (Linux; U; Android 13; zh_CN) gzip", UA};
-    private static String[] clientName = {CLS_IOS, "ANDROID", "WEB"};
-    private static String[] clientVer = {VER_IOS, "19.44.38", "2.20241126.01.00"};
+    private static String[] clientUA = {
+            "com.google.ios.youtube/19.45.4 (iPhone16,2; U; CPU iOS 18_1_0 like Mac OS X;)",
+            "com.google.android.youtube/19.44.38 (Linux; U; Android 13; US) gzip",
+            UA};
+    private static String[] clientName = {"IOS", "ANDROID", "WEB"};
+    private static String[] clientVer = {"19.45.4", "19.44.38", "2.20241126.01.00"};
+    private static String[] clientKey = {
+            "AIzaSyB-63vPrdThhKuerbB2N_l7Kwwcxj6yUAc",
+            "AIzaSyA8eiZmM1FaDVjRy-df2KTyQ_vz_yYM39w",
+            "AIzaSyAO_FJ2SlqU8Q4STEHLGCilw_Y9_11qcW8"};
 
     private static JSONObject iosPlayer(String vid) throws Exception {
         JSONObject resp = null; String lastStatus = "?";
@@ -257,15 +268,20 @@ public final class YtResolver {
     private static JSONObject playerOnce(String vid, int ci) throws Exception {
         JSONObject cl = new JSONObject()
                 .put("clientName", clientName[ci]).put("clientVersion", clientVer[ci])
-                .put("deviceModel", ci == 0 ? "iPhone16,2" : (ci == 1 ? "sargo" : ""))
-                .put("osName", ci == 0 ? "iOS" : (ci == 1 ? "Android" : "Windows"))
-                .put("osVersion", ci == 0 ? "18.1.0.22B83" : (ci == 1 ? "13" : "10.0"));
-        if (ci == 1) cl.put("androidSdkVersion", 33);
+                .put("hl", "en").put("gl", "US");
+        if (ci == 0) {
+            cl.put("deviceMake", "Apple").put("deviceModel", "iPhone16,2")
+              .put("osName", "iPhone").put("osVersion", "18.1.0.22B83");
+        } else if (ci == 1) {
+            cl.put("androidSdkVersion", 33).put("osName", "Android").put("osVersion", "13");
+        } else {
+            cl.put("osName", "Windows").put("osVersion", "10.0");
+        }
         JSONObject body = new JSONObject()
                 .put("context", new JSONObject().put("client", cl))
                 .put("videoId", vid)
                 .put("contentCheckOk", true).put("racyCheckOk", true);
-        HttpURLConnection c = (HttpURLConnection) new URL("https://www.youtube.com/youtubei/v1/player?key=AIzaSyB-63vPrdThhKuerbB2N_l7Kwwcxj6yUAc").openConnection();
+        HttpURLConnection c = (HttpURLConnection) new URL("https://www.youtube.com/youtubei/v1/player?key=" + clientKey[ci] + "&prettyPrint=false").openConnection();
         c.setRequestMethod("POST"); c.setDoOutput(true); c.setConnectTimeout(15000); c.setReadTimeout(20000);
         c.setRequestProperty("User-Agent", clientUA[ci]);
         c.setRequestProperty("Content-Type", "application/json");
