@@ -180,6 +180,7 @@ public class VideoDlActivity extends Activity {
         pb.setCornerRadius(dp(24)); pb.setColor(dark ? 0xFF181E2A : 0xFFFFFFFF);
         if (!dark) pb.setStroke(dp(1), 0xFFE4EAF5);
         box.setBackground(pb);
+        box.setMinimumWidth(dp(300));
         int p2 = dp(6);
         box.setPadding(dp(18), dp(14), p2, dp(14));
         TextView link = new TextView(this);
@@ -214,7 +215,11 @@ public class VideoDlActivity extends Activity {
         box.addView(go);
         dlg.setView(box, dp(18), dp(24), dp(18), dp(6));
         dlg.show();
-        if (dlg.getWindow() != null) dlg.getWindow().setBackgroundDrawableResource(android.R.color.transparent);
+        if (dlg.getWindow() != null) {
+            dlg.getWindow().setBackgroundDrawableResource(android.R.color.transparent);
+            dlg.getWindow().setLayout(android.view.ViewGroup.LayoutParams.MATCH_PARENT, android.view.ViewGroup.LayoutParams.WRAP_CONTENT);
+        }
+        input.requestFocus();
     }
 
     private void submit() { submit(null); }
@@ -365,7 +370,7 @@ public class VideoDlActivity extends Activity {
                                         runUi(new Runnable() { public void run() { render(); }});
                                     }
                                 } catch (Throwable ignored) {}
-                                try { Thread.sleep(1200); } catch (Throwable e) { return; }
+                                try { Thread.sleep(500); } catch (Throwable e) { return; }
                             }
                         }}).start();
                         com.yausername.youtubedl_android.YoutubeDL.getInstance().execute(req);

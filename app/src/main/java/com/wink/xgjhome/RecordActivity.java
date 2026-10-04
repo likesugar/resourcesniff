@@ -153,7 +153,7 @@ public class RecordActivity extends Activity {
         tick = new Runnable() {
             public void run() {
                 rebuild();
-                handler.postDelayed(this, 1500);
+                handler.postDelayed(this, 500);
             }
         };
     }
