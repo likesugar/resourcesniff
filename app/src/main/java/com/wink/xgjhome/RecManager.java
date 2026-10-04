@@ -589,7 +589,9 @@ public class RecManager {
                 for (java.io.File f : list) fw.write("file '" + f.getAbsolutePath() + "'\n");
                 fw.close();
                 final java.io.File mp4 = new java.io.File(job.file, "out.mp4");
-                final long totalSecs = job.secs > 0 ? job.secs : 1;
+                long totalIn = 1;
+                for (java.io.File f : list) totalIn += f.length();
+                final long totalInF = totalIn;
                 com.arthenica.ffmpegkit.FFmpegSession st = com.arthenica.ffmpegkit.FFmpegKit.executeWithArgumentsAsync(
                     new String[]{"-y", "-f", "concat", "-safe", "0", "-i", listFile.getAbsolutePath(),
                         "-c", "copy", "-fflags", "+genpts", "-movflags", "+faststart", mp4.getAbsolutePath()},
@@ -600,9 +602,9 @@ public class RecManager {
                     }, new com.arthenica.ffmpegkit.StatisticsCallback() {
                         public void apply(com.arthenica.ffmpegkit.Statistics stat) {
                             try {
-                                int p = (int) (stat.getTime() / totalSecs * 100);
-                                if (p > 100) p = 100;
-                                if (p < 0) p = 0;
+                                int p = (int) (100L * mp4.length() / totalInF);
+                                if (p > 99) p = 99;
+                                if (p < 1) p = 1;
                                 job.state = "合并MP4中 " + p + "%";
                             } catch (Throwable ignored) {}
                         }
@@ -610,6 +612,12 @@ public class RecManager {
                 while (!st.getState().equals(com.arthenica.ffmpegkit.SessionState.COMPLETED)
                     && !st.getState().equals(com.arthenica.ffmpegkit.SessionState.FAILED)
                     ) {
+                    try {
+                        int p = (int) (100L * mp4.length() / totalInF);
+                        if (p > 99) p = 99;
+                        if (p < 1) p = 1;
+                        job.state = "合并MP4中 " + p + "%";
+                    } catch (Throwable ignored) {}
                     try { Thread.sleep(500); } catch (Throwable e) { }
                 }
                 if (st.getState().equals(com.arthenica.ffmpegkit.SessionState.COMPLETED) && mp4.length() > 0) {
