@@ -132,13 +132,12 @@ public class HomeActivity extends Activity {
             }
         });
         findViewById(R.id.cardDownload).setOnClickListener(new View.OnClickListener() {
-            public void onClick(View v) {
-                startActivity(new Intent(HomeActivity.this, RecordActivity.class));
-            }
+            public void onClick(View v) { startActivity(new Intent(HomeActivity.this, RecordActivity.class)); }
         });
-        findViewById(R.id.lanToggle).setOnClickListener(new View.OnClickListener() {
-            public void onClick(View v) { showLanDialog(); }
+        findViewById(R.id.cardVideoDl).setOnClickListener(new View.OnClickListener() {
+            public void onClick(View v) { startActivity(new Intent(HomeActivity.this, VideoDlActivity.class)); }
         });
+
         findViewById(R.id.cardAppSettings).setOnClickListener(new View.OnClickListener() {
             public void onClick(View v) { startActivity(new Intent(HomeActivity.this, SettingsActivity.class)); }
         });
