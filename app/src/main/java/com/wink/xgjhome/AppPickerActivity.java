@@ -154,11 +154,16 @@ public class AppPickerActivity extends Activity {
     private final java.util.HashMap<String, Bitmap> iconCache = new java.util.HashMap<String, Bitmap>();
 
     private void loadApps() {
-        try { all = pm.getInstalledPackages(0); } catch (Throwable e) { all = new java.util.ArrayList<android.content.pm.PackageInfo>(); }
-        // 后台预取：仅图标缓存（活动数点开"无活动:显"才扫描，列表秒出）
+        try { all = pm.getInstalledPackages(android.content.pm.PackageManager.GET_ACTIVITIES); } catch (Throwable e) { all = new java.util.ArrayList<android.content.pm.PackageInfo>(); }
+        // 一次性批量拿到活动数（单次系统调用,列表秒出且"无活动:隐"首次就生效）
         for (android.content.pm.PackageInfo pi : all) {
+            try {
+                android.content.pm.ActivityInfo[] acts = pi.activities;
+                actCount.put(pi.packageName, acts == null ? 0 : acts.length);
+            } catch (Throwable t) { actCount.put(pi.packageName, 0); }
             try { iconCache.put(pi.packageName, iconToBmp(pi)); } catch (Throwable t) { }
         }
+        actsScanned = true;
         java.util.Collections.sort(all, new java.util.Comparator<android.content.pm.PackageInfo>() {
             public int compare(android.content.pm.PackageInfo a, android.content.pm.PackageInfo b) {
                 return labelOf(a).compareToIgnoreCase(labelOf(b));
