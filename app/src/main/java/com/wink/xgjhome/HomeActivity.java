@@ -2,6 +2,7 @@ package com.wink.xgjhome;
 
 import android.app.Activity;
 import android.content.ClipboardManager;
+import android.widget.Toast;
 import android.content.Intent;
 import android.widget.EditText;
 import android.widget.LinearLayout;
@@ -22,8 +23,18 @@ public class HomeActivity extends Activity {
         ((android.view.ViewGroup) findViewById(R.id.toolRoot)).addView(
             new CapsuleBottomBar(this, dark, new CapsuleBottomBar.OnItem() {
                 public void onItem(int idx) {
-                    if (idx == 1) startActivity(new Intent(HomeActivity.this, SniffActivity.class)
-                            .addFlags(Intent.FLAG_ACTIVITY_REORDER_TO_FRONT));
+                    if (idx == 1) {
+                        String clip = clipUrl();
+                        if (clip != null) {
+                            Intent i = new Intent(HomeActivity.this, NativePlayerActivity.class);
+                            i.putExtra("url", clip);
+                            i.putExtra("title", "播放");
+                            i.putExtra("kernel", "native");
+                            startActivity(i);
+                        } else {
+                            Toast.makeText(HomeActivity.this, "剪贴板里没有可播放链接", Toast.LENGTH_SHORT).show();
+                        }
+                    }
                 }
             }));
         findViewById(R.id.toolColumn).setBackgroundColor(dark ? 0xFF000000 : 0xFFEEF4FF);
