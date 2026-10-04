@@ -52,7 +52,7 @@ public final class YtResolver {
     static void handle(final SniffActivity act, final String url) {
         toast(act, "YouTube 解析中…");
         new Thread(new Runnable() { public void run() {
-            String out = null, err = "未知错误";
+            String saved = null, err = "未知错误";
             try {
                 synchronized (YtResolver.class) {
                     if (!inited) {
@@ -78,7 +78,6 @@ public final class YtResolver {
                 com.yausername.youtubedl_android.YoutubeDLResponse resp =
                         com.yausername.youtubedl_android.YoutubeDL.getInstance().execute(req, null);
                 dump("ytdlp done " + resp.getElapsedTime() + "s tail=" + tail(resp.getOut(), 300));
-                // 找产物：yt_out_<id>.mp4
                 File done = null;
                 for (File f : cache.listFiles()) {
                     if (f.getName().startsWith("yt_out_") && (f.getName().endsWith(".mp4") || f.getName().endsWith(".mkv") || f.getName().endsWith(".webm"))) {
@@ -87,13 +86,12 @@ public final class YtResolver {
                 }
                 if (done == null) throw new Exception("未生成视频文件");
                 String title = "YouTube_" + done.getName().replaceAll("^yt_out_|\\.[a-z]+$", "");
-                final String saved = store(act, done, title);
-                out = saved;
+                saved = store(act, done, title);
             } catch (Throwable t) {
                 err = t.getMessage() == null ? t.toString() : t.getMessage();
                 dump("ytdlp fail: " + err);
             }
-            final String fOut = out, fErr = err;
+            final String fOut = saved, fErr = err;
             act.runOnUiThread(new Runnable() { public void run() {
                 if (fOut != null) toast(act, "已保存到记录");
                 else toast(act, "YouTube 解析失败: " + fErr);
