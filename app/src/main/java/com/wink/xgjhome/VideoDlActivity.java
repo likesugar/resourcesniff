@@ -185,70 +185,99 @@ public class VideoDlActivity extends Activity {
         new Thread(new Runnable() { public void run() {
             try {
                 ensureEngine();
-                // 1) 元数据
-                try {
-                    com.yausername.youtubedl_android.YoutubeDLRequest meta =
-                            new com.yausername.youtubedl_android.YoutubeDLRequest(tk.url);
-                    meta.addOption("--dump-json");
-                    meta.addOption("--no-playlist");
-                    meta.addOption("--cookies", cookies().getAbsolutePath());
-                    com.yausername.youtubedl_android.YoutubeDLResponse mr =
-                            com.yausername.youtubedl_android.YoutubeDL.getInstance().execute(meta, null);
-                    JSONObject j = new JSONObject(mr.getOut().trim().split("\n")[0]);
-                    tk.title = j.optString("title", tk.title);
-                    if (j.has("filesize") && j.optLong("filesize") > 0) tk.size = fmtMB(j.optLong("filesize"));
-                    else if (j.has("filesize_approx")) tk.size = "~" + fmtMB(j.optLong("filesize_approx"));
-                    int w = j.optInt("width"), h = j.optInt("height"), fps = j.optInt("fps", 0);
-                    if (h > 0) tk.res = w + " × " + h + (fps > 0 ? " · " + fps + " fps" : "");
-                    tk.percent = 0;
-                    runUi(new Runnable() { public void run() { render(); }});
-                } catch (Throwable e) {
-                    tk.percent = 0;  // 元数据失败继续下
-                }
-                // 2) 下载
                 File cache = getExternalCacheDir() != null ? getExternalCacheDir() : getCacheDir();
                 File out = new File(cache, "vdl_%(id)s.%(ext)s");
-                com.yausername.youtubedl_android.YoutubeDLRequest req =
-                        new com.yausername.youtubedl_android.YoutubeDLRequest(tk.url);
-                req.addOption("-f", "b/bv*+ba/b");  // 优先已合并格式
-                req.addOption("--user-agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36");
-                req.addOption("--add-headers", "Referer: " + tk.url);
-                req.addOption("--cookies", cookies().getAbsolutePath());
-                req.addOption("-o", out.getAbsolutePath());
-                req.addOption("--no-playlist"); req.addOption("--no-mtime");
-                // 进度监视：轮询 .part 文件大小
-                new Thread(new Runnable() { public void run() {
-                    while (tk.percent >= 0 && tk.percent < 100) {
+                // 策略轮询：不同 UA/Cookie 组合，谁成用谁
+                String[][] strategies = {
+                    // {ua, referer, cookie开关}
+                    {"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36", "https://www.bilibili.com/", "1"},
+                    {"Mozilla/5.0 (Linux; Android 13; M2102K1C) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36", "https://www.bilibili.com/", "1"},
+                    {"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36", "https://www.bilibili.com/", "0"},
+                    {"Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36", "https://live.douyin.com/", "0"},
+                };
+                Throwable last = null;
+                for (int si = 0; si < strategies.length; si++) {
+                    try {
+                        final String[] st = strategies[si];
+                        // 1) 元数据
                         try {
-                            File cache2 = getExternalCacheDir() != null ? getExternalCacheDir() : getCacheDir();
-                            long mx = 0;
-                            for (File f2 : cache2.listFiles()) {
-                                if (f2.getName().startsWith("vdl_") && f2.getName().endsWith(".part") && f2.length() > mx) mx = f2.length();
+                            com.yausername.youtubedl_android.YoutubeDLRequest meta =
+                                    new com.yausername.youtubedl_android.YoutubeDLRequest(tk.url);
+                            meta.addOption("--dump-json");
+                            meta.addOption("--no-playlist");
+                            meta.addOption("--no-update");
+                            meta.addOption("--user-agent", st[0]);
+                            meta.addOption("--add-headers", "Referer: " + st[1]);
+                            if (st[2].equals("1")) meta.addOption("--cookies", cookies().getAbsolutePath());
+                            com.yausername.youtubedl_android.YoutubeDLResponse mr =
+                                    com.yausername.youtubedl_android.YoutubeDL.getInstance().execute(meta, null);
+                            String[] ls = mr.getOut().trim().split("\n");
+                            JSONObject j = new JSONObject(ls[ls.length - 1]);
+                            tk.title = j.optString("title", tk.title);
+                            if (j.optLong("filesize") > 0) tk.size = fmtMB(j.optLong("filesize"));
+                            else if (j.optLong("filesize_approx") > 0) tk.size = "~" + fmtMB(j.optLong("filesize_approx"));
+                            int w = j.optInt("width"), h = j.optInt("height"), fps = j.optInt("fps", 0);
+                            if (h > 0) tk.res = w + " × " + h + (fps > 0 ? " · " + fps + " fps" : "");
+                            tk.percent = 0;
+                            runUi(new Runnable() { public void run() { render(); }});
+                        } catch (Throwable e) {
+                            tk.percent = 0;  // 元数据失败继续下
+                        }
+                        // 2) 下载
+                        com.yausername.youtubedl_android.YoutubeDLRequest req =
+                                new com.yausername.youtubedl_android.YoutubeDLRequest(tk.url);
+                        req.addOption("-f", "b/bv*+ba/b");
+                        req.addOption("--no-update");
+                        req.addOption("--user-agent", st[0]);
+                        req.addOption("--add-headers", "Referer: " + st[1]);
+                        if (st[2].equals("1")) req.addOption("--cookies", cookies().getAbsolutePath());
+                        req.addOption("-o", out.getAbsolutePath());
+                        req.addOption("--no-playlist"); req.addOption("--no-mtime");
+                        // 进度监视：轮询 .part 文件大小
+                        new Thread(new Runnable() { public void run() {
+                            while (tk.percent >= 0 && tk.percent < 100) {
+                                try {
+                                    long mx = 0;
+                                    File cache2 = getExternalCacheDir() != null ? getExternalCacheDir() : getCacheDir();
+                                    for (File f2 : cache2.listFiles()) {
+                                        if (f2.getName().startsWith("vdl_") && f2.getName().endsWith(".part") && f2.length() > mx) mx = f2.length();
+                                    }
+                                    if (mx > 0) {
+                                        tk.size = fmtMB(mx);
+                                        if (tk.percent < 1) tk.percent = 1;
+                                        runUi(new Runnable() { public void run() { render(); }});
+                                    }
+                                } catch (Throwable ignored) {}
+                                try { Thread.sleep(1500); } catch (Throwable e) { return; }
                             }
-                            if (mx > 0) {
-                                tk.size = fmtMB(mx);
-                                if (tk.percent < 1) tk.percent = 1;
-                                runUi(new Runnable() { public void run() { render(); }});
+                        }}).start();
+                        com.yausername.youtubedl_android.YoutubeDLResponse resp =
+                                com.yausername.youtubedl_android.YoutubeDL.getInstance().execute(req);
+                        // 3) 找产物
+                        File done = null;
+                        for (File f : cache.listFiles()) {
+                            if (f.getName().startsWith("vdl_")) {
+                                if (done == null || f.lastModified() > done.lastModified()) done = f;
                             }
+                        }
+                        if (done == null || done.length() < 1024) throw new Exception("未生成视频文件");
+                        tk.out = done;
+                        tk.saved = store(done, safeName(tk.title));
+                        tk.percent = 100;
+                        HistoryStore.add(VideoDlActivity.this, "视频", safeName(tk.title), tk.saved.toString());
+                        runUi(new Runnable() { public void run() { render(); }});
+                        return;  // 成功收工
+                    } catch (Throwable e) {
+                        last = e;
+                        try {
+                            java.io.File dir = getExternalFilesDir(null) != null ? getExternalFilesDir(null).getParentFile() : getFilesDir();
+                            java.io.FileWriter fw = new java.io.FileWriter(new java.io.File(dir, "网页诊断.txt"), true);
+                            fw.write("\n==== VDL try#" + si + " " + new java.util.Date() + " url=" + tk.url + " ====\n" + e.getMessage() + "\n");
+                            fw.close();
                         } catch (Throwable ignored) {}
-                        try { Thread.sleep(1500); } catch (Throwable e) { return; }
-                    }
-                }}).start();
-                com.yausername.youtubedl_android.YoutubeDLResponse resp =
-                        com.yausername.youtubedl_android.YoutubeDL.getInstance().execute(req);
-                // 3) 找产物
-                File done = null;
-                for (File f : cache.listFiles()) {
-                    if (f.getName().startsWith("vdl_")) {
-                        if (done == null || f.lastModified() > done.lastModified()) done = f;
                     }
                 }
-                if (done == null || done.length() < 1024) throw new Exception("未生成视频文件");
-                tk.out = done;
-                tk.saved = store(done, safeName(tk.title));
-                tk.percent = 100;
-                HistoryStore.add(VideoDlActivity.this, "视频", safeName(tk.title), tk.saved.toString());
-                runUi(new Runnable() { public void run() { render(); }});
+                throw last != null ? last : new Exception("全部策略失败");
             } catch (Throwable e) {
                 tk.percent = -2;
                 tk.err = e.getMessage() == null ? e.toString() : e.getMessage();
