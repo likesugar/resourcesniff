@@ -58,7 +58,6 @@ public final class YtResolver {
                     if (!inited) {
                         System.setProperty("java.net.preferIPv4Stack", "true");
                         com.yausername.youtubedl_android.YoutubeDL.getInstance().init(act.getApplicationContext());
-                        try { com.yausername.ffmpeg.FFmpeg.getInstance().init(act.getApplicationContext()); } catch (Throwable ignored) {}
                         dump("ytdlp engine inited");
                         inited = true;
                     }
@@ -68,8 +67,7 @@ public final class YtResolver {
                 File outTpl = new File(cache, "yt_out_%(id)s.%(ext)s");
                 com.yausername.youtubedl_android.YoutubeDLRequest req =
                         new com.yausername.youtubedl_android.YoutubeDLRequest(url);
-                req.addOption("-f", "bv*[ext=mp4]+ba[ext=m4a]/b[ext=mp4]/bv*+ba/b");
-                req.addOption("--merge-output-format", "mp4");
+                req.addOption("-f", "b[ext=mp4]/b");  // 精简引擎无ffmpeg:只取自带音轨的最高合并格式(≤720p)
                 req.addOption("--cookies", cookies.getAbsolutePath());
                 req.addOption("-o", outTpl.getAbsolutePath());
                 req.addOption("--no-mtime");
