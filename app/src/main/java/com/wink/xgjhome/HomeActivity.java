@@ -159,7 +159,7 @@ public class HomeActivity extends Activity {
 
         TextView status = new TextView(this);
         status.setTextSize(14);
-        status.setTextColor(0xFF444444);
+        status.setTextColor(0xFFFFFFFF);
         String url = "http://" + LanShareServer.localIp() + ":" + LanShareServer.getPort();
         if (on) {
             status.setText("已开启，电脑浏览器访问：\n" + url + "\n（可查看并打开记录中的链接）");
@@ -175,7 +175,7 @@ public class HomeActivity extends Activity {
         TextView swLabel = new TextView(this);
         swLabel.setText("局域网共享");
         swLabel.setTextSize(16);
-        swLabel.setTextColor(0xFF222222);
+        swLabel.setTextColor(0xFFFFFFFF);
         swRow.addView(swLabel, new LinearLayout.LayoutParams(0, -2, 1f));
         final android.widget.Switch sw = new android.widget.Switch(this);
         sw.setChecked(on);
