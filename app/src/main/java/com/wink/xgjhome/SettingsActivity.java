@@ -67,7 +67,8 @@ public class SettingsActivity extends Activity {
             }
         });
         findViewById(R.id.cardNotify).setOnClickListener(new View.OnClickListener() {
-            public void onClick(View v) {                try {
+            public void onClick(View v) {
+                try {
                     Intent i = new Intent(android.provider.Settings.ACTION_APP_NOTIFICATION_SETTINGS)
                             .putExtra(android.provider.Settings.EXTRA_APP_PACKAGE, getPackageName());
                     startActivity(i);

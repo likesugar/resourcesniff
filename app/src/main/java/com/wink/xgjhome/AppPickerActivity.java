@@ -126,6 +126,7 @@ public class AppPickerActivity extends Activity {
         sv.addView(list);
         root.addView(sv, new LinearLayout.LayoutParams(-1, 0, 1f));
         setContentView(root);
+        applyFilter();   // 初始显示"加载中…"，不用等触碰开关
 
         new Thread(new Runnable() { public void run() { loadApps(); runOnUiThread(new Runnable() { public void run() { loaded = true; applyFilter(); } }); } }).start();
     }

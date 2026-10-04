@@ -114,10 +114,8 @@ public class SniffActivity extends Activity {
 
         WebSettings ws = webView.getSettings();
         ws.setJavaScriptEnabled(true);
-        ws.setUserAgentString(UA_MOBILE); // 首屏手机UA快速渲染
+        ws.setUserAgentString(UA_MOBILE); // 手机UA：抖音直播流按移动端下发
         isMobileUa = true;
-        btnSwitchUa.setText("切手机UA");
-        btnSwitchUa.setBackgroundColor(0x4D3742fa);
         ws.setDomStorageEnabled(true);
         ws.setMediaPlaybackRequiresUserGesture(false);
         ws.setMixedContentMode(WebSettings.MIXED_CONTENT_ALWAYS_ALLOW);
@@ -445,7 +443,6 @@ public class SniffActivity extends Activity {
 
             @Override
             public void onPageFinished(WebView view, String url) {
-                webView.getSettings().setCacheMode(WebSettings.LOAD_DEFAULT);  // 页面完成后恢复默认缓存
                 if (url != null && (url.contains("douyin.com") || url.contains("iesdouyin"))) {
                     injectDouyinScript();
                 }
@@ -548,30 +545,7 @@ public class SniffActivity extends Activity {
             etUrl.setText(pre);
             openInputUrl();
         } else {
-            // 自动检测剪贴板：有新链接则直接进入嗅探（同一条链接只自动进一次）
-            try {
-                if (!getSharedPreferences("settings", MODE_PRIVATE).getBoolean("clipboard", true)) throw new Exception("off");
-                android.content.ClipboardManager cm = (android.content.ClipboardManager) getSystemService(Context.CLIPBOARD_SERVICE);
-                if (cm != null && cm.hasPrimaryClip() && cm.getPrimaryClip() != null && cm.getPrimaryClip().getItemCount() > 0) {
-                    CharSequence cs = cm.getPrimaryClip().getItemAt(0).getText();
-                    String clip = cs == null ? "" : cs.toString().trim();
-                    java.util.regex.Matcher m2 = java.util.regex.Pattern.compile("https?://\\S+").matcher(clip);
-                    if (m2.find()) {
-                        String url = m2.group();
-                        android.content.SharedPreferences sp = getSharedPreferences("settings", MODE_PRIVATE);
-                        String seen = sp.getString("clip_seen", "");
-                        if (!url.equals(seen)) {
-                            sp.edit().putString("clip_seen", url).apply();
-                            etUrl.setText(url);
-                            openInputUrl();
-                            Toast.makeText(this, "检测到剪贴板链接，已打开", Toast.LENGTH_SHORT).show();
-                            return;
-                        }
-                    }
-                }
-            } catch (Throwable ignored) {}
             webView.loadUrl("https://live.douyin.com/");
-            dyAutoPcClick();
         }
     }
 
@@ -605,26 +579,7 @@ public class SniffActivity extends Activity {
         }
         if (!url.startsWith("http")) url = "https://" + url;
         if (url.contains("v.douyin.com")) { resolveDouyinShort(url); return; }  // 抖音短链原生解析302直达房间
-        if (url.contains("live.douyin.com")) dyAutoPcClick();
         webView.loadUrl(url);
-    }
-
-    /** 抖音直播：手机版加载完成后自动"点击"切电脑UA按钮（3s兜底，只点一次） */
-    static boolean isDyLiveUrl(String u) {
-        return u != null && (u.contains("live.douyin.com") || u.contains("webcast.amemv.com"));
-    }
-
-    void dyAutoPcClick() {
-        new android.os.Handler(android.os.Looper.getMainLooper()).postDelayed(new Runnable() { public void run() {
-            try {
-                if (isFinishing() || isDestroyed() || webView == null || btnSwitchUa == null) return;
-                if (!isMobileUa) { try { dumpFc2Debug("DYPC: skip, already pc"); } catch (Throwable ignored) {} return; }
-                String cur = webView.getUrl();
-                if (!isDyLiveUrl(cur)) { try { dumpFc2Debug("DYPC: skip, url=" + cur); } catch (Throwable ignored) {} return; }
-                try { dumpFc2Debug("DYPC: auto click, url=" + cur); } catch (Throwable ignored) {}
-                btnSwitchUa.performClick();   // = 手动点"切电脑UA"
-            } catch (Throwable ignored) {}
-        }}, 3000);
     }
 
     /** 抖音短链(v.douyin.com)原生跟随302，直达直播间地址 */
@@ -649,7 +604,7 @@ public class SniffActivity extends Activity {
             dumpFc2Debug("DYRESOLVE final: " + cur);
             final String fu = cur;
             runOnUiThread(new Runnable() { public void run() {
-                try { if (isMobileUa) dyAutoPcClick(); webView.loadUrl(fu); } catch (Throwable ignored) {}
+                try { webView.loadUrl(fu); } catch (Throwable ignored) {}
             }});
         }}).start();
     }
@@ -1378,8 +1333,6 @@ public class SniffActivity extends Activity {
     }
 
     void switchUa() {
-        webView.getSettings().setCacheMode(WebSettings.LOAD_NO_CACHE);  // 换UA必须绕过缓存,否则reload吐旧缓存页面
-        try { dumpFc2Debug("UASWITCH: mobile=" + isMobileUa + " url=" + webView.getUrl() + " ua=" + webView.getSettings().getUserAgentString()); } catch (Throwable ignored) {}
         if (isMobileUa) {
             webView.getSettings().setUserAgentString("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36");
             btnSwitchUa.setText("切手机UA");
