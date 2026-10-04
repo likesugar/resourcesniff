@@ -178,6 +178,11 @@ public class VideoDlActivity extends Activity {
         final Task tk = new Task(); tk.url = u;
         TASKS.add(0, tk);
         render();
+        // B站 URL 规范化: m.bilibili.com -> www, 去查询参数只留 BV 号
+        try {
+            java.util.regex.Matcher bm = java.util.regex.Pattern.compile("bilibili[.]com/video/(BV[0-9A-Za-z]{8,12})").matcher(u);
+            if (bm.find()) u = "https://www.bilibili.com/video/" + bm.group(1) + "/";
+        } catch (Throwable ignored) {}
         // b23.tv 短链先原生跟随302
         final String fu0 = u;
         if (fu0.contains("b23.tv")) {
