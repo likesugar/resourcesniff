@@ -29,6 +29,10 @@ public class HistoryStore {
         } catch (Throwable ignored) {}
     }
 
+    public static void clearAll(Context c) {
+        try { sp(c).edit().clear().apply(); } catch (Throwable ignored) {}
+    }
+
     /** 新→旧 */
     public static ArrayList<Item> load(Context c) {
         ArrayList<Item> out = new ArrayList<Item>();

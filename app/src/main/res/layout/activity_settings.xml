@@ -33,6 +33,9 @@
                 android:background="@drawable/bg_card"
                 android:padding="20dp">
 
+                <ScrollView android:id="@+id/platScroll"
+                    android:layout_width="match_parent" android:layout_height="240dp"
+                    android:scrollbars="none" android:overScrollMode="never">
                 <!-- 哔哩哔哩 -->
                 <LinearLayout
                     android:layout_width="match_parent" android:layout_height="wrap_content"
@@ -90,13 +93,15 @@
 
                 <View android:layout_width="match_parent" android:layout_height="1dp"
                     android:background="@color/divider" android:layout_marginTop="16dp" android:layout_marginBottom="16dp" android:id="@+id/divCust"/>
+                </ScrollView>
+
                 <LinearLayout
                     android:layout_width="match_parent" android:layout_height="wrap_content"
                     android:orientation="horizontal" android:gravity="center_vertical">
                     <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content"
                         android:layout_weight="1" android:orientation="vertical">
                         <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
-                            android:text="自定义平台" android:textSize="18sp" android:textStyle="bold" android:id="@+id/tCust"/>
+                            android:text="＋ 自定义平台" android:textSize="18sp" android:textStyle="bold" android:id="@+id/tCust"/>
                         <TextView android:id="@+id/custState"
                             android:layout_width="wrap_content" android:layout_height="wrap_content"
                             android:text="未配置" android:textSize="14sp" android:paddingTop="4dp"/>

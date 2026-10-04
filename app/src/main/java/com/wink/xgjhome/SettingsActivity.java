@@ -91,6 +91,13 @@ public class SettingsActivity extends Activity {
         });
 
         // ---------- 自定义平台 ----------
+        {
+            String legacy = getSharedPreferences("settings", MODE_PRIVATE).getString("custom_site", "");
+            if (legacy.length() > 0) {
+                getSharedPreferences("settings", MODE_PRIVATE).edit()
+                    .putString("custom_sites", legacy).remove("custom_site").apply();
+            }
+        }
         refreshCust();
         findViewById(R.id.custAction).setOnClickListener(new View.OnClickListener() {
             public void onClick(View v) {
@@ -117,19 +124,85 @@ public class SettingsActivity extends Activity {
 
     private void refreshCust() {
         try {
-            String conf = getSharedPreferences("settings", MODE_PRIVATE).getString("custom_site", "");
-            TextView st = (TextView) findViewById(R.id.custState);
-            TextView ac = (TextView) findViewById(R.id.custAction);
-            if (conf.length() > 0) {
-                String[] p2 = conf.split("\\u0001", -1);
-                st.setText("已配置：" + p2[0] + "（" + (p2.length > 2 && p2[2].equals("pc") ? "PC" : "手机") + "版登录）");
-                ac.setText("网页登录");
-            } else {
-                st.setText("未配置");
-                ac.setText("配置");
+            android.view.ViewGroup card1 = (android.view.ViewGroup) findViewById(R.id.card1);
+            // 移除旧的自定义行
+            for (int i = card1.getChildCount() - 1; i >= 0; i--) {
+                View ch = card1.getChildAt(i);
+                if (ch.getId() == 777001 + i && ch.getTag() != null && "custrow".equals(ch.getTag().toString())) { }
             }
+            for (int i = card1.getChildCount() - 1; i >= 0; i--) {
+                View ch = card1.getChildAt(i);
+                Object tg = ch.getTag();
+                if (tg != null && tg.toString().startsWith("custrow")) card1.removeViewAt(i);
+            }
+            String list = getSharedPreferences("settings", MODE_PRIVATE).getString("custom_sites", "");
+            if (list.length() > 0) {
+                int dp8 = (int) (8 * getResources().getDisplayMetrics().density);
+                for (final String entry : list.split("\u0002")) {
+                    if (entry.length() == 0) continue;
+                    String[] p2 = entry.split("\u0001", -1);
+                    if (p2.length < 3) continue;
+                    android.widget.LinearLayout row = new android.widget.LinearLayout(this);
+                    row.setOrientation(android.widget.LinearLayout.HORIZONTAL);
+                    row.setGravity(android.view.Gravity.CENTER_VERTICAL);
+                    row.setTag("custrow");
+                    android.widget.LinearLayout mid = new android.widget.LinearLayout(this);
+                    mid.setOrientation(android.widget.LinearLayout.VERTICAL);
+                    android.widget.LinearLayout.LayoutParams mlp = new android.widget.LinearLayout.LayoutParams(0, -2, 1f);
+                    mid.setLayoutParams(mlp);
+                    android.widget.TextView name = new android.widget.TextView(this);
+                    name.setText(p2[0]); name.setTextSize(18); name.setTypeface(name.getTypeface(), android.graphics.Typeface.BOLD);
+                    name.setTextColor(color(0xFFE8ECF4, 0xFF1F2329));
+                    mid.addView(name);
+                    android.widget.TextView st = new android.widget.TextView(this);
+                    st.setText("PC版登录".equals("") ? "" : (p2[2].equals("pc") ? "PC版登录" : "手机版登录")); st.setTextSize(14);
+                    st.setTextColor(color(0xFF8A94A6, 0xFF8A94A6)); st.setPadding(0, dp8 / 2, 0, 0);
+                    mid.addView(st);
+                    row.addView(mid);
+                    android.widget.TextView go = new android.widget.TextView(this);
+                    go.setText("登录"); go.setTextSize(16); go.setPadding(dp8, dp8, dp8, dp8);
+                    go.setTextColor(color(0xFFB4C5FF, 0xFF315CDE));
+                    go.setOnClickListener(new View.OnClickListener() {
+                        public void onClick(View v) {
+                            try {
+                                String[] p3 = entry.split("\u0001", -1);
+                                Intent i = new Intent(SettingsActivity.this, LoginWebActivity.class);
+                                i.putExtra("url", p3[1]);
+                                i.putExtra("uamode", p3[2]);
+                                startActivity(i);
+                            } catch (Throwable t) { Toast.makeText(SettingsActivity.this, "打开失败", Toast.LENGTH_SHORT).show(); }
+                        }
+                    });
+                    row.addView(go);
+                    android.widget.TextView del = new android.widget.TextView(this);
+                    del.setText("删除"); del.setTextSize(16); del.setPadding(dp8, dp8, 0, dp8);
+                    del.setTextColor(color(0xFF8A94A6, 0xFF8A94A6));
+                    del.setOnClickListener(new View.OnClickListener() {
+                        public void onClick(View v) {
+                            String list2 = getSharedPreferences("settings", MODE_PRIVATE).getString("custom_sites", "");
+                            StringBuilder sb = new StringBuilder();
+                            for (String e2 : list2.split("\u0002")) {
+                                if (e2.length() > 0 && !e2.equals(entry)) { if (sb.length() > 0) sb.append('\u0002'); sb.append(e2); }
+                            }
+                            getSharedPreferences("settings", MODE_PRIVATE).edit().putString("custom_sites", sb.toString()).apply();
+                            refreshCust();
+                        }
+                    });
+                    row.addView(del);
+                    // 插到 desc1 之前
+                    int di = card1.indexOfChild(findViewById(R.id.desc1));
+                    card1.addView(row, di > 0 ? di : card1.getChildCount());
+                }
+            }
+            TextView st2 = (TextView) findViewById(R.id.custState);
+            TextView ac = (TextView) findViewById(R.id.custAction);
+            int n = 0;
+            String listN = getSharedPreferences("settings", MODE_PRIVATE).getString("custom_sites", "");
+            for (String e2 : listN.split("\u0002")) if (e2.length() > 0) n++;
+            st2.setText(n > 0 ? "已添加 " + n + " 个，列表超出3个可上下滑动" : "添加自定义网站登录");
+            ac.setText("添加");
         } catch (Throwable ignored) {}
-        refresh();  // 原有登录态刷新
+        refresh();
     }
 
     private void showCustConfig() {
@@ -166,8 +239,10 @@ public class SettingsActivity extends Activity {
                         return;
                     }
                     String mode = rg.getCheckedRadioButtonId() == 102 ? "pc" : "mobile";
+                    String list = getSharedPreferences("settings", MODE_PRIVATE).getString("custom_sites", "");
+                    String add = n + "\u0001" + u + "\u0001" + mode;
                     getSharedPreferences("settings", MODE_PRIVATE).edit()
-                        .putString("custom_site", n + "\u0001" + u + "\u0001" + mode).apply();
+                        .putString("custom_sites", list.length() > 0 ? list + "\u0002" + add : add).apply();
                     refreshCust();
                     Toast.makeText(SettingsActivity.this, "已保存，点「网页登录」登录", Toast.LENGTH_SHORT).show();
                 }
