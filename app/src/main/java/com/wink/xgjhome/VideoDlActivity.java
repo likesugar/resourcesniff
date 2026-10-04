@@ -230,6 +230,7 @@ public class VideoDlActivity extends Activity {
                 ensureEngine();
                 File cache = getExternalCacheDir() != null ? getExternalCacheDir() : getCacheDir();
                 File out = new File(cache, "vdl_%(id)s.%(ext)s");
+                final String ref = tk.url.contains("douyin.com") ? "https://www.douyin.com/" : "https://www.bilibili.com/";
                 // 策略轮询：不同 UA/Cookie 组合，谁成用谁
                 String[][] strategies = {
                     // {ua, referer, cookie开关}
@@ -251,7 +252,7 @@ public class VideoDlActivity extends Activity {
                             meta.addOption("--no-update");
                             if (si == 0) meta.addOption("--verbose");
                             meta.addOption("--user-agent", st[0]);
-                            meta.addOption("--add-headers", "Referer: " + st[1]);
+                            meta.addOption("--add-headers", "Referer: " + ref);
                             if (st[2].equals("1")) meta.addOption("--cookies", cookies().getAbsolutePath());
                             com.yausername.youtubedl_android.YoutubeDLResponse mr =
                                     com.yausername.youtubedl_android.YoutubeDL.getInstance().execute(meta, null);
@@ -291,7 +292,7 @@ public class VideoDlActivity extends Activity {
                         }
                         req.addOption("--no-update");
                         req.addOption("--user-agent", st[0]);
-                        req.addOption("--add-headers", "Referer: " + st[1]);
+                        req.addOption("--add-headers", "Referer: " + ref);
                         if (st[2].equals("1")) req.addOption("--cookies", cookies().getAbsolutePath());
                         req.addOption("-o", out.getAbsolutePath());
                         req.addOption("--restrict-filenames");
@@ -333,7 +334,7 @@ public class VideoDlActivity extends Activity {
                             ra.addOption("-f", "ba[ext=m4a]/ba/b");
                             ra.addOption("--no-update");
                             ra.addOption("--user-agent", st[0]);
-                            ra.addOption("--add-headers", "Referer: " + st[1]);
+                            ra.addOption("--add-headers", "Referer: " + ref);
                             if (st[2].equals("1")) ra.addOption("--cookies", cookies().getAbsolutePath());
                             ra.addOption("-o", out.getAbsolutePath());
                             ra.addOption("--restrict-filenames");
