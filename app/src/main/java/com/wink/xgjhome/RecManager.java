@@ -33,7 +33,62 @@ public class RecManager {
     private static volatile com.arthenica.ffmpegkit.FFmpegSession ffkSession = null;
     private static android.os.PowerManager.WakeLock recWake = null;
     private static Context sCtx;
-    public static void init(Context appCtx) { if (sCtx == null) sCtx = appCtx; }
+    public static void init(Context appCtx) {
+        if (sCtx == null) sCtx = appCtx;
+        // 进程被杀(手动/系统)后重启: 遗留录制任务自动转为暂停, 文件保留可续录
+        try {
+            android.content.SharedPreferences sp = sCtx.getSharedPreferences("rec_live", 0);
+            String raw = sp.getString("jobs", "");
+            if (raw != null && raw.length() > 2) {
+                org.json.JSONArray arr = new org.json.JSONArray(raw);
+                for (int i = 0; i < arr.length(); i++) {
+                    try {
+                        org.json.JSONObject o = arr.getJSONObject(i);
+                        RecJob j = new RecJob();
+                        j.id = ++recSeq;
+                        j.notifId = 9000 + j.id;
+                        j.url = o.optString("url");
+                        j.name = o.optString("name");
+                        j.file = new java.io.File(o.optString("file"));
+                        j.active = false;
+                        j.paused = true;
+                        j.state = null;   // 显示"暂停录制", 可继续/结束
+                        stoppedJobs.put(j.id, j);
+                    } catch (Throwable ignored) {}
+                }
+                sp.edit().remove("jobs").apply();
+            }
+        } catch (Throwable ignored) {}
+    }
+
+    /** 登记进行中的录制(用于进程被杀后自动转暂停) */
+    static void saveLiveRec(final RecJob job) {
+        try {
+            if (job == null || job.file == null || !job.file.isDirectory()) return;
+            android.content.SharedPreferences sp = sCtx.getSharedPreferences("rec_live", 0);
+            java.util.Set<String> set = new java.util.HashSet<String>(sp.getStringSet("jobs_set", new java.util.HashSet<String>()));
+            org.json.JSONObject o = new org.json.JSONObject();
+            o.put("url", job.url == null ? "" : job.url);
+            o.put("name", job.name == null ? "" : job.name);
+            o.put("file", job.file.getAbsolutePath());
+            set.add(job.file.getAbsolutePath());
+            java.util.Map<String, String> map = new java.util.HashMap<String, String>();
+            map.put(job.file.getAbsolutePath(), o.toString());
+            android.content.SharedPreferences.Editor ed = sp.edit();
+            for (String k : sp.getAll().keySet()) if (k.startsWith("job:")) ed.remove(k);
+            ed.putString("job:" + job.file.getAbsolutePath(), o.toString());
+            ed.putStringSet("jobs_set", set);
+            ed.apply();
+        } catch (Throwable ignored) {}
+    }
+
+    static void removeLiveRec(final RecJob job) {
+        try {
+            if (job == null || job.file == null) return;
+            android.content.SharedPreferences sp = sCtx.getSharedPreferences("rec_live", 0);
+            sp.edit().remove("job:" + job.file.getAbsolutePath()).apply();
+        } catch (Throwable ignored) {}
+    }
     public static volatile String lastStreamUrl = null;
 
     private static void acquireWake() {
@@ -320,6 +375,7 @@ public class RecManager {
             job.state = null;
             job.startTs = System.currentTimeMillis();  // 续录时长继续走
             recJobs.put(job.id, job);
+            saveLiveRec(job);
             acquireWake();
             startBgPlayer(job);
             startBgSession(job);
@@ -341,6 +397,7 @@ public class RecManager {
                 live.startTs = 0;
             }
             recJobs.remove(live.id);
+            removeLiveRec(live);
             releaseWakeIfIdle();
             mergeSegs(live);
             return;
@@ -430,6 +487,7 @@ public class RecManager {
             dir.mkdirs();
             job.file = dir;
             recJobs.put(job.id, job);
+            saveLiveRec(job);
             acquireWake();
             startBgPlayer(job);
             startBgSession(job);
