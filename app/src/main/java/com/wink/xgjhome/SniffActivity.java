@@ -546,6 +546,7 @@ public class SniffActivity extends Activity {
             openInputUrl();
         } else {
             webView.loadUrl("https://live.douyin.com/");
+            dyAutoPcClick();
         }
     }
 
@@ -565,6 +566,23 @@ public class SniffActivity extends Activity {
         if (hasFocus) hideBars();
     }
 
+    static boolean isDyLiveUrl(String u) {
+        return u != null && (u.contains("live.douyin.com") || u.contains("webcast.amemv.com"));
+    }
+
+    /** 抖音直播：手机UA渲染后自动点"切电脑UA"（含刷新），3s兜底，只切一次 */
+    void dyAutoPcClick() {
+        new android.os.Handler(android.os.Looper.getMainLooper()).postDelayed(new Runnable() { public void run() {
+            try {
+                if (isFinishing() || isDestroyed() || webView == null || btnSwitchUa == null) return;
+                if (!isMobileUa) return;
+                String cur = webView.getUrl();
+                if (!isDyLiveUrl(cur)) return;
+                btnSwitchUa.performClick();   // 走手动按钮同一路径：切UA+刷新
+            } catch (Throwable ignored) {}
+        }}, 3000);
+    }
+
     void openInputUrl() {
         String raw = etUrl.getText().toString().trim();
         if (raw.length() == 0) return;
@@ -579,6 +597,7 @@ public class SniffActivity extends Activity {
         }
         if (!url.startsWith("http")) url = "https://" + url;
         if (url.contains("v.douyin.com")) { resolveDouyinShort(url); return; }  // 抖音短链原生解析302直达房间
+        if (isDyLiveUrl(url)) dyAutoPcClick();
         webView.loadUrl(url);
     }
 
@@ -604,7 +623,7 @@ public class SniffActivity extends Activity {
             dumpFc2Debug("DYRESOLVE final: " + cur);
             final String fu = cur;
             runOnUiThread(new Runnable() { public void run() {
-                try { webView.loadUrl(fu); } catch (Throwable ignored) {}
+                try { if (isMobileUa) dyAutoPcClick(); webView.loadUrl(fu); } catch (Throwable ignored) {}
             }});
         }}).start();
     }
