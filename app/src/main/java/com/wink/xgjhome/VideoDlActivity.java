@@ -441,6 +441,24 @@ public class VideoDlActivity extends Activity {
                     pw.println(".bilibili.com\tTRUE\t/\tTRUE\t0\t" + kv[0] + "\t" + kv[1]);
             }
         } catch (Throwable ignored) {}
+        // douyin 域(原生 GET 首页拿 ttwid 等匿名 Cookie)
+        try {
+            java.net.HttpURLConnection c = (java.net.HttpURLConnection) new java.net.URL("https://www.douyin.com/").openConnection();
+            c.setRequestProperty("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36");
+            c.setConnectTimeout(8000); c.setReadTimeout(8000);
+            c.getInputStream();
+            for (String sc : c.getHeaderFields().getOrDefault("set-cookie", java.util.Collections.<String>emptyList())) {
+                String kv0 = sc.split(";", 2)[0];
+                String[] kv = kv0.split("=", 2);
+                if (kv.length == 2 && kv[0].length() > 0)
+                    pw.println(".douyin.com\tTRUE\t/\tTRUE\t0\t" + kv[0] + "\t" + kv[1]);
+            }
+        } catch (Throwable ignored) {}
+        String draw = cm.getCookie("https://www.douyin.com");
+        if (draw != null) for (String p : draw.split(";")) {
+            String[] kv = p.trim().split("=", 2);
+            if (kv.length == 2) pw.println(".douyin.com\tTRUE\t/\tTRUE\t0\t" + kv[0] + "\t" + kv[1]);
+        }
         String braw = cm.getCookie("https://www.bilibili.com");
         if (braw != null) for (String p : braw.split(";")) {
             String[] kv = p.trim().split("=", 2);
