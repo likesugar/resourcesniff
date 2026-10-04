@@ -204,9 +204,32 @@ public class AppPickerActivity extends Activity {
         renderList();
     }
 
+    private int renderGen = 0;   // 渲染代次：新渲染请求会取消旧的分批任务
+
     private void renderList() {
         list.removeAllViews();
-        for (final android.content.pm.PackageInfo pi : shown) {
+        renderGen++;
+        final int gen = renderGen;
+        // 首屏只渲染10个，其余分批慢渲染
+        final int first = Math.min(10, shown.size());
+        for (int i = 0; i < first; i++) renderRow(shown.get(i));
+        if (first < shown.size()) {
+            final int[] next = {first};
+            final android.os.Handler h = new android.os.Handler(android.os.Looper.getMainLooper());
+            final Runnable[] chunk = new Runnable[1];
+            chunk[0] = new Runnable() { public void run() {
+                if (gen != renderGen) return;   // 已有新渲染请求，作废
+                int end = Math.min(next[0] + 20, shown.size());
+                for (int i = next[0]; i < end; i++) renderRow(shown.get(i));
+                next[0] = end;
+                if (end < shown.size()) h.postDelayed(chunk[0], 40);
+            }};
+            h.postDelayed(chunk[0], 60);
+        }
+    }
+
+    private void renderRow(final android.content.pm.PackageInfo pi) {
+        {
             LinearLayout row = new LinearLayout(this);
             row.setOrientation(LinearLayout.HORIZONTAL);
             row.setGravity(Gravity.CENTER_VERTICAL);
