@@ -390,7 +390,7 @@ public class RecordActivity extends Activity {
                 pm.getMenu().add("暂停");
                 pm.getMenu().add("结束(合并MP4)");
             } else if (j.paused) {
-                pm.getMenu().add("开始");
+                pm.getMenu().add("继续录制");
                 pm.getMenu().add("结束(合并MP4)");
             } else if (j.done) {
                 pm.getMenu().add("播放");
@@ -512,7 +512,7 @@ public class RecordActivity extends Activity {
             pm.getMenu().add("打开").setOnMenuItemClickListener(new android.view.MenuItem.OnMenuItemClickListener() {
                 public boolean onMenuItemClick(android.view.MenuItem it) { play(j); return true; }
             });
-            pm.getMenu().add("开始").setOnMenuItemClickListener(new android.view.MenuItem.OnMenuItemClickListener() {
+            pm.getMenu().add("继续录制").setOnMenuItemClickListener(new android.view.MenuItem.OnMenuItemClickListener() {
                 public boolean onMenuItemClick(android.view.MenuItem it) { RecManager.recContinue(j.id); rebuild(); return true; }
             });
         }
