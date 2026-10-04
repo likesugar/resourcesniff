@@ -32,7 +32,7 @@ public class HomeActivity extends Activity {
                             i.putExtra("kernel", "native");
                             startActivity(i);
                         } else {
-                            Toast.makeText(HomeActivity.this, "剪贴板里没有可播放链接", Toast.LENGTH_SHORT).show();
+                            showPlayChoice();
                         }
                     }
                 }
@@ -121,6 +121,7 @@ public class HomeActivity extends Activity {
         findViewById(R.id.cardPlayer).setOnClickListener(new View.OnClickListener() {
             public void onClick(View v) {
                 String clip = getSharedPreferences("settings", MODE_PRIVATE).getBoolean("clipboard", true) ? clipUrl() : null;
+                if (clip != null && !supportedSite(clip)) clip = null;
                 if (clip != null) {
                     Intent i = new Intent(HomeActivity.this, SniffActivity.class);
                     i.putExtra("input", clip);
@@ -215,6 +216,81 @@ public class HomeActivity extends Activity {
             .setView(box)
             .setPositiveButton("完成", null)
             .show();
+    }
+
+    /** 只允许抖音/B站/YouTube 直进 */
+    private boolean supportedSite(String u) {
+        if (u == null) return false;
+        return u.contains("douyin.com") || u.contains("b23.tv") || u.contains("bilibili.com")
+                || u.contains("youtube.com") || u.contains("youtu.be");
+    }
+
+    /** 播放入口选择：网络流 / 本地文件 */
+    private void showPlayChoice() {
+        new android.app.AlertDialog.Builder(this)
+            .setTitle("播放")
+            .setItems(new String[]{"网络流（输入链接）", "本地文件（选择视频）"}, new android.content.DialogInterface.OnClickListener() {
+                public void onClick(android.content.DialogInterface d, int w) {
+                    if (w == 0) showUrlInput();
+                    else pickLocal();
+                }
+            }).show();
+    }
+
+    private void showUrlInput() {
+        final android.widget.EditText et = new android.widget.EditText(this);
+        et.setHint("http(s)://");
+        et.setSingleLine(true);
+        new android.app.AlertDialog.Builder(this)
+            .setTitle("网络流")
+            .setView(et)
+            .setPositiveButton("播放", new android.content.DialogInterface.OnClickListener() {
+                public void onClick(android.content.DialogInterface d, int w) {
+                    playAny(et.getText().toString().trim());
+                }
+            }).setNegativeButton("取消", null).show();
+    }
+
+    private static final int REQ_PICK_LOCAL = 9911;
+
+    private void pickLocal() {
+        try {
+            android.content.Intent i = new android.content.Intent(android.content.Intent.ACTION_GET_CONTENT);
+            i.setType("video/*");
+            i.addCategory(android.content.Intent.CATEGORY_OPENABLE);
+            startActivityForResult(android.content.Intent.createChooser(i, "选择视频"), REQ_PICK_LOCAL);
+        } catch (Throwable e) {
+            Toast.makeText(this, "无法打开文件选择器", Toast.LENGTH_SHORT).show();
+        }
+    }
+
+    private void playAny(String url) {
+        if (url == null || url.length() == 0) return;
+        Intent i = new Intent(this, NativePlayerActivity.class);
+        i.putExtra("url", url);
+        i.putExtra("title", "播放");
+        i.putExtra("kernel", "native");
+        startActivity(i);
+    }
+
+    @Override
+    protected void onActivityResult(int requestCode, int resultCode, android.content.Intent data) {
+        if (requestCode == REQ_PICK_LOCAL && resultCode == RESULT_OK && data != null && data.getData() != null) {
+            android.net.Uri uri = data.getData();
+            try {
+                getContentResolver().takePersistableUriPermission(uri,
+                        android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION);
+            } catch (Throwable ignored) {}
+            Intent i = new Intent(this, NativePlayerActivity.class);
+            i.putExtra("url", uri.toString());
+            i.putExtra("title", "本地视频");
+            i.putExtra("kernel", "native");
+            i.setData(uri);
+            i.addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION);
+            startActivity(i);
+            return;
+        }
+        super.onActivityResult(requestCode, resultCode, data);
     }
 
     /** 剪贴板里抽 http 链接，没有返回 null */

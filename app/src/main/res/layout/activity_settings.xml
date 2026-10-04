@@ -162,6 +162,19 @@
                     android:text="→" android:textSize="20sp" android:id="@+id/arrow"/>
             </LinearLayout>
 
+            <LinearLayout android:id="@+id/cardAbout2"
+                android:layout_width="match_parent" android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:background="@drawable/bg_card"
+                android:padding="20dp"
+                android:layout_marginTop="18dp">
+                <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+                    android:text="关于" android:textSize="18sp" android:textStyle="bold" android:id="@+id/tvAboutTitle2"/>
+                <TextView android:layout_width="match_parent" android:layout_height="wrap_content"
+                    android:text="查看每个卡片的用途说明"
+                    android:textSize="14sp" android:id="@+id/tvAboutText2" android:paddingTop="8dp"/>
+            </LinearLayout>
+
             
         </LinearLayout>
     </ScrollView>
