@@ -570,6 +570,7 @@ public class SniffActivity extends Activity {
                 }
             } catch (Throwable ignored) {}
             webView.loadUrl("https://live.douyin.com/");
+            dyAutoPcClick();
         }
     }
 
@@ -610,10 +611,13 @@ public class SniffActivity extends Activity {
     /** 抖音直播：手机版加载完成后自动"点击"切电脑UA按钮（3s兜底，只点一次） */
     void dyAutoPcClick() {
         new android.os.Handler(android.os.Looper.getMainLooper()).postDelayed(new Runnable() { public void run() {
-            if (!isMobileUa) return;
-            String cur = webView.getUrl();
-            if (cur == null || !cur.contains("live.douyin.com")) return;
-            btnSwitchUa.performClick();   // = 手动点"切电脑UA"
+            try {
+                if (isFinishing() || isDestroyed() || webView == null || btnSwitchUa == null) return;
+                if (!isMobileUa) return;
+                String cur = webView.getUrl();
+                if (cur == null || !cur.contains("live.douyin.com")) return;
+                btnSwitchUa.performClick();   // = 手动点"切电脑UA"
+            } catch (Throwable ignored) {}
         }}, 3000);
     }
 
