@@ -98,9 +98,18 @@ public class HomeActivity extends Activity {
             }
         });
 
-        // 复刻壳：卡片 → 嗅探弹窗
+        // 复刻壳：卡片 → 嗅探弹窗；剪贴板有链接则直接进嗅探
         findViewById(R.id.cardPlayer).setOnClickListener(new View.OnClickListener() {
-            public void onClick(View v) { showSniffDialog(); }
+            public void onClick(View v) {
+                String clip = clipUrl();
+                if (clip != null) {
+                    Intent i = new Intent(HomeActivity.this, SniffActivity.class);
+                    i.putExtra("input", clip);
+                    startActivity(i);
+                } else {
+                    showSniffDialog();
+                }
+            }
         });
         findViewById(R.id.cardDownload).setOnClickListener(new View.OnClickListener() {
             public void onClick(View v) {
@@ -187,6 +196,18 @@ public class HomeActivity extends Activity {
             .setView(box)
             .setPositiveButton("完成", null)
             .show();
+    }
+
+    /** 剪贴板里抽 http 链接，没有返回 null */
+    private String clipUrl() {
+        try {
+            ClipboardManager cm = (ClipboardManager) getSystemService(CLIPBOARD_SERVICE);
+            if (cm == null || cm.getPrimaryClip() == null || cm.getPrimaryClip().getItemAt(0) == null) return null;
+            CharSequence t = cm.getPrimaryClip().getItemAt(0).getText();
+            if (t == null) return null;
+            java.util.regex.Matcher m = java.util.regex.Pattern.compile("https?://\\S+").matcher(t.toString());
+            return m.find() ? m.group() : null;
+        } catch (Throwable e) { return null; }
     }
 
     private void showSniffDialog() {

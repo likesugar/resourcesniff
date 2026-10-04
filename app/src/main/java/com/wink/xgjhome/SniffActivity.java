@@ -439,6 +439,16 @@ public class SniffActivity extends Activity {
                     view.loadUrl(url);
                     return;
                 }
+                // 抖音直播自动电脑UA（站内跳转/刷新也生效）
+                if (url != null && url.contains("live.douyin.com") && isMobileUa) {
+                    isMobileUa = false;
+                    view.getSettings().setUserAgentString(UA_PC);
+                    btnSwitchUa.setText("切手机UA");
+                    btnSwitchUa.setBackgroundColor(0x4D3742fa);
+                    view.stopLoading();
+                    view.loadUrl(url);
+                    return;
+                }
             }
 
             @Override
@@ -600,7 +610,20 @@ public class SniffActivity extends Activity {
         }
         if (!url.startsWith("http")) url = "https://" + url;
         if (url.contains("v.douyin.com")) { resolveDouyinShort(url); return; }  // 抖音短链原生解析302直达房间
+        autoUaDouyin(url);
         webView.loadUrl(url);
+    }
+
+    static final String UA_PC = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36";
+
+    /** 抖音直播自动切电脑UA（手动切换仍可用） */
+    void autoUaDouyin(String url) {
+        if (url == null || !url.contains("live.douyin.com")) return;
+        if (!isMobileUa) return;   // 已是电脑UA
+        isMobileUa = false;
+        webView.getSettings().setUserAgentString(UA_PC);
+        btnSwitchUa.setText("切手机UA");
+        btnSwitchUa.setBackgroundColor(0x4D3742fa);
     }
 
     /** 抖音短链(v.douyin.com)原生跟随302，直达直播间地址 */
