@@ -131,7 +131,10 @@ public class CalendarCardView extends LinearLayout {
 
         gridHost = new LinearLayout(ctx);
         gridHost.setOrientation(VERTICAL);
-        addView(frameWrap(gridHost));
+        android.widget.ScrollView gsv = new android.widget.ScrollView(ctx);
+        gsv.setVerticalScrollBarEnabled(true);
+        gsv.addView(gridHost, new LayoutParams(-1, -2));
+        addView(frameWrap(gsv));
 
         // 签到行
         LinearLayout signRow = new LinearLayout(ctx);
@@ -360,7 +363,7 @@ public class CalendarCardView extends LinearLayout {
         } catch (Throwable ignored) {}
     }
 
-    private LinearLayout frameWrap(LinearLayout content) {
+    private LinearLayout frameWrap(android.view.View content) {
         LinearLayout f = new LinearLayout(ctx);
         f.setOrientation(VERTICAL);
         f.setBackground(flatBg(cellBg(), 14));
@@ -368,7 +371,7 @@ public class CalendarCardView extends LinearLayout {
         f.setPadding(p2, p2, p2, p2);
         LayoutParams lp = new LayoutParams(-1, -2);
         lp.setMargins(0, dp(10), 0, 0);
-        f.addView(content, new LayoutParams(-1, -2));
+        f.addView(content, new android.view.ViewGroup.LayoutParams(-1, -2));
         // 占位让margin生效
         LinearLayout outer = new LinearLayout(ctx);
         outer.setOrientation(VERTICAL);
@@ -461,20 +464,6 @@ public class CalendarCardView extends LinearLayout {
                 drugBox.addView(none);
             }
             row.addView(drugBox, new LayoutParams(0, -2, 1f));
-            for (int j = meds[i].size() - 1; j >= 0; j--) {
-                final int di = j;
-                TextView del = new TextView(ctx);
-                del.setText("✕"); del.setTextSize(13);
-                del.setTextColor(0xFFFF7B8A);
-                del.setPadding(dp(10), dp(4), dp(4), dp(4));
-                del.setOnClickListener(new OnClickListener() { public void onClick(View v) {
-                    java.util.List<String>[] a = medArr();
-                    a[si].remove(di);
-                    saveMeds(a);
-                    rebuildMedsOnly();
-                }});
-                row.addView(del);
-            }
             TextView add = new TextView(ctx);
             add.setText("＋"); add.setTextSize(15);
             add.setTextColor(Color.WHITE);
