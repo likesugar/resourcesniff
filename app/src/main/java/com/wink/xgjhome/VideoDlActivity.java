@@ -83,6 +83,12 @@ public class VideoDlActivity extends Activity {
     private TextView[] chipTx;
     private EditText input;
     private boolean inited = false;
+    private final java.util.HashMap<Task, LinearLayout> cardMap = new java.util.HashMap<Task, LinearLayout>();
+    private final java.util.HashMap<Task, TextView> sizeMap = new java.util.HashMap<Task, TextView>();
+    private final java.util.HashMap<Task, TextView> titleMap = new java.util.HashMap<Task, TextView>();
+    private final java.util.HashMap<Task, TextView> resMap = new java.util.HashMap<Task, TextView>();
+    private final java.util.HashMap<Task, Integer> shapeMap = new java.util.HashMap<Task, Integer>();
+    private int lastChip = -1;
     private final boolean dark = true;
 
     @Override
@@ -604,131 +610,196 @@ public class VideoDlActivity extends Activity {
     private void runUi(final Runnable r) { runOnUiThread(r); }
 
     // ---------- 渲染 ----------
+    private int shapeOf(Task tk) {
+        if (tk.percent == -3) return 3;
+        if (tk.percent == -2) return 4;
+        if (tk.percent == 100) return 2;
+        if (tk.percent >= 0) return 1;
+        return 0;
+    }
+
     private void render() {
         if (list == null) return;
-        list.removeAllViews();
-        int dp2 = dp(12);
-        boolean any = false;
+        if (lastChip != chip) { cardMap.clear(); sizeMap.clear(); titleMap.clear(); resMap.clear(); shapeMap.clear(); lastChip = chip; }
         for (final Task tk : TASKS) {
             boolean busy = tk.percent >= 0 && tk.percent < 100;
             boolean done = tk.percent == 100;
             if (chip == 1 && !busy) continue;
             if (chip == 2 && !done) continue;
-            any = true;
-            LinearLayout card = new LinearLayout(this);
-            card.setOrientation(LinearLayout.VERTICAL);
-            GradientDrawable g = new GradientDrawable();
-            g.setCornerRadius(dp(24));
-            g.setColor(0xFF171C27);
-            card.setBackground(g);
-            card.setPadding(dp(18), dp(16), dp(18), dp(16));
-            LinearLayout.LayoutParams clp = new LinearLayout.LayoutParams(-1, -2);
-            clp.topMargin = dp(12);
-            // 行1: 徽标 + 大小 + ⋮
-            LinearLayout r1 = new LinearLayout(this);
-            r1.setGravity(Gravity.CENTER_VERTICAL);
-            TextView badge = new TextView(this);
-            badge.setText(platformEmoji(tk.url)); badge.setTextSize(20);
-            r1.addView(badge);
-            r1.addView(new TextView(this), new LinearLayout.LayoutParams(0, 0, 1f));
-            TextView size = new TextView(this);
-            size.setText(tk.percent >= 0 && tk.percent < 100 ? tk.percent + "%" : tk.size);
-            size.setTextSize(14); size.setTextColor(0xFFAEB6C2);
-            r1.addView(size);
-            TextView more = new TextView(this);
-            more.setText("⋮"); more.setTextSize(18);
-            more.setTextColor(0xFF8A94A6);
-            more.setPadding(dp(12), 0, 0, 0);
-            more.setOnClickListener(new OnClickListener() { public void onClick(View v) { taskMenu(tk); }});
-            r1.addView(more);
-            card.addView(r1, new LinearLayout.LayoutParams(-1, -2));
-            // 行2: 标题
-            TextView tTitle = new TextView(this);
-            String txt = tk.percent == -2 ? "失败: " + tk.err : tk.title;
-            tTitle.setText(txt);
-            tTitle.setTextSize(16); tTitle.setTypeface(Typeface.DEFAULT_BOLD);
-            tTitle.setTextColor(tk.percent == -2 ? 0xFFFF7B8A : (dark ? Color.WHITE : Color.WHITE));
-            tTitle.setMaxLines(2);
-            tTitle.setPadding(0, dp2(10), 0, 0);
-            card.addView(tTitle, new LinearLayout.LayoutParams(-1, -2));
-            // 行3: 分辨率 + 播放 + 分享
-            if (tk.percent >= 0 && tk.percent < 100) {
-                LinearLayout r4 = new LinearLayout(this);
-                r4.setGravity(Gravity.CENTER_VERTICAL);
-                TextView pauseBtn = new TextView(this);
-                pauseBtn.setText("⏸ 暂停"); pauseBtn.setTextSize(15);
-                pauseBtn.setTextColor(0xFFFFB74D);
-                pauseBtn.setPadding(0, dp(8), dp(20), dp(4));
-                pauseBtn.setOnClickListener(new OnClickListener() { public void onClick(View v) {
-                    tk.paused = true;
-                    try {
-                        String tok = tk.pid;
-                        if (tok != null) Runtime.getRuntime().exec(new String[]{"pkill", "-f", tok});
-                    } catch (Throwable ignored) {}
-                }});
-                r4.addView(pauseBtn);
-                card.addView(r4, new LinearLayout.LayoutParams(-1, -2));
+            Integer sh = shapeMap.get(tk);
+            LinearLayout card = cardMap.get(tk);
+            if (card == null || sh == null || sh != shapeOf(tk)) {
+                if (card != null && card.getParent() != null) ((android.view.ViewGroup) card.getParent()).removeView(card);
+                card = buildCard(tk);
+                cardMap.put(tk, card);
+                shapeMap.put(tk, shapeOf(tk));
             }
-            if (tk.percent == -3) {
-                LinearLayout r4 = new LinearLayout(this);
-                r4.setGravity(Gravity.CENTER_VERTICAL);
-                TextView resumeBtn = new TextView(this);
-                resumeBtn.setText("▶ 继续下载"); resumeBtn.setTextSize(15);
-                resumeBtn.setTextColor(0xFF9CCC65);
-                resumeBtn.setPadding(0, dp(8), dp(20), dp(4));
-                resumeBtn.setOnClickListener(new OnClickListener() { public void onClick(View v) {
-                    tk.percent = 0; tk.paused = false;
-                    runTask(tk);
-                }});
-                r4.addView(resumeBtn);
-                card.addView(r4, new LinearLayout.LayoutParams(-1, -2));
+            TextView sz = sizeMap.get(tk);
+            if (sz != null) sz.setText(tk.percent >= 0 && tk.percent < 100 ? tk.percent + "%" : tk.size);
+            TextView tt = titleMap.get(tk);
+            if (tt != null) tt.setText(tk.percent == -2 ? "失败: " + tk.err : tk.title);
+            TextView rs = resMap.get(tk);
+            if (rs != null) rs.setText(tk.percent == 100 ? (tk.res.length() > 0 ? tk.res : "已完成") : (tk.percent == -1 ? "解析中…" : (tk.percent == -2 ? "长按可删除" : (tk.percent == -3 ? "已暂停" : "下载中…"))));
+            int target = chipFilteredIndex(tk);
+            if (card.getParent() != list) {
+                if (card.getParent() != null) ((android.view.ViewGroup) card.getParent()).removeView(card);
+                list.addView(card, Math.min(target, list.getChildCount()));
+            } else if (list.indexOfChild(card) != target) {
+                list.removeView(card);
+                list.addView(card, Math.min(target, list.getChildCount()));
             }
-            LinearLayout r3 = new LinearLayout(this);
-            r3.setGravity(Gravity.CENTER_VERTICAL);
-            r3.setPadding(0, dp2(12), 0, 0);
-            TextView res = new TextView(this);
-            res.setText(tk.percent == 100 ? (tk.res.length() > 0 ? tk.res : "已完成") : (tk.percent == -1 ? "解析中…" : (tk.percent == -2 ? "长按可删除" : "下载中…")));
-            res.setTextSize(15); res.setTextColor(0xFFAEB6C2);
-            r3.addView(res, new LinearLayout.LayoutParams(0, -2, 1f));
-            if (done) {
-                TextView play = new TextView(this);
-                play.setText("▷"); play.setTextSize(22); play.setTextColor(0xFFE8ECF4);
-                play.setPadding(dp2(14), 0, dp2(14), 0);
-                play.setOnClickListener(new OnClickListener() { public void onClick(View v) {
-                    try {
-                        Intent i = new Intent(VideoDlActivity.this, NativePlayerActivity.class);
-                        i.putExtra("url", tk.saved.toString());
-                        i.putExtra("title", tk.title);
-                        i.putExtra("kernel", "native");
-                        startActivity(i);
-                    } catch (Throwable e) { Toast.makeText(VideoDlActivity.this, "打不开", Toast.LENGTH_SHORT).show(); }
-                }});
-                r3.addView(play);
-                TextView share = new TextView(this);
-                share.setText("▶"); share.setTextSize(20); share.setTextColor(0xFFE8ECF4);
-                share.setOnClickListener(new OnClickListener() { public void onClick(View v) {
-                    try {
-                        java.io.File vf = new java.io.File(tk.saved.getPath());
-                        android.net.Uri cu = androidx.core.content.FileProvider.getUriForFile(VideoDlActivity.this, getPackageName() + ".fp", vf);
-                        Intent sh = new Intent(Intent.ACTION_VIEW);
-                        sh.setDataAndType(cu, "video/mp4");
-                        sh.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
-                        startActivity(sh);
-                    } catch (Throwable e) { Toast.makeText(VideoDlActivity.this, "没有可用的播放器", Toast.LENGTH_SHORT).show(); }
-                }});
-                r3.addView(share);
-            }
-            card.addView(r3, new LinearLayout.LayoutParams(-1, -2));
-            list.addView(card, clp);
         }
-        if (!any) {
-            TextView e = new TextView(this);
-            e.setText("暂无任务，粘贴链接开始");
-            e.setTextColor(0xFF6B7684); e.setTextSize(14);
-            e.setGravity(Gravity.CENTER);
-            e.setPadding(0, dp(40), 0, 0);
-            list.addView(e, new LinearLayout.LayoutParams(-1, -2));
+        java.util.Iterator<Task> it = cardMap.keySet().iterator();
+        while (it.hasNext()) {
+            Task t = it.next();
+            boolean vis = false;
+            for (Task tk : TASKS) if (tk == t) { vis = true; break; }
+            boolean busy = t.percent >= 0 && t.percent < 100;
+            if (chip == 1 && !busy) vis = false;
+            if (chip == 2 && t.percent != 100) vis = false;
+            if (!vis) {
+                LinearLayout cv = cardMap.get(t);
+                if (cv != null && cv.getParent() != null) ((android.view.ViewGroup) cv.getParent()).removeView(cv);
+                it.remove(); sizeMap.remove(t); titleMap.remove(t); resMap.remove(t); shapeMap.remove(t);
+            }
         }
+        refreshEmptyHint();
+    }
+
+    private int chipFilteredIndex(Task tk) {
+        int idx = 0;
+        for (Task t : TASKS) {
+            if (t == tk) return idx;
+            boolean busy = t.percent >= 0 && t.percent < 100;
+            boolean ok = !(chip == 1 && !busy) && !(chip == 2 && t.percent != 100);
+            if (ok) idx++;
+        }
+        return idx;
+    }
+
+    private void refreshEmptyHint() {
+        int n = 0;
+        for (int i = 0; i < list.getChildCount(); i++) if (list.getChildAt(i).getId() != 0xE11) n++;
+        if (n == 0) {
+            if (list.findViewById(0xE11) == null) {
+                TextView empty = new TextView(this);
+                empty.setId(0xE11);
+                empty.setText("暂无任务，点击标题粘贴链接");
+                empty.setTextColor(0xFF6B7684); empty.setTextSize(14);
+                empty.setGravity(Gravity.CENTER);
+                empty.setPadding(0, dp(60), 0, 0);
+                list.addView(empty);
+            }
+        } else {
+            View oldEmpty = list.findViewById(0xE11);
+            if (oldEmpty != null) list.removeView(oldEmpty);
+        }
+    }
+
+    private LinearLayout buildCard(final Task tk) {
+        int dp2 = dp(12);
+        LinearLayout card = new LinearLayout(this);
+        card.setOrientation(LinearLayout.VERTICAL);
+        GradientDrawable g = new GradientDrawable();
+        g.setCornerRadius(dp(24));
+        g.setColor(0xFF171C27);
+        card.setBackground(g);
+        card.setPadding(dp(18), dp(16), dp(18), dp(16));
+        LinearLayout r1 = new LinearLayout(this);
+        r1.setGravity(Gravity.CENTER_VERTICAL);
+        TextView badge = new TextView(this);
+        badge.setText(platformEmoji(tk.url)); badge.setTextSize(20);
+        r1.addView(badge);
+        r1.addView(new TextView(this), new LinearLayout.LayoutParams(0, 0, 1f));
+        TextView size = new TextView(this);
+        size.setText(tk.percent >= 0 && tk.percent < 100 ? tk.percent + "%" : tk.size);
+        size.setTextSize(14); size.setTextColor(0xFFAEB6C2);
+        r1.addView(size);
+        sizeMap.put(tk, size);
+        TextView more = new TextView(this);
+        more.setText("⋮"); more.setTextSize(18);
+        more.setTextColor(0xFF8A94A6);
+        more.setPadding(dp(12), 0, 0, 0);
+        more.setOnClickListener(new OnClickListener() { public void onClick(View v) { taskMenu(tk); }});
+        r1.addView(more);
+        card.addView(r1, new LinearLayout.LayoutParams(-1, -2));
+        TextView tTitle = new TextView(this);
+        tTitle.setText(tk.percent == -2 ? "失败: " + tk.err : tk.title);
+        tTitle.setTextSize(16); tTitle.setTypeface(Typeface.DEFAULT_BOLD);
+        tTitle.setTextColor(tk.percent == -2 ? 0xFFFF7B8A : (dark ? Color.WHITE : Color.WHITE));
+        tTitle.setMaxLines(2);
+        tTitle.setPadding(0, dp2(10), 0, 0);
+        card.addView(tTitle, new LinearLayout.LayoutParams(-1, -2));
+        titleMap.put(tk, tTitle);
+        if (tk.percent >= 0 && tk.percent < 100) {
+            LinearLayout r4 = new LinearLayout(this);
+            r4.setGravity(Gravity.CENTER_VERTICAL);
+            TextView pauseBtn = new TextView(this);
+            pauseBtn.setText("⏸ 暂停"); pauseBtn.setTextSize(15);
+            pauseBtn.setTextColor(0xFFFFB74D);
+            pauseBtn.setPadding(0, dp(8), dp(20), dp(4));
+            pauseBtn.setOnClickListener(new OnClickListener() { public void onClick(View v) {
+                tk.paused = true;
+                try {
+                    String tok = tk.pid;
+                    if (tok != null) Runtime.getRuntime().exec(new String[]{"pkill", "-f", tok});
+                } catch (Throwable ignored) {}
+            }});
+            r4.addView(pauseBtn);
+            card.addView(r4, new LinearLayout.LayoutParams(-1, -2));
+        }
+        if (tk.percent == -3) {
+            LinearLayout r4 = new LinearLayout(this);
+            r4.setGravity(Gravity.CENTER_VERTICAL);
+            TextView resumeBtn = new TextView(this);
+            resumeBtn.setText("▶ 继续下载"); resumeBtn.setTextSize(15);
+            resumeBtn.setTextColor(0xFF9CCC65);
+            resumeBtn.setPadding(0, dp(8), dp(20), dp(4));
+            resumeBtn.setOnClickListener(new OnClickListener() { public void onClick(View v) {
+                tk.percent = 0; tk.paused = false;
+                runTask(tk);
+            }});
+            r4.addView(resumeBtn);
+            card.addView(r4, new LinearLayout.LayoutParams(-1, -2));
+        }
+        LinearLayout r3 = new LinearLayout(this);
+        r3.setGravity(Gravity.CENTER_VERTICAL);
+        r3.setPadding(0, dp2(12), 0, 0);
+        TextView res = new TextView(this);
+        res.setText(tk.percent == 100 ? (tk.res.length() > 0 ? tk.res : "已完成") : (tk.percent == -1 ? "解析中…" : (tk.percent == -2 ? "长按可删除" : (tk.percent == -3 ? "已暂停" : "下载中…"))));
+        res.setTextSize(15); res.setTextColor(0xFFAEB6C2);
+        r3.addView(res, new LinearLayout.LayoutParams(0, -2, 1f));
+        resMap.put(tk, res);
+        if (tk.percent == 100) {
+            TextView play = new TextView(this);
+            play.setText("▷"); play.setTextSize(22); play.setTextColor(0xFFE8ECF4);
+            play.setPadding(dp2(14), 0, dp2(14), 0);
+            play.setOnClickListener(new OnClickListener() { public void onClick(View v) {
+                try {
+                    Intent i = new Intent(VideoDlActivity.this, NativePlayerActivity.class);
+                    i.putExtra("url", tk.saved.toString());
+                    i.putExtra("title", tk.title);
+                    i.putExtra("kernel", "native");
+                    startActivity(i);
+                } catch (Throwable e) { Toast.makeText(VideoDlActivity.this, "打不开", Toast.LENGTH_SHORT).show(); }
+            }});
+            r3.addView(play);
+            TextView share = new TextView(this);
+            share.setText("▶"); share.setTextSize(20); share.setTextColor(0xFFE8ECF4);
+            share.setOnClickListener(new OnClickListener() { public void onClick(View v) {
+                try {
+                    java.io.File vf = new java.io.File(tk.saved.getPath());
+                    android.net.Uri cu = androidx.core.content.FileProvider.getUriForFile(VideoDlActivity.this, getPackageName() + ".fp", vf);
+                    Intent sh = new Intent(Intent.ACTION_VIEW);
+                    sh.setDataAndType(cu, "video/mp4");
+                    sh.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+                    startActivity(sh);
+                } catch (Throwable e) { Toast.makeText(VideoDlActivity.this, "没有可用的播放器", Toast.LENGTH_SHORT).show(); }
+            }});
+            r3.addView(share);
+        }
+        card.addView(r3, new LinearLayout.LayoutParams(-1, -2));
+        return card;
     }
 
     private void taskMenu(final Task tk) {
