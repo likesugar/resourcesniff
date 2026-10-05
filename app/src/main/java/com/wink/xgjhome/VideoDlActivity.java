@@ -454,7 +454,7 @@ public class VideoDlActivity extends Activity {
                                 try { Thread.sleep(500); } catch (Throwable e) { return; }
                             }
                         }}).start();
-                        com.yausername.youtubedl_android.YoutubeDL.getInstance().execute(req, tk.runId, false, null);
+                        com.yausername.youtubedl_android.YoutubeDL.getInstance().execute(req, tk.pid + "#" + java.util.UUID.randomUUID(), false, null);
                         File done = null;
                         if (isBili) {
                             File vfile = null;
@@ -478,7 +478,7 @@ public class VideoDlActivity extends Activity {
                             java.util.Set<String> before2 = new java.util.HashSet<String>();
                             for (File f0 : cache.listFiles()) if (f0.getName().startsWith("vdl_")) before2.add(f0.getName());
                             before2.add(vfile.getName());
-                            com.yausername.youtubedl_android.YoutubeDL.getInstance().execute(ra, tk.runId + "_a", false, null);
+                            com.yausername.youtubedl_android.YoutubeDL.getInstance().execute(ra, tk.pid + "#" + java.util.UUID.randomUUID(), false, null);
                             File afile = null;
                             for (File f : cache.listFiles())
                                 if (f.getName().startsWith("vdl_") && tk.pid != null && f.getName().contains(tk.pid)
@@ -627,6 +627,31 @@ public class VideoDlActivity extends Activity {
     private void runUi(final Runnable r) { runOnUiThread(r); }
 
     // ---------- 渲染 ----------
+    private void killYtProcesses(String token) {
+        if (token == null) return;
+        try {
+            java.io.File[] dirs = new java.io.File("/proc").listFiles();
+            if (dirs == null) return;
+            for (java.io.File d : dirs) {
+                String n = d.getName();
+                if (!n.matches("\\d+")) continue;
+                try {
+                    byte[] b = new byte[4096];
+                    java.io.InputStream in = new java.io.FileInputStream(new java.io.File(d, "cmdline"));
+                    int r = in.read(b); in.close();
+                    if (r <= 0) continue;
+                    String cmd = new String(b, 0, r);
+                    if (cmd.contains(token)) {
+                        int pid = Integer.parseInt(n);
+                        android.os.Process.killProcess(pid);
+                        try { Thread.sleep(150); } catch (Throwable ignored) {}
+                        Runtime.getRuntime().exec(new String[]{"kill", "-9", String.valueOf(pid)});
+                    }
+                } catch (Throwable ignored) {}
+            }
+        } catch (Throwable ignored) {}
+    }
+
     private int shapeOf(Task tk) {
         if (tk.percent == -3) return 3;
         if (tk.percent == -2) return 4;
@@ -762,11 +787,13 @@ public class VideoDlActivity extends Activity {
             pauseBtn.setPadding(dp(12), dp(10), dp(12), dp(10));
             pauseBtn.setOnClickListener(new OnClickListener() { public void onClick(View v) {
                 tk.paused = true;
-                try { com.yausername.youtubedl_android.YoutubeDL.getInstance().destroyProcessById(tk.runId); } catch (Throwable ignored) {}
+                try { com.yausername.youtubedl_android.YoutubeDL.getInstance().destroyProcessById(tk.pid); } catch (Throwable ignored) {}
+                try { com.yausername.youtubedl_android.YoutubeDL.getInstance().destroyProcessById(tk.pid + "_a"); } catch (Throwable ignored) {}
                 try {
                     String tok = tk.pid;
                     if (tok != null) Runtime.getRuntime().exec(new String[]{"pkill", "-f", tok});
                 } catch (Throwable ignored) {}
+                killYtProcesses(tk.pid);
             }});
             TextView stopBtn = new TextView(this);
             stopBtn.setText("⏹ 停止"); stopBtn.setTextSize(15);
@@ -778,11 +805,13 @@ public class VideoDlActivity extends Activity {
             stopBtn.setPadding(dp(12), dp(10), dp(12), dp(10));
             stopBtn.setOnClickListener(new OnClickListener() { public void onClick(View v) {
                 tk.paused = true;
-                try { com.yausername.youtubedl_android.YoutubeDL.getInstance().destroyProcessById(tk.runId); } catch (Throwable ignored) {}
+                try { com.yausername.youtubedl_android.YoutubeDL.getInstance().destroyProcessById(tk.pid); } catch (Throwable ignored) {}
+                try { com.yausername.youtubedl_android.YoutubeDL.getInstance().destroyProcessById(tk.pid + "_a"); } catch (Throwable ignored) {}
                 try {
                     String tok = tk.pid;
                     if (tok != null) Runtime.getRuntime().exec(new String[]{"pkill", "-f", tok});
                 } catch (Throwable ignored) {}
+                killYtProcesses(tk.pid);
                 tk.percent = -2;
                 tk.err = "已手动停止";
                 saveTasks(VideoDlActivity.this);
