@@ -32,7 +32,8 @@ public class VideoDlActivity extends Activity {
         String url, title = "解析中…", size = "", res = "";
         long expect = 0;               // 预期总字节数(视频+音频)
         volatile boolean paused = false;   // 用户请求暂停
-        String pid;                        // 暂停用的进程匹配token(BV号/视频id)
+        String pid;                        // 文件匹配token(BV号/视频id)
+        String runId;                      // 每次尝试唯一的进程id(库要求不复用)
         int percent = -1;            // -1解析中/等待 0-100下载中 100完成 -2失败
         String err; Uri saved; File out;
     }
@@ -359,6 +360,7 @@ public class VideoDlActivity extends Activity {
                     }
                 } catch (Throwable ignored) {}
                 if (tk.pid == null) tk.pid = "t" + System.currentTimeMillis();
+                tk.runId = tk.pid + "#" + System.currentTimeMillis();
                 ensureEngine();
                 File cache = getExternalCacheDir() != null ? getExternalCacheDir() : getCacheDir();
                 File out = new File(cache, "vdl_%(id)s.%(ext)s");
@@ -452,7 +454,7 @@ public class VideoDlActivity extends Activity {
                                 try { Thread.sleep(500); } catch (Throwable e) { return; }
                             }
                         }}).start();
-                        com.yausername.youtubedl_android.YoutubeDL.getInstance().execute(req, tk.pid, false, null);
+                        com.yausername.youtubedl_android.YoutubeDL.getInstance().execute(req, tk.runId, false, null);
                         File done = null;
                         if (isBili) {
                             File vfile = null;
@@ -476,7 +478,7 @@ public class VideoDlActivity extends Activity {
                             java.util.Set<String> before2 = new java.util.HashSet<String>();
                             for (File f0 : cache.listFiles()) if (f0.getName().startsWith("vdl_")) before2.add(f0.getName());
                             before2.add(vfile.getName());
-                            com.yausername.youtubedl_android.YoutubeDL.getInstance().execute(ra, tk.pid + "_a", false, null);
+                            com.yausername.youtubedl_android.YoutubeDL.getInstance().execute(ra, tk.runId + "_a", false, null);
                             File afile = null;
                             for (File f : cache.listFiles())
                                 if (f.getName().startsWith("vdl_") && tk.pid != null && f.getName().contains(tk.pid)
@@ -760,7 +762,7 @@ public class VideoDlActivity extends Activity {
             pauseBtn.setPadding(dp(12), dp(10), dp(12), dp(10));
             pauseBtn.setOnClickListener(new OnClickListener() { public void onClick(View v) {
                 tk.paused = true;
-                try { com.yausername.youtubedl_android.YoutubeDL.getInstance().destroyProcessById(tk.pid); } catch (Throwable ignored) {}
+                try { com.yausername.youtubedl_android.YoutubeDL.getInstance().destroyProcessById(tk.runId); } catch (Throwable ignored) {}
                 try {
                     String tok = tk.pid;
                     if (tok != null) Runtime.getRuntime().exec(new String[]{"pkill", "-f", tok});
@@ -776,7 +778,7 @@ public class VideoDlActivity extends Activity {
             stopBtn.setPadding(dp(12), dp(10), dp(12), dp(10));
             stopBtn.setOnClickListener(new OnClickListener() { public void onClick(View v) {
                 tk.paused = true;
-                try { com.yausername.youtubedl_android.YoutubeDL.getInstance().destroyProcessById(tk.pid); } catch (Throwable ignored) {}
+                try { com.yausername.youtubedl_android.YoutubeDL.getInstance().destroyProcessById(tk.runId); } catch (Throwable ignored) {}
                 try {
                     String tok = tk.pid;
                     if (tok != null) Runtime.getRuntime().exec(new String[]{"pkill", "-f", tok});
