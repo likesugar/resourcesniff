@@ -25,6 +25,7 @@ public class HomeCalendarCompact extends LinearLayout {
     private final Activity act;
     private TextView dateText, holidayText, signText, remindText;
     private LinearLayout signBtn;
+    private LinearLayout medHost;
 
     public HomeCalendarCompact(Activity a) {
         super(a);
@@ -84,11 +85,91 @@ public class HomeCalendarCompact extends LinearLayout {
         remindText.setPadding((int) (14 * getResources().getDisplayMetrics().density), 0, 0, 0);
         r2.addView(remindText, new LinearLayout.LayoutParams(0, -2, 1f));
         addView(r2);
+        medHost = new LinearLayout(a);
+        medHost.setOrientation(VERTICAL);
+        addView(medHost);
+
+        // 药物快速确认区(签到后面)
+        medHost = new LinearLayout(act);
+        medHost.setOrientation(VERTICAL);
+        addView(medHost);
 
         setOnClickListener(new View.OnClickListener() { public void onClick(View v) {
             act.startActivity(new Intent(act, CalendarActivity.class));
         }});
         refresh();
+    }
+
+    private LinearLayout medHost;
+
+    private java.util.Set<String> medTaken(String day, int slot) {
+        java.util.Set<String> out = new java.util.HashSet<String>();
+        try {
+            JSONObject o = new JSONObject(act.getSharedPreferences("cal", 0).getString("meds_taken", "{}"));
+            JSONObject d = o.optJSONObject(day);
+            if (d != null) {
+                JSONArray a = d.optJSONArray(new String[]{"早","中","晚"}[slot]);
+                if (a != null) for (int i = 0; i < a.length(); i++) out.add(a.optString(i));
+            }
+        } catch (Throwable ignored) {}
+        return out;
+    }
+
+    private void toggleTaken(int slot, String name) {
+        try {
+            String day = new SimpleDateFormat("yyyy-MM-dd", Locale.US).format(new Date());
+            android.content.SharedPreferences sp = act.getSharedPreferences("cal", 0);
+            JSONObject o = new JSONObject(sp.getString("meds_taken", "{}"));
+            JSONObject d = o.optJSONObject(day); if (d == null) d = new JSONObject();
+            JSONArray a = d.optJSONArray(new String[]{"早","中","晚"}[slot]); if (a == null) a = new JSONArray();
+            java.util.List<String> l = new java.util.ArrayList<String>();
+            for (int i = 0; i < a.length(); i++) l.add(a.optString(i));
+            if (l.contains(name)) l.remove(name); else l.add(name);
+            JSONArray na = new JSONArray(); for (String x : l) na.put(x);
+            d.put(new String[]{"早","中","晚"}[slot], na); o.put(day, d);
+            sp.edit().putString("meds_taken", o.toString()).apply();
+        } catch (Throwable ignored) {}
+    }
+
+    private void buildMedQuick() {
+        medHost.removeAllViews();
+        try {
+            JSONObject mo = new JSONObject(act.getSharedPreferences("cal", 0).getString("meds", "{}"));
+            boolean dark = act.getSharedPreferences("settings", 0).getBoolean("dark", false);
+            int fgMain = dark ? Color.WHITE : 0xFF1F2329;
+            String[] slots = {"早", "中", "晚"};
+            String tday = new SimpleDateFormat("yyyy-MM-dd", Locale.US).format(new Date());
+            for (int i = 0; i < 3; i++) {
+                JSONArray a = mo.optJSONArray(slots[i]);
+                if (a == null || a.length() == 0) continue;
+                java.util.Set<String> taken = medTaken(tday, i);
+                LinearLayout row = new LinearLayout(act);
+                row.setGravity(Gravity.CENTER_VERTICAL);
+                row.setPadding(0, (int) (8 * getResources().getDisplayMetrics().density), 0, 0);
+                TextView slotT = new TextView(act);
+                slotT.setText(slots[i]);
+                slotT.setTextSize(14); slotT.setTypeface(Typeface.DEFAULT_BOLD);
+                slotT.setTextColor(fgMain);
+                row.addView(slotT);
+                for (int j = 0; j < a.length(); j++) {
+                    final String dn = a.optString(j);
+                    final int si = i;
+                    if (dn.isEmpty()) continue;
+                    TextView drug = new TextView(act);
+                    boolean ate = taken.contains(dn);
+                    drug.setText((ate ? "✓ " : "") + dn);
+                    drug.setTextSize(15); drug.setTypeface(Typeface.DEFAULT_BOLD);
+                    drug.setTextColor(ate ? 0xFF9CCC65 : fgMain);
+                    drug.setPadding((int) (12 * getResources().getDisplayMetrics().density), 0, 0, 0);
+                    drug.setOnClickListener(new View.OnClickListener() { public void onClick(View v) {
+                        toggleTaken(si, dn);
+                        refresh();
+                    }});
+                    row.addView(drug);
+                }
+                medHost.addView(row);
+            }
+        } catch (Throwable ignored) {}
     }
 
     public void refresh() {
@@ -133,6 +214,69 @@ public class HomeCalendarCompact extends LinearLayout {
                 }
             } catch (Throwable ignored) {}
             remindText.setText(next.isEmpty() ? "暂无日程" : "日程: " + next);
+            buildMedQuick();
+            rebuildMeds();
+        } catch (Throwable ignored) {}
+    }
+
+    // ---------- 首页药物确认区 ----------
+    private static final String[] MED_SLOTS = {"早", "中", "晚"};
+
+    private void rebuildMeds() {
+        if (medHost == null) return;
+        medHost.removeAllViews();
+        try {
+            boolean dark = act.getSharedPreferences("settings", 0).getBoolean("dark", false);
+            JSONObject o = new JSONObject(act.getSharedPreferences("cal", 0).getString("meds", "{}"));
+            String tday = new SimpleDateFormat("yyyy-MM-dd", Locale.US).format(new Date());
+            JSONObject takenAll = new JSONObject(act.getSharedPreferences("cal", 0).getString("meds_taken", "{}"));
+            JSONObject takenDay = takenAll.optJSONObject(tday); if (takenDay == null) takenDay = new JSONObject();
+            int pad = (int) (8 * getResources().getDisplayMetrics().density);
+            boolean any = false;
+            for (int i = 0; i < 3; i++) {
+                JSONArray a = o.optJSONArray(MED_SLOTS[i]);
+                if (a == null || a.length() == 0) continue;
+                any = true;
+                TextView slot = new TextView(act);
+                slot.setText(MED_SLOTS[i]);
+                slot.setTextSize(14); slot.setTypeface(Typeface.DEFAULT_BOLD);
+                slot.setTextColor(dark ? Color.WHITE : 0xFF1F2329);
+                slot.setPadding(0, pad, 0, pad / 2);
+                medHost.addView(slot);
+                for (int j = 0; j < a.length(); j++) {
+                    final String dn = a.optString(j);
+                    JSONArray ta = takenDay.optJSONArray(MED_SLOTS[i]);
+                    boolean ate = false;
+                    if (ta != null) for (int k = 0; k < ta.length(); k++) if (dn.equals(ta.optString(k))) ate = true;
+                    final int si = i;
+                    TextView drug = new TextView(act);
+                    drug.setText((ate ? "✓ " : "") + dn);
+                    drug.setTextSize(15); drug.setTypeface(Typeface.DEFAULT_BOLD);
+                    drug.setTextColor(ate ? 0xFF9CCC65 : (dark ? Color.WHITE : 0xFF1F2329));
+                    drug.setPadding(pad, pad / 2, pad, pad / 2);
+                    drug.setOnClickListener(new View.OnClickListener() { public void onClick(View v) {
+                        toggleTaken(si, dn);
+                        refresh();
+                    }});
+                    medHost.addView(drug);
+                }
+            }
+        } catch (Throwable ignored) {}
+    }
+
+    private void toggleTaken(int slot, String name) {
+        try {
+            String day = new SimpleDateFormat("yyyy-MM-dd", Locale.US).format(new Date());
+            android.content.SharedPreferences sp = act.getSharedPreferences("cal", 0);
+            JSONObject all = new JSONObject(sp.getString("meds_taken", "{}"));
+            JSONObject d = all.optJSONObject(day); if (d == null) d = new JSONObject();
+            JSONArray a = d.optJSONArray(MED_SLOTS[slot]); if (a == null) a = new JSONArray();
+            java.util.List<String> l = new java.util.ArrayList<String>();
+            for (int i = 0; i < a.length(); i++) l.add(a.optString(i));
+            if (l.contains(name)) l.remove(name); else l.add(name);
+            JSONArray na = new JSONArray(); for (String x : l) na.put(x);
+            d.put(MED_SLOTS[slot], na); all.put(day, d);
+            sp.edit().putString("meds_taken", all.toString()).apply();
         } catch (Throwable ignored) {}
     }
 
