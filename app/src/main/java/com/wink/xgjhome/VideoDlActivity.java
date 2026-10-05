@@ -435,7 +435,8 @@ public class VideoDlActivity extends Activity {
                                     long mx = 0;
                                     File cache2 = getExternalCacheDir() != null ? getExternalCacheDir() : getCacheDir();
                                     for (File f2 : cache2.listFiles()) {
-                                        if (f2.getName().startsWith("vdl_") && !before.contains(f2.getName())) mx += f2.length();
+                                        boolean mine = tk.pid != null ? f2.getName().contains(tk.pid) : !before.contains(f2.getName());
+                                        if (f2.getName().startsWith("vdl_") && mine) mx += f2.length();
                                     }
                                     if (mx > 0) {
                                         tk.size = fmtMB(mx);
