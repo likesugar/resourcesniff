@@ -29,6 +29,7 @@ public class ConfirmReceiver extends BroadcastReceiver {
             context.getSharedPreferences("cal", 0).edit().putString("reminders", out.toString()).apply();
             NotificationManager nm = (NotificationManager) context.getSystemService(Context.NOTIFICATION_SERVICE);
             nm.cancel((int) (id & 0x7fffffff));
+            try { CalendarCardView.scheduleNext(context); } catch (Throwable ignored) {}
         } catch (Throwable ignored) {}
     }
 }
