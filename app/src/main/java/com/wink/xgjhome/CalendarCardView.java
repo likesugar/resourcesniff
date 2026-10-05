@@ -589,7 +589,9 @@ String[] labels = {"早上", "中午", "晚上"};
         gridHost.removeAllViews();
         SimpleDateFormat df = new SimpleDateFormat("yyyy-MM-dd", Locale.US);
         Calendar cal = Calendar.getInstance();
+        cal.setFirstDayOfWeek(Calendar.SUNDAY);   // 强制周日起算, 与表头对齐
         cal.set(year, month, 1);
+        cal.set(Calendar.DAY_OF_MONTH, 1);
         int firstDow = cal.get(Calendar.DAY_OF_WEEK) - 1; // 0=周日
         int maxDay = cal.getActualMaximum(Calendar.DAY_OF_MONTH);
         Calendar today = Calendar.getInstance();
