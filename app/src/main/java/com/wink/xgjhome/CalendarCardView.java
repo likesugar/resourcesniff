@@ -263,10 +263,16 @@ public class CalendarCardView extends LinearLayout {
         Calendar today = Calendar.getInstance();
         String todayStr = df.format(today.getTime());
 
-        LinearLayout row = null;
+        LinearLayout row = new LinearLayout(ctx);
+        gridHost.addView(row, new LayoutParams(-1, -2));
+        for (int b = 0; b < firstDow; b++) {   // 月首前置空白
+            TextView pad = new TextView(ctx);
+            pad.setTextSize(14);
+            row.addView(pad, new LayoutParams(0, -2, 1f));
+        }
         for (int day = 1; day <= maxDay; day++) {
             int pos = firstDow + day - 1;
-            if (row == null || pos % 7 == 0) { row = new LinearLayout(ctx); gridHost.addView(row, new LayoutParams(-1, -2)); }
+            if (pos % 7 == 0) { row = new LinearLayout(ctx); gridHost.addView(row, new LayoutParams(-1, -2)); }
             cal.set(year, month, day);
             String ds = df.format(cal.getTime());
             JSONObject hol = holidays.get(ds);

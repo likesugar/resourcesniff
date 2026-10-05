@@ -16,15 +16,15 @@ import android.widget.TextView;
 public class HomeActivity extends Activity {
 
     // ---------- 主题（纯黑 / 冰蓝） ----------
-    private CalendarCardView calCard;
+    private HomeCalendarCompact compact;
 
     private void setupCalendar() {
         try {
             android.view.ViewGroup host = (android.view.ViewGroup) findViewById(R.id.calHost);
             if (host == null) throw new IllegalStateException("calHost not found");
             if (host.getChildCount() == 0) {
-                calCard = new CalendarCardView(this);
-                host.addView(calCard, new android.view.ViewGroup.LayoutParams(-1, -2));
+                compact = new HomeCalendarCompact(this);
+                host.addView(compact, new android.view.ViewGroup.LayoutParams(-1, -2));
             }
         } catch (Throwable t) {
             try {
@@ -45,7 +45,7 @@ public class HomeActivity extends Activity {
 
     private final android.os.Handler calTick = new android.os.Handler();
     private final Runnable calTickRun = new Runnable() { public void run() {
-        try { if (calCard != null) calCard.tick(); } catch (Throwable ignored) {}
+        try { if (compact != null) compact.refresh(); } catch (Throwable ignored) {}
         calTick.postDelayed(this, 30_000);
     }};
 
