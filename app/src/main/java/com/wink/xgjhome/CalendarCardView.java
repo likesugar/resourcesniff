@@ -247,7 +247,22 @@ public class CalendarCardView extends LinearLayout {
 
     // ---------- 药物提醒 ----------
     private static final String[] MED_SLOTS = {"早", "中", "晚"};
-    private static final long[] MED_TIMES = {8 * 3600000L, 12 * 3600000L, 18 * 3600000L + 1800000L}; // 8:00 12:00 18:30
+    private static final int[] MED_DEFAULT_MIN = {8 * 60, 12 * 60, 18 * 60 + 30};
+
+    private int medMin(int slot) {
+        try {
+            JSONObject o = new JSONObject(ctx.getSharedPreferences("cal", 0).getString("meds_times", "{}"));
+            return o.optInt(MED_SLOTS[slot], MED_DEFAULT_MIN[slot]);
+        } catch (Throwable e) { return MED_DEFAULT_MIN[slot]; }
+    }
+
+    private void setMedMin(int slot, int minutes) {
+        try {
+            JSONObject o = new JSONObject(ctx.getSharedPreferences("cal", 0).getString("meds_times", "{}"));
+            o.put(MED_SLOTS[slot], minutes);
+            ctx.getSharedPreferences("cal", 0).edit().putString("meds_times", o.toString()).apply();
+        } catch (Throwable ignored) {}
+    }
 
     private java.util.List<String>[] medArr() {
         java.util.List<String>[] out = new java.util.List[3];
@@ -287,8 +302,9 @@ public class CalendarCardView extends LinearLayout {
                 am.cancel(pi);
                 if (arr[i].isEmpty()) continue;
                 Calendar t = Calendar.getInstance();
-                t.set(Calendar.HOUR_OF_DAY, (int) (MED_TIMES[i] / 3600000L));
-                t.set(Calendar.MINUTE, (int) ((MED_TIMES[i] % 3600000L) / 60000L));
+                int mm = medMinStatic(c, i);
+                t.set(Calendar.HOUR_OF_DAY, mm / 60);
+                t.set(Calendar.MINUTE, mm % 60);
                 t.set(Calendar.SECOND, 0);
                 if (t.getTimeInMillis() <= System.currentTimeMillis()) t.add(Calendar.DATE, 1);
                 if (android.os.Build.VERSION.SDK_INT >= 31 && !am.canScheduleExactAlarms())
@@ -299,10 +315,46 @@ public class CalendarCardView extends LinearLayout {
         } catch (Throwable ignored) {}
     }
 
+    private static int medMinStatic(Context c, int slot) {
+        try {
+            JSONObject o = new JSONObject(c.getSharedPreferences("cal", 0).getString("meds_times", "{}"));
+            return o.optInt(MED_SLOTS[slot], MED_DEFAULT_MIN[slot]);
+        } catch (Throwable e) { return MED_DEFAULT_MIN[slot]; }
+    }
+
     private static String medText(java.util.List<String>[] arr, int i) {
         StringBuilder sb = new StringBuilder(MED_SLOTS[i] + "吃药: ");
         for (String n : arr[i]) sb.append(n).append("、");
         return sb.substring(0, sb.length() - 1);
+    }
+
+    private java.util.Set<String> medTaken(String day, int slot) {
+        java.util.Set<String> out = new java.util.HashSet<String>();
+        try {
+            JSONObject o = new JSONObject(ctx.getSharedPreferences("cal", 0).getString("meds_taken", "{}"));
+            JSONObject d = o.optJSONObject(day);
+            if (d != null) {
+                JSONArray a = d.optJSONArray(MED_SLOTS[slot]);
+                if (a != null) for (int i = 0; i < a.length(); i++) out.add(a.optString(i));
+            }
+        } catch (Throwable ignored) {}
+        return out;
+    }
+
+    private void toggleTaken(int slot, String name) {
+        try {
+            String day = new SimpleDateFormat("yyyy-MM-dd", Locale.US).format(new Date());
+            android.content.SharedPreferences sp = ctx.getSharedPreferences("cal", 0);
+            JSONObject o = new JSONObject(sp.getString("meds_taken", "{}"));
+            JSONObject d = o.optJSONObject(day); if (d == null) d = new JSONObject();
+            JSONArray a = d.optJSONArray(MED_SLOTS[slot]); if (a == null) a = new JSONArray();
+            java.util.List<String> l = new java.util.ArrayList<String>();
+            for (int i = 0; i < a.length(); i++) l.add(a.optString(i));
+            if (l.contains(name)) l.remove(name); else l.add(name);
+            JSONArray na = new JSONArray(); for (String x : l) na.put(x);
+            d.put(MED_SLOTS[slot], na); o.put(day, d);
+            sp.edit().putString("meds_taken", o.toString()).apply();
+        } catch (Throwable ignored) {}
     }
 
     private LinearLayout buildMedSection() {
@@ -312,7 +364,7 @@ public class CalendarCardView extends LinearLayout {
         head.setGravity(Gravity.CENTER_VERTICAL);
         head.setPadding(0, dp(16), 0, dp(4));
         TextView ti = new TextView(ctx);
-        ti.setText("💊 药物提醒(早8:00 / 中12:00 / 晚18:30)");
+        ti.setText("💊 药物提醒(点时间可改, 点药名确认已吃)");
         ti.setTextSize(14); ti.setTypeface(Typeface.DEFAULT_BOLD);
         ti.setTextColor(fgMain());
         head.addView(ti, new LayoutParams(0, -2, 1f));
@@ -330,11 +382,52 @@ public class CalendarCardView extends LinearLayout {
             slot.setText(MED_SLOTS[i]); slot.setTextSize(14); slot.setTypeface(Typeface.DEFAULT_BOLD);
             slot.setTextColor(fgMain());
             row.addView(slot);
-            TextView names = new TextView(ctx);
-            names.setTextSize(13); names.setTextColor(fgSub());
-            names.setText(meds[i].isEmpty() ? "未添加" : join(meds[i]));
-            names.setPadding(dp(12), 0, 0, 0);
-            row.addView(names, new LayoutParams(0, -2, 1f));
+            // 可点时间
+            TextView timeT = new TextView(ctx);
+            int mm0 = medMin(i);
+            timeT.setText(String.format(Locale.US, "%02d:%02d", mm0 / 60, mm0 % 60));
+            timeT.setTextSize(13); timeT.setTypeface(Typeface.DEFAULT_BOLD);
+            timeT.setTextColor(ACCENT);
+            timeT.setPadding(dp(12), 0, 0, 0);
+            timeT.setOnClickListener(new OnClickListener() { public void onClick(View v) {
+                int cur = medMin(si);
+                new TimePickerDialog(ctx, new TimePickerDialog.OnTimeSetListener() {
+                    public void onTimeSet(TimePicker tp, int h, int m) {
+                        setMedMin(si, h * 60 + m);
+                        saveMeds(medArr());
+                        rebuildMedsOnly();
+                    }
+                }, cur / 60, cur % 60, true).show();
+            }});
+            row.addView(timeT);
+            // 药名: 黑色加大加粗, 点击确认吃没吃
+            LinearLayout drugBox = new LinearLayout(ctx);
+            drugBox.setOrientation(HORIZONTAL);
+            drugBox.setPadding(dp(12), 0, 0, 0);
+            String tday = new SimpleDateFormat("yyyy-MM-dd", Locale.US).format(new Date());
+            java.util.Set<String> taken = medTaken(tday, si);
+            for (int j = 0; j < meds[i].size(); j++) {
+                final int dj = j;
+                TextView drug = new TextView(ctx);
+                String dn = meds[i].get(j);
+                boolean ate = taken.contains(dn);
+                drug.setText((ate ? "✓" : "") + dn);
+                drug.setTextSize(16);
+                drug.setTypeface(Typeface.DEFAULT_BOLD);
+                drug.setTextColor(ate ? 0xFF9CCC65 : fgMain());
+                drug.setPadding(dp(6), dp(4), dp(6), dp(4));
+                drug.setOnClickListener(new OnClickListener() { public void onClick(View v) {
+                    toggleTaken(si, dn);
+                    rebuildMedsOnly();
+                }});
+                drugBox.addView(drug);
+            }
+            if (meds[i].isEmpty()) {
+                TextView none = new TextView(ctx);
+                none.setText("未添加"); none.setTextSize(13); none.setTextColor(fgSub());
+                drugBox.addView(none);
+            }
+            row.addView(drugBox, new LayoutParams(0, -2, 1f));
             for (int j = meds[i].size() - 1; j >= 0; j--) {
                 final int di = j;
                 TextView del = new TextView(ctx);
