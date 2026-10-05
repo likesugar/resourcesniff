@@ -45,6 +45,27 @@ public class CalendarActivity extends Activity {
         head.addView(title, new LinearLayout.LayoutParams(0, -2, 1f));
         col.addView(head);
 
+        // 星期表头
+        LinearLayout week = new LinearLayout(this);
+        week.setGravity(Gravity.CENTER_VERTICAL);
+        int pw = (int) (10 * getResources().getDisplayMetrics().density);
+        week.setPadding(pw, (int) (10 * getResources().getDisplayMetrics().density), pw, (int) (4 * getResources().getDisplayMetrics().density));
+        String[] wd = {"日", "一", "二", "三", "四", "五", "六"};
+        for (int i = 0; i < 7; i++) {
+            TextView t = new TextView(this);
+            t.setText(wd[i]); t.setTextSize(12);
+            t.setGravity(Gravity.CENTER);
+            t.setTextColor(i == 0 || i == 6 ? 0xFFFF6B6B : (dark ? 0xFF9AA3AE : 0xFF8A94A6));
+            week.addView(t, new LinearLayout.LayoutParams(0, -2, 1f));
+        }
+        col.addView(week);
+
+        // NCalendar 月视图(农历/节气/选中), 周/月上下滑动切换
+        com.necer.calendar.NCalendarView ncv = new com.necer.calendar.NCalendarView(this);
+        ncv.setPagerInitDate(java.time.LocalDate.now());
+        LinearLayout.LayoutParams nlp = new LinearLayout.LayoutParams(-1, (int) (300 * getResources().getDisplayMetrics().density));
+        col.addView(ncv, nlp);
+
         LinearLayout host = new LinearLayout(this);
         host.setOrientation(LinearLayout.VERTICAL);
         LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(-1, -2);
