@@ -23,6 +23,9 @@ import android.widget.TextView;
 import android.widget.TimePicker;
 import android.widget.Toast;
 
+import com.wink.xgjhome.cal.ChinaDate;
+import com.wink.xgjhome.cal.SolarTermsUtil;
+
 import org.json.JSONArray;
 import org.json.JSONObject;
 
@@ -172,7 +175,7 @@ public class CalendarCardView extends LinearLayout {
 
         loadHolidaysAndBuildGrid();
         refreshReminders();
-        try { fireDue(ctx); scheduleNext(ctx); } catch (Throwable ignored) {}
+        try { CalendarCardView.scheduleSchedules(ctx); } catch (Throwable ignored) {}
     }
 
     private TextView navBtn(String s) {
@@ -197,10 +200,8 @@ public class CalendarCardView extends LinearLayout {
         for (int i = 0; i < arr.length(); i++) {
             try {
                 final JSONObject o = arr.getJSONObject(i);
-                boolean isDaily = o.optBoolean("daily");
                 String oday = df.format(new Date(o.optLong("ts")));
-                if (!isDaily && !date.equals(oday)) continue;
-                if (isDaily && date.compareTo(oday) < 0) continue;  // 每日: 从开始日起
+                if (!date.equals(oday)) continue;
                 cnt++;
                 LinearLayout row = new LinearLayout(ctx);
                 row.setGravity(Gravity.CENTER_VERTICAL);
@@ -209,7 +210,7 @@ public class CalendarCardView extends LinearLayout {
                 LayoutParams rlp = new LayoutParams(-1, -2);
                 rlp.setMargins(0, dp(6), 0, 0);
                 TextView t = new TextView(ctx);
-                String when = isDaily ? "每天 " + new SimpleDateFormat("HH:mm", Locale.US).format(new Date(o.optLong("ts"))) : new SimpleDateFormat("HH:mm", Locale.US).format(new Date(o.optLong("ts")));
+                String when = new SimpleDateFormat("HH:mm", Locale.US).format(new Date(o.optLong("ts")));
                 t.setText(when + "  " + o.optString("t"));
                 t.setTextSize(13); t.setTextColor(fgMain());
                 row.addView(t, new LayoutParams(0, -2, 1f));
@@ -353,7 +354,26 @@ public class CalendarCardView extends LinearLayout {
             else if (hol != null) num.setTextColor(BLUE_W);
             else if (weekend) num.setTextColor(dark ? 0xFFC77 : RED);
             else num.setTextColor(fgMain());
-            cell.addView(num);
+            // 节气 > 农历日
+            String sub = SolarTermsUtil.getSolarTermName(year, month, day);
+            if (sub == null || sub.length() == 0) {
+                try {
+                    long[] l = com.wink.xgjhome.cal.LunarCalendar.computeLunar(year, month, day);
+                    sub = ChinaDate.getChinaDate((int) l[2]);
+                } catch (Throwable ignored) {}
+            }
+            TextView lunarT = new TextView(ctx);
+            lunarT.setText(sub == null ? "" : sub.trim());
+            lunarT.setTextSize(8);
+            lunarT.setGravity(Gravity.CENTER);
+            boolean isTerm = sub != null && sub.startsWith(" ");
+            lunarT.setTextColor(isTerm ? ACCENT : fgSub());
+            LinearLayout vcell = new LinearLayout(ctx);
+            vcell.setOrientation(VERTICAL);
+            vcell.setGravity(Gravity.CENTER);
+            vcell.addView(num);
+            vcell.addView(lunarT);
+            cell.addView(vcell);
             final String fds = ds;
             cell.setOnClickListener(new OnClickListener() { public void onClick(View v) { showDayReminders(fds); }});
 
@@ -419,16 +439,39 @@ public class CalendarCardView extends LinearLayout {
     }
 
     // ---------- 提醒 ----------
-    private JSONArray reminders() {
-        try {
-            String raw = ctx.getSharedPreferences("cal", 0).getString("reminders", "[]");
-            return new JSONArray(raw);
-        } catch (Throwable e) { return new JSONArray(); }
+    private JSONArray reminders() { return schedulesArr(); }
+
+    private JSONArray schedulesArr() {
+        try { return new JSONArray(ctx.getSharedPreferences("cal", 0).getString("schedules", "[]")); }
+        catch (Throwable e) { return new JSONArray(); }
     }
 
     private void saveReminders(JSONArray arr) {
-        ctx.getSharedPreferences("cal", 0).edit().putString("reminders", arr.toString()).apply();
-        try { scheduleNext(ctx); } catch (Throwable ignored) {}
+        ctx.getSharedPreferences("cal", 0).edit().putString("schedules", arr.toString()).apply();
+        try { scheduleSchedules(ctx); } catch (Throwable ignored) {}
+    }
+
+    /** 安排最近日程的后台通知 */
+    public static void scheduleSchedules(Context c) {
+        try {
+            org.json.JSONArray arr = new org.json.JSONArray(c.getSharedPreferences("cal", 0).getString("schedules", "[]"));
+            long best = Long.MAX_VALUE; String title = null;
+            for (int i = 0; i < arr.length(); i++) {
+                long ts = arr.getJSONObject(i).optLong("ts");
+                if (ts > System.currentTimeMillis() && ts < best) { best = ts; title = arr.getJSONObject(i).optString("t"); }
+            }
+            android.app.AlarmManager am = (android.app.AlarmManager) c.getSystemService(Context.ALARM_SERVICE);
+            android.app.PendingIntent pi = android.app.PendingIntent.getBroadcast(c, 46002,
+                new Intent(c, ScheduleReceiver.class).putExtra("t", title == null ? "" : title),
+                android.app.PendingIntent.FLAG_UPDATE_CURRENT | android.app.PendingIntent.FLAG_IMMUTABLE);
+            am.cancel(pi);
+            if (best != Long.MAX_VALUE) {
+                if (android.os.Build.VERSION.SDK_INT >= 31 && !am.canScheduleExactAlarms())
+                    am.setAndAllowWhileIdle(android.app.AlarmManager.RTC_WAKEUP, best, pi);
+                else
+                    am.setExactAndAllowWhileIdle(android.app.AlarmManager.RTC_WAKEUP, best, pi);
+            }
+        } catch (Throwable ignored) {}
     }
 
     private void refreshReminders() {
@@ -436,7 +479,7 @@ public class CalendarCardView extends LinearLayout {
         JSONArray arr = reminders();
         if (arr.length() == 0) {
             TextView e = new TextView(ctx);
-            e.setText("暂无提醒，点右上角＋新建");
+            e.setText("暂无日程，点右上角＋新建");
             e.setTextSize(13); e.setTextColor(fgSub());
             e.setPadding(dp(12), dp(10), dp(12), dp(10));
             remindList.addView(e);
@@ -464,7 +507,7 @@ public class CalendarCardView extends LinearLayout {
                 row.setGravity(Gravity.CENTER_VERTICAL);
                 TextView t = new TextView(ctx);
                 String when = new SimpleDateFormat("MM-dd HH:mm", Locale.US).format(new Date(o.optLong("ts")));
-                t.setText(o.optString("t") + (o.optBoolean("daily") ? " · 每天" : "") + "\n" + when);
+                t.setText(o.optString("t") + "\n" + when);
                 t.setTextSize(13); t.setTextColor(fgMain());
                 row.addView(t, new LayoutParams(0, -2, 1f));
                 // 确认按钮
@@ -564,146 +607,5 @@ public class CalendarCardView extends LinearLayout {
     }
 
     // ---------- 到点触发(每30s由首页调用) ----------
-    public void tick() {
-        try { fireDue(ctx); } catch (Throwable ignored) {}
-    }
 
-    /** 到期触发: 通知+标记待确认(页面tick与后台闹钟共用) */
-    public static void fireDue(Context c) {
-        try {
-            org.json.JSONArray arr = new org.json.JSONArray(c.getSharedPreferences("cal", 0).getString("reminders", "[]"));
-            long now = System.currentTimeMillis();
-            boolean changed = false;
-            for (int i = 0; i < arr.length(); i++) {
-                org.json.JSONObject o = arr.getJSONObject(i);
-                long ts = o.optLong("ts");
-                boolean daily = o.optBoolean("daily");
-                long due = ts;
-                if (daily) { // 每日: 对齐到今天的同时刻
-                    java.util.Calendar t = java.util.Calendar.getInstance();
-                    java.util.Calendar d = java.util.Calendar.getInstance();
-                    d.setTimeInMillis(ts);
-                    t.set(java.util.Calendar.HOUR_OF_DAY, d.get(java.util.Calendar.HOUR_OF_DAY));
-                    t.set(java.util.Calendar.MINUTE, d.get(java.util.Calendar.MINUTE));
-                    due = t.getTimeInMillis();
-                    if (o.optBoolean("fired") && !o.optString("fired_date", "").equals(
-                            new java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.US).format(new java.util.Date()))) {
-                        o.put("fired", false);
-                        o.put("fired_date", new java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.US).format(new java.util.Date()));
-                        changed = true;
-                    }
-                }
-                if (due <= now && !o.optBoolean("fired")) {
-                    notifyUserStatic(c, o.optString("t"), ts, daily);
-                    o.put("fired", true);
-                    changed = true;
-                }
-            }
-            if (changed) {
-                c.getSharedPreferences("cal", 0).edit().putString("reminders", arr.toString()).apply();
-            }
-        } catch (Throwable ignored) {}
-    }
-
-    /** 安排最近一次提醒的后台闹钟 */
-    public static void scheduleNext(Context c) {
-        try {
-            org.json.JSONArray arr = new org.json.JSONArray(c.getSharedPreferences("cal", 0).getString("reminders", "[]"));
-            long best = Long.MAX_VALUE;
-            for (int i = 0; i < arr.length(); i++) {
-                org.json.JSONObject o = arr.getJSONObject(i);
-                long ts = o.optLong("ts");
-                if (o.optBoolean("daily")) {
-                    java.util.Calendar t = java.util.Calendar.getInstance();
-                    java.util.Calendar d = java.util.Calendar.getInstance();
-                    d.setTimeInMillis(ts);
-                    t.set(java.util.Calendar.HOUR_OF_DAY, d.get(java.util.Calendar.HOUR_OF_DAY));
-                    t.set(java.util.Calendar.MINUTE, d.get(java.util.Calendar.MINUTE));
-                    long due = t.getTimeInMillis();
-                    if (due <= System.currentTimeMillis()) due += 86400000L;
-                    if (due < best) best = due;
-                } else if (ts > System.currentTimeMillis() && ts < best) best = ts;
-            }
-            android.app.AlarmManager am = (android.app.AlarmManager) c.getSystemService(Context.ALARM_SERVICE);
-            android.app.PendingIntent pi = android.app.PendingIntent.getBroadcast(c, 46001,
-                new Intent(c, AlarmReceiver.class), android.app.PendingIntent.FLAG_UPDATE_CURRENT | android.app.PendingIntent.FLAG_IMMUTABLE);
-            am.cancel(pi);
-            if (best != Long.MAX_VALUE) {
-                if (android.os.Build.VERSION.SDK_INT >= 31 && !am.canScheduleExactAlarms())
-                    am.setAndAllowWhileIdle(android.app.AlarmManager.RTC_WAKEUP, best, pi);
-                else
-                    am.setExactAndAllowWhileIdle(android.app.AlarmManager.RTC_WAKEUP, best, pi);
-            }
-        } catch (Throwable ignored) {}
-    }
-
-    /** 当日提醒(每日提醒每天都算) */
-    private int dayCount(String date, org.json.JSONArray arr, java.text.SimpleDateFormat df) { return 0; }
-
-    public static void confirmById(Context c, long id, boolean daily) {
-        try {
-            JSONArray arr = new JSONArray(c.getSharedPreferences("cal", 0).getString("reminders", "[]"));
-            JSONArray out = new JSONArray();
-            for (int i = 0; i < arr.length(); i++) {
-                JSONObject o = arr.getJSONObject(i);
-                if (!daily && o.optLong("ts") == id) continue;
-                if (daily && o.optLong("ts") == id) {
-                    Calendar cc = Calendar.getInstance();
-                    cc.setTimeInMillis(o.optLong("ts")); cc.add(Calendar.DATE, 1);
-                    o.put("ts", cc.getTimeInMillis());
-                    o.put("fired", false);
-                }
-                out.put(o);
-            }
-            c.getSharedPreferences("cal", 0).edit().putString("reminders", out.toString()).apply();
-        } catch (Throwable ignored) {}
-    }
-
-    private static void notifyUserStatic(Context cx, String text, long id, boolean daily) {
-        CalendarCardView v = null;
-        // 静态环境直接构造通知
-        try {
-            NotificationManager nm = (NotificationManager) cx.getSystemService(Context.NOTIFICATION_SERVICE);
-            if (Build.VERSION.SDK_INT >= 26) {
-                NotificationChannel ch = new NotificationChannel("remind", "提醒", NotificationManager.IMPORTANCE_HIGH);
-                nm.createNotificationChannel(ch);
-            }
-            Intent ci = new Intent(cx, ConfirmReceiver.class);
-            ci.putExtra("id", id); ci.putExtra("daily", daily);
-            android.app.PendingIntent pi = android.app.PendingIntent.getBroadcast(cx, (int) (id & 0x7fffffff), ci,
-                android.app.PendingIntent.FLAG_UPDATE_CURRENT | android.app.PendingIntent.FLAG_IMMUTABLE);
-            Notification.Builder b = Build.VERSION.SDK_INT >= 26
-                ? new Notification.Builder(cx, "remind")
-                : new Notification.Builder(cx);
-            b.setSmallIcon(android.R.drawable.ic_dialog_info)
-             .setContentTitle("提醒")
-             .setContentText(text)
-             .addAction(new Notification.Action.Builder(android.R.drawable.ic_menu_send, "确认", pi).build())
-             .setAutoCancel(true);
-            nm.notify((int) (id & 0x7fffffff), b.build());
-        } catch (Throwable ignored) {}
-    }
-
-    private void notifyUser(String text, long id, boolean daily) {
-        try {
-            NotificationManager nm = (NotificationManager) ctx.getSystemService(Context.NOTIFICATION_SERVICE);
-            if (Build.VERSION.SDK_INT >= 26) {
-                NotificationChannel ch = new NotificationChannel("remind", "提醒", NotificationManager.IMPORTANCE_HIGH);
-                nm.createNotificationChannel(ch);
-            }
-            Intent ci = new Intent(ctx, ConfirmReceiver.class);
-            ci.putExtra("id", id); ci.putExtra("daily", daily);
-            PendingIntent pi = PendingIntent.getBroadcast(ctx, (int) (id & 0x7fffffff), ci,
-                PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
-            Notification.Builder b = Build.VERSION.SDK_INT >= 26
-                ? new Notification.Builder(ctx, "remind")
-                : new Notification.Builder(ctx);
-            b.setSmallIcon(android.R.drawable.ic_dialog_info)
-             .setContentTitle("提醒")
-             .setContentText(text)
-             .addAction(new Notification.Action.Builder(android.R.drawable.ic_menu_send, "确认", pi).build())
-             .setAutoCancel(true);
-            nm.notify((int) (id & 0x7fffffff), b.build());
-        } catch (Throwable ignored) {}
-    }
 }

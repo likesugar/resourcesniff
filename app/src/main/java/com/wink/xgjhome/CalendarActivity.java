@@ -56,6 +56,6 @@ public class CalendarActivity extends Activity {
     @Override
     protected void onResume() {
         super.onResume();
-        try { if (card != null) card.tick(); } catch (Throwable ignored) {}
+
     }
 }

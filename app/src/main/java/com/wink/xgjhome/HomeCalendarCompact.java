@@ -120,22 +120,19 @@ public class HomeCalendarCompact extends LinearLayout {
             boolean signed = sp.getString("sign_last", "").equals(today);
             int days = sp.getInt("sign_days", 0);
             signText.setText(signed ? "✓ 已连签" + days + "天" : "签到");
-            // 提醒摘要: 待确认(到期未确认)优先, 否则最近一条
+            // 日程摘要: 最近一条
             String next = "";
             try {
-                JSONArray arr = new JSONArray(sp.getString("reminders", "[]"));
+                JSONArray arr = new JSONArray(sp.getString("schedules", "[]"));
                 long nowMs = System.currentTimeMillis();
                 long best = Long.MAX_VALUE;
-                boolean pending = false;
                 for (int i = 0; i < arr.length(); i++) {
                     JSONObject r = arr.getJSONObject(i);
                     long ts = r.optLong("ts");
-                    if (ts <= nowMs) { pending = true; best = ts; next = r.optString("t", "提醒"); break; }
-                    if (ts < best) { best = ts; next = r.optString("t", "提醒"); }
+                    if (ts >= nowMs && ts < best) { best = ts; next = r.optString("t", "日程"); }
                 }
-                if (pending) next = "待确认: " + next;
             } catch (Throwable ignored) {}
-            remindText.setText(next.isEmpty() ? "暂无提醒" : next);
+            remindText.setText(next.isEmpty() ? "暂无日程" : "日程: " + next);
         } catch (Throwable ignored) {}
     }
 
