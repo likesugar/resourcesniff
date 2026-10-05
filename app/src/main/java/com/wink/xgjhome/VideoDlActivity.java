@@ -433,8 +433,10 @@ public class VideoDlActivity extends Activity {
                         req.addOption("--add-headers", "Referer: " + ref);
                         if (st[2].equals("1")) req.addOption("--cookies", cookies().getAbsolutePath());
                         if (tk.url.contains("youtube.com") || tk.url.contains("youtu.be")) {
-                            String[] clients = {"tv,web_safari", "tv_embedded,web_safari", "web_embedded", "mweb"};
-                            req.addOption("--extractor-args", "youtube:player_client=" + clients[si % clients.length]);
+                            req.addOption("--extractor-args", "youtube:player_client=tv");
+                            req.addOption("--retries", "10");
+                            req.addOption("--fragment-retries", "10");
+                            req.addOption("--socket-timeout", "30");
                         }
                     if (tk.gen != myGen) return;
                         req.addOption("-o", out.getAbsolutePath());
