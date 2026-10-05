@@ -34,6 +34,8 @@ public class VideoDlActivity extends Activity {
         volatile boolean paused = false;   // 用户请求暂停
         String pid;                        // 文件匹配token(BV号/视频id)
         String runId;                      // 每次尝试唯一的进程id(库要求不复用)
+        int gen = 0;                       // 代数: 暂停/停止/重开时+1, 旧线程发现换代即退出
+        int r416 = 0;                      // 416重试计数
         int percent = -1;            // -1解析中/等待 0-100下载中 100完成 -2失败
         String err; Uri saved; File out;
     }
@@ -360,6 +362,8 @@ public class VideoDlActivity extends Activity {
                     }
                 } catch (Throwable ignored) {}
                 if (tk.pid == null) tk.pid = "t" + System.currentTimeMillis();
+                final int myGen = ++tk.gen;
+                tk.r416 = 0;
                 tk.runId = tk.pid + "#" + System.currentTimeMillis();
                 ensureEngine();
                 File cache = getExternalCacheDir() != null ? getExternalCacheDir() : getCacheDir();
@@ -428,6 +432,7 @@ public class VideoDlActivity extends Activity {
                         req.addOption("--user-agent", st[0]);
                         req.addOption("--add-headers", "Referer: " + ref);
                         if (st[2].equals("1")) req.addOption("--cookies", cookies().getAbsolutePath());
+                    if (tk.gen != myGen) return;
                         req.addOption("-o", out.getAbsolutePath());
                         req.addOption("--restrict-filenames");
                         req.addOption("--no-playlist"); req.addOption("--no-mtime");
@@ -511,13 +516,17 @@ public class VideoDlActivity extends Activity {
                         return;  // 成功收工
                     } catch (Throwable e) {
                         String em = e.getMessage() == null ? "" : e.getMessage();
-                        if (em.contains("416")) {
+                        if (em.contains("416") && tk.gen == myGen) {
+                            tk.r416++;
+                            if (tk.r416 <= 2) {
                             // 断点分片与远端Range不匹配: 清.part重试本策略一次
-                            try {
-                                for (File f : cache.listFiles()) if (f.getName().endsWith(".part")) f.delete();
-                            } catch (Throwable ignored) {}
-                            si--; continue;
+                                try {
+                                    for (File f : cache.listFiles()) if (f.getName().endsWith(".part")) f.delete();
+                                } catch (Throwable ignored) {}
+                                si--; continue;
+                            }
                         }
+                        if (tk.gen != myGen) return;
                         if (tk.paused) {
                             tk.percent = -3;   // 用户暂停
                             runUi(new Runnable() { public void run() { render(); }});
@@ -812,6 +821,7 @@ public class VideoDlActivity extends Activity {
                     if (tok != null) Runtime.getRuntime().exec(new String[]{"pkill", "-f", tok});
                 } catch (Throwable ignored) {}
                 killYtProcesses(tk.pid);
+                tk.gen++;
                 tk.percent = -2;
                 tk.err = "已手动停止";
                 saveTasks(VideoDlActivity.this);
@@ -836,6 +846,7 @@ public class VideoDlActivity extends Activity {
             resumeBtn.setPadding(dp(12), dp(10), dp(12), dp(10));
             resumeBtn.setOnClickListener(new OnClickListener() { public void onClick(View v) {
                 tk.percent = 0; tk.paused = false;
+                tk.gen++;
                 runTask(tk);
             }});
             r4.addView(resumeBtn, new LinearLayout.LayoutParams(-1, -2));
