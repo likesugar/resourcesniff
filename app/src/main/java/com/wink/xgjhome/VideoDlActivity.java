@@ -374,8 +374,8 @@ public class VideoDlActivity extends Activity {
                     // {ua, referer, cookie开关}
                     {"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36", "https://www.bilibili.com/", "1"},
                     {"Mozilla/5.0 (Linux; Android 13; M2102K1C) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36", "https://www.bilibili.com/", "1"},
-                    {"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36", "https://www.bilibili.com/", "0"},
-                    {"Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36", "https://live.douyin.com/", "0"},
+                    {"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36", "https://www.bilibili.com/", "1"},
+                    {"Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36", "https://live.douyin.com/", "1"},
                 };
                 Throwable last = null;
                 for (int si = 0; si < strategies.length; si++) {
@@ -635,6 +635,27 @@ public class VideoDlActivity extends Activity {
                 if (kv.length == 2 && kv[0].length() > 0)
                     pw.println(".douyin.com\tTRUE\t/\tTRUE\t0\t" + kv[0] + "\t" + kv[1]);
             }
+        } catch (Throwable ignored) {}
+        // youtube登录态全域导出(google域的SID/SAPISID也是YouTube登录Cookie)
+        int ytCount = 0;
+        String[] yd = {"https://www.youtube.com", "https://m.youtube.com", "https://accounts.google.com", "https://www.google.com"};
+        for (String dom : yd) {
+            String craw = cm.getCookie(dom);
+            if (craw == null) continue;
+            for (String p : craw.split(";")) {
+                String[] kv = p.trim().split("=", 2);
+                if (kv.length == 2 && kv[0].length() > 0) {
+                    pw.println(".youtube.com\tTRUE\t/\tTRUE\t0\t" + kv[0] + "\t" + kv[1]);
+                    if (dom.contains("google.com")) pw.println(".google.com\tTRUE\t/\tTRUE\t0\t" + kv[0] + "\t" + kv[1]);
+                    ytCount++;
+                }
+            }
+        }
+        try {
+            java.io.File dbg = new java.io.File(getExternalFilesDir(null) != null ? getExternalFilesDir(null).getParentFile() : getFilesDir(), "网页诊断.txt");
+            java.io.FileWriter fw = new java.io.FileWriter(dbg, true);
+            fw.write("YT-COOKIES exported: " + ytCount + " @ " + new java.util.Date() + "\n");
+            fw.close();
         } catch (Throwable ignored) {}
         String draw = cm.getCookie("https://www.douyin.com");
         if (draw != null) for (String p : draw.split(";")) {
