@@ -25,7 +25,10 @@ public class CalendarActivity extends Activity {
         col.setOrientation(LinearLayout.VERTICAL);
         int pad = (int) (18 * getResources().getDisplayMetrics().density);
         col.setPadding(pad, pad + (int) (24 * getResources().getDisplayMetrics().density), pad, pad);
-        root.addView(col, new FrameLayout.LayoutParams(-1, -1));
+        android.widget.ScrollView page = new android.widget.ScrollView(this);
+        page.setFillViewport(true);
+        root.addView(page, new FrameLayout.LayoutParams(-1, -1));
+        page.addView(col, new FrameLayout.LayoutParams(-1, -2));
 
         LinearLayout head = new LinearLayout(this);
         head.setGravity(Gravity.CENTER_VERTICAL);
