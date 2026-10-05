@@ -34,6 +34,7 @@ public class VideoDlActivity extends Activity {
         volatile boolean paused = false;   // 用户请求暂停
         String pid;                        // 文件匹配token(BV号/视频id)
         String runId;                      // 每次尝试唯一的进程id(库要求不复用)
+        String webManifest;                // WebView提取的streamingData清单
         int gen = 0;                       // 代数: 暂停/停止/重开时+1, 旧线程发现换代即退出
         int r416 = 0;                      // 416重试计数
         int percent = -1;            // -1解析中/等待 0-100下载中 100完成 -2失败
@@ -368,7 +369,7 @@ public class VideoDlActivity extends Activity {
                 if (tk.url.contains("youtube.com") || tk.url.contains("youtu.be")) {
                     final java.util.concurrent.CountDownLatch latch = new java.util.concurrent.CountDownLatch(1);
                     runUi(new Runnable() { public void run() {
-                        android.webkit.WebView wv = new android.webkit.WebView(VideoDlActivity.this);
+                        final android.webkit.WebView wv = new android.webkit.WebView(VideoDlActivity.this);
                         wv.setVisibility(View.GONE);
                         android.webkit.WebSettings ws = wv.getSettings();
                         ws.setJavaScriptEnabled(true);
@@ -377,22 +378,49 @@ public class VideoDlActivity extends Activity {
                         android.webkit.CookieManager.getInstance().setAcceptCookie(true);
                         android.webkit.CookieManager.getInstance().setAcceptThirdPartyCookies(wv, true);
                         wv.setWebViewClient(new android.webkit.WebViewClient() {
-                            int loads = 0;
                             @Override public void onPageFinished(android.webkit.WebView v, String u) {
-                                loads++;
-                                if (loads >= 2 || u.contains("watch")) {
-                                    android.webkit.CookieManager.getInstance().flush();
-                                    latch.countDown();
-                                }
+                                android.webkit.CookieManager.getInstance().flush();
+                                v.evaluateJavascript(
+                                    "(function(){try{var pr=window.ytInitialPlayerResponse;if(pr&&pr.streamingData){return JSON.stringify({d:pr.streamingData.dashManifestUrl||'',h:pr.streamingData.hlsManifestUrl||''});}var m=document.documentElement.innerHTML.match(/ytInitialPlayerResponse\\s*=\\s*(\\{.+?\\});/);if(m){var p2=JSON.parse(m[1]);if(p2.streamingData)return JSON.stringify({d:p2.streamingData.dashManifestUrl||'',h:p2.streamingData.hlsManifestUrl||''});}}catch(e){}return '{}';})()",
+                                    new android.webkit.ValueCallback<String>() {
+                                        @Override public void onReceiveValue(String val) {
+                                            tk.webManifest = val == null ? "{}" : val;
+                                            latch.countDown();
+                                        }
+                                    });
                             }
                         });
                         wv.loadUrl("https://m.youtube.com/watch?v=" + videoId(tk.url));
                         new Thread(new Runnable() { public void run() {
-                            try { latch.await(18, java.util.concurrent.TimeUnit.SECONDS); } catch (Throwable ignored) {}
+                            try { latch.await(20, java.util.concurrent.TimeUnit.SECONDS); } catch (Throwable ignored) {}
                             runUi(new Runnable() { public void run() { wv.destroy(); }});
                         }}).start();
                     }});
-                    try { latch.await(20, java.util.concurrent.TimeUnit.SECONDS); } catch (Throwable ignored) {}
+                    try { latch.await(22, java.util.concurrent.TimeUnit.SECONDS); } catch (Throwable ignored) {}
+                    // 清单直下: 不需要n-challenge/PO Token
+                    try {
+                        if (tk.webManifest != null && tk.webManifest.contains("http")) {
+                            JSONObject wm = new JSONObject(tk.webManifest);
+                            String murl = wm.optString("d", "");
+                            boolean isDash = true;
+                            if (murl.isEmpty()) { murl = wm.optString("h", ""); isDash = false; }
+                            if (murl.startsWith("http")) {
+                                File cacheDir = getExternalCacheDir() != null ? getExternalCacheDir() : getCacheDir();
+                                File out = new File(cacheDir, "vdl_" + tk.pid + "_w.mp4");
+                                String args = "-y " + (isDash ? "" : "") + "-i \"" + murl + "\" -c copy -movflags +faststart \"" + out.getAbsolutePath() + "\"";
+                                com.arthenica.ffmpegkit.FFmpegSession st = com.arthenica.ffmpegkit.FFmpegKit.executeWithArguments(
+                                    com.arthenica.ffmpegkit.FFmpegKitConfig.parseArguments(args));
+                                if (out.exists() && out.length() > 1024) {
+                                    tk.percent = 100;
+                                    tk.title = "YouTube " + tk.pid;
+                                    tk.saved = store(out, safeName(tk.title));
+                                    tk.out = out;
+                                    runUi(new Runnable() { public void run() { render(); }});
+                                    return;  // 完成
+                                }
+                            }
+                        }
+                    } catch (Throwable ignored) {}
                 }
                 tk.runId = tk.pid + "#" + System.currentTimeMillis();
                 ensureEngine();
