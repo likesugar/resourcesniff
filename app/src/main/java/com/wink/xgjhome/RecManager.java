@@ -249,11 +249,17 @@ public class RecManager {
                             } finally {
                                 if (pc != null) { try { pc.disconnect(); } catch (Throwable ignored) {} }
                             }
-                            // master 清单：优先 _or4 原画，其次第一个变体
+                            // master 清单：只认 _or4 原画; 没有则每2秒刷新清单等待原画出现
                             if (!variants.isEmpty() && segs.isEmpty()) {
-                                String pick = variants.get(0);
+                                String pick = null;
                                 for (String v : variants) if (v.contains("_or4")) { pick = v; break; }
-                                curUrl = pick; failStreak = 0; continue;
+                                if (pick == null) {
+                                    job.state = "兜底画质, 等待原画(2s刷新)…";
+                                    if (job.finishNow) break;
+                                    Thread.sleep(2000);
+                                    continue;
+                                }
+                                curUrl = pick; failStreak = 0; job.state = null; continue;
                             }
                             if (!ok) { failStreak++; job.state = "清单失败x" + failStreak + " (HTTP" + pc.getResponseCode() + ")"; Thread.sleep(2000); continue; }
                             // ---- 逐分片下载（独立容错）----
@@ -505,6 +511,46 @@ public class RecManager {
             recJobs.put(job.id, job);
             saveLiveRec(job);
             acquireWake();
+            // 抖音: 只录原画——若拿到的是master/兜底清单, 每2秒刷新直到_or4原画出现
+            if (job.url != null && job.url.contains("douyin")) {
+                int waits = 0;
+                while (job.active) {
+                    try {
+                        java.net.HttpURLConnection pc = (java.net.HttpURLConnection) new java.net.URL(job.url).openConnection();
+                        pc.setConnectTimeout(8000); pc.setReadTimeout(8000);
+                        pc.setRequestProperty("User-Agent", "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36");
+                        pc.setRequestProperty("Referer", "https://live.douyin.com/");
+                        java.io.BufferedReader br = new java.io.BufferedReader(new java.io.InputStreamReader(pc.getInputStream()));
+                        java.util.List<String> variants = new java.util.ArrayList<String>();
+                        boolean inVar = false;
+                        String ln;
+                        while ((ln = br.readLine()) != null) {
+                            if (ln.startsWith("#EXT-X-STREAM-INF")) inVar = true;
+                            else if (inVar && !ln.startsWith("#")) { variants.add(ln.trim()); inVar = false; }
+                        }
+                        br.close(); pc.disconnect();
+                        if (variants.isEmpty()) break;
+                        String pick = null;
+                        for (String v : variants) if (v.contains("_or4")) { pick = v; break; }
+                        if (pick == null) {
+                            job.state = "兜底画质, 等待原画(2s刷新)…";
+                            if (job.finishNow) break;
+                            Thread.sleep(2000);
+                            waits++;
+                            if (waits > 900) break;
+                            continue;
+                        }
+                        if (!pick.startsWith("http")) pick = new java.net.URL(new java.net.URL(job.url), pick).toString();
+                        job.url = pick;
+                        job.state = null;
+                    } catch (Throwable e2) {
+                        if (!job.active || job.finishNow) break;
+                        try { Thread.sleep(2000); } catch (Throwable ignored) {}
+                        continue;
+                    }
+                    break;
+                }
+            }
             startBgPlayer(job);
             startBgSession(job);
             startWatchdog(job);
