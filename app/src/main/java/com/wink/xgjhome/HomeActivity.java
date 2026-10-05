@@ -60,6 +60,7 @@ public class HomeActivity extends Activity {
                 }
             }));
         findViewById(R.id.toolColumn).setBackgroundColor(dark ? 0xFF000000 : 0xFFEEF4FF);
+        try { if (compact != null) compact.setDark(dark); } catch (Throwable ignored) {}
         ((TextView) findViewById(R.id.themeToggle)).setText(dark ? "☀️" : "🌙");
         applyTraversal((android.view.ViewGroup) findViewById(R.id.toolColumn), dark);
     }
