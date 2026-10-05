@@ -364,6 +364,36 @@ public class VideoDlActivity extends Activity {
                 if (tk.pid == null) tk.pid = "t" + System.currentTimeMillis();
                 final int myGen = ++tk.gen;
                 tk.r416 = 0;
+                // YouTube: 先用后台WebView建立会话(JS/consent/风控), Cookie再交yt-dlp
+                if (tk.url.contains("youtube.com") || tk.url.contains("youtu.be")) {
+                    final java.util.concurrent.CountDownLatch latch = new java.util.concurrent.CountDownLatch(1);
+                    runUi(new Runnable() { public void run() {
+                        android.webkit.WebView wv = new android.webkit.WebView(VideoDlActivity.this);
+                        wv.setVisibility(View.GONE);
+                        android.webkit.WebSettings ws = wv.getSettings();
+                        ws.setJavaScriptEnabled(true);
+                        ws.setDomStorageEnabled(true);
+                        ws.setUserAgentString("Mozilla/5.0 (Linux; Android 13) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Mobile Safari/537.36");
+                        android.webkit.CookieManager.getInstance().setAcceptCookie(true);
+                        android.webkit.CookieManager.getInstance().setAcceptThirdPartyCookies(wv, true);
+                        wv.setWebViewClient(new android.webkit.WebViewClient() {
+                            int loads = 0;
+                            @Override public void onPageFinished(android.webkit.WebView v, String u) {
+                                loads++;
+                                if (loads >= 2 || u.contains("watch")) {
+                                    android.webkit.CookieManager.getInstance().flush();
+                                    latch.countDown();
+                                }
+                            }
+                        });
+                        wv.loadUrl("https://m.youtube.com/watch?v=" + videoId(tk.url));
+                        new Thread(new Runnable() { public void run() {
+                            try { latch.await(18, java.util.concurrent.TimeUnit.SECONDS); } catch (Throwable ignored) {}
+                            runUi(new Runnable() { public void run() { wv.destroy(); }});
+                        }}).start();
+                    }});
+                    try { latch.await(20, java.util.concurrent.TimeUnit.SECONDS); } catch (Throwable ignored) {}
+                }
                 tk.runId = tk.pid + "#" + System.currentTimeMillis();
                 ensureEngine();
                 File cache = getExternalCacheDir() != null ? getExternalCacheDir() : getCacheDir();
@@ -699,6 +729,11 @@ public class VideoDlActivity extends Activity {
                 } catch (Throwable ignored) {}
             }
         } catch (Throwable ignored) {}
+    }
+
+    private static String videoId(String u) {
+        java.util.regex.Matcher m = java.util.regex.Pattern.compile("(?:v=|youtu[.]be/|shorts/|/watch.*?v=)([A-Za-z0-9_-]{6,20})").matcher(u);
+        return m.find() ? m.group(1) : "";
     }
 
     private int shapeOf(Task tk) {
