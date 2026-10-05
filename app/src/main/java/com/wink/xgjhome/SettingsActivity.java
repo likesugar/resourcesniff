@@ -106,6 +106,7 @@ public class SettingsActivity extends Activity {
                     // 已配置：直接登录
                     try {
                         String[] p2 = conf.split("\\u0001", -1);
+                        CookieHosts.add(SettingsActivity.this, p2[1]);
                         Intent i = new Intent(SettingsActivity.this, LoginWebActivity.class);
                         i.putExtra("url", p2[1]);
                         i.putExtra("uamode", p2.length > 2 ? p2[2] : "mobile");
@@ -166,6 +167,7 @@ public class SettingsActivity extends Activity {
                         public void onClick(View v) {
                             try {
                                 String[] p3 = entry.split("\u0001", -1);
+                                CookieHosts.add(SettingsActivity.this, p3[1]);
                                 Intent i = new Intent(SettingsActivity.this, LoginWebActivity.class);
                                 i.putExtra("url", p3[1]);
                                 i.putExtra("uamode", p3[2]);
@@ -250,6 +252,7 @@ public class SettingsActivity extends Activity {
     }
 
     private void openWeb(int idx) {
+        CookieHosts.add(this, PLATFORMS[idx][1]);
         Intent i = new Intent(this, LoginWebActivity.class);
         i.putExtra("url", PLATFORMS[idx][1]);
         i.putExtra("domain", platformDomain(idx));
