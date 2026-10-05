@@ -131,7 +131,7 @@ public class CalendarCardView extends LinearLayout {
 
         gridHost = new LinearLayout(ctx);
         gridHost.setOrientation(VERTICAL);
-        addView(gridHost);
+        addView(frameWrap(gridHost));
 
         // 签到行
         LinearLayout signRow = new LinearLayout(ctx);
@@ -151,7 +151,7 @@ public class CalendarCardView extends LinearLayout {
         refreshSignUi();
 
         // 药物提醒区
-        addView(buildMedSection());
+        addView(frameWrap(buildMedSection()));
 
         // 提醒行
         LinearLayout rHead = new LinearLayout(ctx);
@@ -170,11 +170,14 @@ public class CalendarCardView extends LinearLayout {
         addBtn.setPadding(dp(14), dp(7), dp(14), dp(7));
         addBtn.setOnClickListener(new OnClickListener() { public void onClick(View v) { showAddReminder(); }});
         rHead.addView(addBtn);
-        addView(rHead);
 
         remindList = new LinearLayout(ctx);
         remindList.setOrientation(VERTICAL);
-        addView(remindList);
+        LinearLayout remindSec = new LinearLayout(ctx);
+        remindSec.setOrientation(VERTICAL);
+        remindSec.addView(rHead);
+        remindSec.addView(remindList);
+        addView(frameWrap(remindSec));
 
         loadHolidaysAndBuildGrid();
         refreshReminders();
@@ -357,6 +360,22 @@ public class CalendarCardView extends LinearLayout {
         } catch (Throwable ignored) {}
     }
 
+    private LinearLayout frameWrap(LinearLayout content) {
+        LinearLayout f = new LinearLayout(ctx);
+        f.setOrientation(VERTICAL);
+        f.setBackground(flatBg(cellBg(), 14));
+        int p2 = dp(12);
+        f.setPadding(p2, p2, p2, p2);
+        LayoutParams lp = new LayoutParams(-1, -2);
+        lp.setMargins(0, dp(10), 0, 0);
+        f.addView(content, new LayoutParams(-1, -2));
+        // 占位让margin生效
+        LinearLayout outer = new LinearLayout(ctx);
+        outer.setOrientation(VERTICAL);
+        outer.addView(f, lp);
+        return outer;
+    }
+
     private LinearLayout buildMedSection() {
         LinearLayout sec = new LinearLayout(ctx);
         sec.setOrientation(VERTICAL);
@@ -400,18 +419,20 @@ public class CalendarCardView extends LinearLayout {
                 }, cur / 60, cur % 60, true).show();
             }});
             row.addView(timeT);
-            // 药名: 黑色加大加粗, 点击确认吃没吃
+            // 药名: 每种一行, 黑色加大加粗, 点击确认吃没吃, 后跟✕删除
             LinearLayout drugBox = new LinearLayout(ctx);
-            drugBox.setOrientation(HORIZONTAL);
+            drugBox.setOrientation(VERTICAL);
             drugBox.setPadding(dp(12), 0, 0, 0);
             String tday = new SimpleDateFormat("yyyy-MM-dd", Locale.US).format(new Date());
             java.util.Set<String> taken = medTaken(tday, si);
             for (int j = 0; j < meds[i].size(); j++) {
                 final int dj = j;
-                TextView drug = new TextView(ctx);
                 String dn = meds[i].get(j);
                 boolean ate = taken.contains(dn);
-                drug.setText((ate ? "✓" : "") + dn);
+                LinearLayout drow = new LinearLayout(ctx);
+                drow.setGravity(Gravity.CENTER_VERTICAL);
+                TextView drug = new TextView(ctx);
+                drug.setText((ate ? "✓ " : "") + dn);
                 drug.setTextSize(16);
                 drug.setTypeface(Typeface.DEFAULT_BOLD);
                 drug.setTextColor(ate ? 0xFF9CCC65 : fgMain());
@@ -420,7 +441,19 @@ public class CalendarCardView extends LinearLayout {
                     toggleTaken(si, dn);
                     rebuildMedsOnly();
                 }});
-                drugBox.addView(drug);
+                drow.addView(drug, new LayoutParams(0, -2, 1f));
+                TextView del = new TextView(ctx);
+                del.setText("✕"); del.setTextSize(14);
+                del.setTextColor(0xFFFF7B8A);
+                del.setPadding(dp(10), dp(4), dp(6), dp(4));
+                del.setOnClickListener(new OnClickListener() { public void onClick(View v) {
+                    java.util.List<String>[] a = medArr();
+                    a[si].remove(dj);
+                    saveMeds(a);
+                    rebuildMedsOnly();
+                }});
+                drow.addView(del);
+                drugBox.addView(drow, new LayoutParams(-1, -2));
             }
             if (meds[i].isEmpty()) {
                 TextView none = new TextView(ctx);
