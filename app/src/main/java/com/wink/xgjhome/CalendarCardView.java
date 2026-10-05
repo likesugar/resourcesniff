@@ -150,6 +150,9 @@ public class CalendarCardView extends LinearLayout {
         addView(signRow);
         refreshSignUi();
 
+        // 药物提醒区
+        addView(buildMedSection());
+
         // 提醒行
         LinearLayout rHead = new LinearLayout(ctx);
         rHead.setGravity(Gravity.CENTER_VERTICAL);
@@ -241,6 +244,150 @@ public class CalendarCardView extends LinearLayout {
         new AlertDialog.Builder(ctx).setTitle(date).setView(box)
             .setPositiveButton("关闭", null).show();
     }
+
+    // ---------- 药物提醒 ----------
+    private static final String[] MED_SLOTS = {"早", "中", "晚"};
+    private static final long[] MED_TIMES = {8 * 3600000L, 12 * 3600000L, 18 * 3600000L + 1800000L}; // 8:00 12:00 18:30
+
+    private java.util.List<String>[] medArr() {
+        java.util.List<String>[] out = new java.util.List[3];
+        for (int i = 0; i < 3; i++) out[i] = new java.util.ArrayList<String>();
+        try {
+            JSONObject o = new JSONObject(ctx.getSharedPreferences("cal", 0).getString("meds", "{}"));
+            for (int i = 0; i < 3; i++) {
+                JSONArray a = o.optJSONArray(MED_SLOTS[i]);
+                if (a != null) for (int j = 0; j < a.length(); j++) {
+                    String n = a.optString(j); if (n.length() > 0) out[i].add(n);
+                }
+            }
+        } catch (Throwable ignored) {}
+        return out;
+    }
+
+    private void saveMeds(java.util.List<String>[] arr) {
+        try {
+            JSONObject o = new JSONObject();
+            for (int i = 0; i < 3; i++) {
+                JSONArray a = new JSONArray();
+                for (String n : arr[i]) a.put(n);
+                o.put(MED_SLOTS[i], a);
+            }
+            ctx.getSharedPreferences("cal", 0).edit().putString("meds", o.toString()).apply();
+            scheduleMeds(ctx, arr);
+        } catch (Throwable ignored) {}
+    }
+
+    public static void scheduleMeds(Context c, java.util.List<String>[] arr) {
+        try {
+            android.app.AlarmManager am = (android.app.AlarmManager) c.getSystemService(Context.ALARM_SERVICE);
+            for (int i = 0; i < 3; i++) {
+                android.app.PendingIntent pi = android.app.PendingIntent.getBroadcast(c, 46010 + i,
+                    new Intent(c, ScheduleReceiver.class).putExtra("t", medText(arr, i)),
+                    android.app.PendingIntent.FLAG_UPDATE_CURRENT | android.app.PendingIntent.FLAG_IMMUTABLE);
+                am.cancel(pi);
+                if (arr[i].isEmpty()) continue;
+                Calendar t = Calendar.getInstance();
+                t.set(Calendar.HOUR_OF_DAY, (int) (MED_TIMES[i] / 3600000L));
+                t.set(Calendar.MINUTE, (int) ((MED_TIMES[i] % 3600000L) / 60000L));
+                t.set(Calendar.SECOND, 0);
+                if (t.getTimeInMillis() <= System.currentTimeMillis()) t.add(Calendar.DATE, 1);
+                if (android.os.Build.VERSION.SDK_INT >= 31 && !am.canScheduleExactAlarms())
+                    am.setAndAllowWhileIdle(android.app.AlarmManager.RTC_WAKEUP, t.getTimeInMillis(), pi);
+                else
+                    am.setExactAndAllowWhileIdle(android.app.AlarmManager.RTC_WAKEUP, t.getTimeInMillis(), pi);
+            }
+        } catch (Throwable ignored) {}
+    }
+
+    private static String medText(java.util.List<String>[] arr, int i) {
+        StringBuilder sb = new StringBuilder(MED_SLOTS[i] + "吃药: ");
+        for (String n : arr[i]) sb.append(n).append("、");
+        return sb.substring(0, sb.length() - 1);
+    }
+
+    private LinearLayout buildMedSection() {
+        LinearLayout sec = new LinearLayout(ctx);
+        sec.setOrientation(VERTICAL);
+        LinearLayout head = new LinearLayout(ctx);
+        head.setGravity(Gravity.CENTER_VERTICAL);
+        head.setPadding(0, dp(16), 0, dp(4));
+        TextView ti = new TextView(ctx);
+        ti.setText("💊 药物提醒(早8:00 / 中12:00 / 晚18:30)");
+        ti.setTextSize(14); ti.setTypeface(Typeface.DEFAULT_BOLD);
+        ti.setTextColor(fgMain());
+        head.addView(ti, new LayoutParams(0, -2, 1f));
+        sec.addView(head);
+        java.util.List<String>[] meds = medArr();
+        for (int i = 0; i < 3; i++) {
+            final int si = i;
+            LinearLayout row = new LinearLayout(ctx);
+            row.setGravity(Gravity.CENTER_VERTICAL);
+            row.setBackground(flatBg(cellBg(), 10));
+            row.setPadding(dp(12), dp(8), dp(12), dp(8));
+            LayoutParams rlp = new LayoutParams(-1, -2);
+            rlp.setMargins(0, dp(6), 0, 0);
+            TextView slot = new TextView(ctx);
+            slot.setText(MED_SLOTS[i]); slot.setTextSize(14); slot.setTypeface(Typeface.DEFAULT_BOLD);
+            slot.setTextColor(fgMain());
+            row.addView(slot);
+            TextView names = new TextView(ctx);
+            names.setTextSize(13); names.setTextColor(fgSub());
+            names.setText(meds[i].isEmpty() ? "未添加" : join(meds[i]));
+            names.setPadding(dp(12), 0, 0, 0);
+            row.addView(names, new LayoutParams(0, -2, 1f));
+            for (int j = meds[i].size() - 1; j >= 0; j--) {
+                final int di = j;
+                TextView del = new TextView(ctx);
+                del.setText("✕"); del.setTextSize(13);
+                del.setTextColor(0xFFFF7B8A);
+                del.setPadding(dp(10), dp(4), dp(4), dp(4));
+                del.setOnClickListener(new OnClickListener() { public void onClick(View v) {
+                    java.util.List<String>[] a = medArr();
+                    a[si].remove(di);
+                    saveMeds(a);
+                    rebuildMedsOnly();
+                }});
+                row.addView(del);
+            }
+            TextView add = new TextView(ctx);
+            add.setText("＋"); add.setTextSize(15);
+            add.setTextColor(Color.WHITE);
+            add.setGravity(Gravity.CENTER);
+            add.setBackground(flatBg(ACCENT, 8));
+            add.setPadding(dp(8), dp(2), dp(8), dp(2));
+            add.setOnClickListener(new OnClickListener() { public void onClick(View v) {
+                android.widget.EditText et = new android.widget.EditText(ctx);
+                et.setHint("药物名称");
+                et.setSingleLine(true);
+                new AlertDialog.Builder(ctx).setTitle("添加" + MED_SLOTS[si] + "药物").setView(et)
+                    .setPositiveButton("添加", new android.content.DialogInterface.OnClickListener() {
+                        public void onClick(android.content.DialogInterface dlg, int w) {
+                            String n = et.getText().toString().trim();
+                            if (n.isEmpty()) return;
+                            java.util.List<String>[] a = medArr();
+                            a[si].add(n);
+                            saveMeds(a);
+                            rebuildMedsOnly();
+                        }
+                    }).setNegativeButton("取消", null).show();
+            }});
+            row.addView(add);
+            sec.addView(row);
+        }
+        return sec;
+    }
+
+    private String join(java.util.List<String> list) {
+        StringBuilder sb = new StringBuilder();
+        for (String n : list) sb.append(n).append("、");
+        return sb.substring(0, sb.length() - 1);
+    }
+
+    private void rebuildMedsOnly() {
+        // 仅重建药物区: build()整体重建最简单
+        build();
+    }
+
 
     // ---------- holiday-cn ----------
     private void loadHolidaysAndBuildGrid() {
@@ -507,6 +654,20 @@ public class CalendarCardView extends LinearLayout {
                     refreshReminders();
                 }});
                 row.addView(ok);
+                if (o.optBoolean("daily")) {
+                    TextView off = new TextView(ctx);
+                    off.setText("关闭重复"); off.setTextSize(12);
+                    off.setTextColor(0xFFFFB74D);
+                    off.setPadding(dp(10), dp(6), dp(10), dp(6));
+                    off.setOnClickListener(new OnClickListener() { public void onClick(View v) {
+                        JSONArray arr2 = reminders();
+                        try { arr2.getJSONObject(idx).put("daily", false); } catch (Throwable ignored) { return; }
+                        saveReminders(arr2);
+                        Toast.makeText(ctx, "已改为仅一次", Toast.LENGTH_SHORT).show();
+                        refreshReminders();
+                    }});
+                    row.addView(off);
+                }
                 card.addView(row);
                 inner.addView(card, new LayoutParams(-1, android.view.ViewGroup.LayoutParams.WRAP_CONTENT));
             } catch (Throwable ignored) {}
