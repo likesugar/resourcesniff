@@ -62,11 +62,13 @@ public class CalendarActivity extends Activity {
         }
         col.addView(week);
 
-        // NCalendar 月视图(农历/节气/选中), 周/月上下滑动切换
-        com.necer.calendar.NCalendarView ncv = new com.necer.calendar.NCalendarView(this);
-        ncv.setPagerInitDate(java.time.LocalDate.now());
-        LinearLayout.LayoutParams nlp = new LinearLayout.LayoutParams(-1, (int) (300 * getResources().getDisplayMetrics().density));
-        col.addView(ncv, nlp);
+        // NCalendar 完整容器(周条+月视图+周翻页): 农历/节气/选中/月周切换
+        com.necer.calendar.NCalendar nc = new com.necer.calendar.NCalendar(this, null);
+        nc.setOnCalendarChangedListener(new com.necer.listener.OnCalendarChangedListener() {
+            @Override public void onCalendarChange(int year, int month, java.time.LocalDate localDate, com.necer.enumeration.DateChangeBehavior b2) {}
+        });
+        LinearLayout.LayoutParams nlp = new LinearLayout.LayoutParams(-1, (int) (310 * getResources().getDisplayMetrics().density));
+        col.addView(nc, nlp);
 
         LinearLayout host = new LinearLayout(this);
         host.setOrientation(LinearLayout.VERTICAL);
