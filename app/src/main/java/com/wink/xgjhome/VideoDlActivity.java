@@ -358,6 +358,7 @@ public class VideoDlActivity extends Activity {
                         if (dt.find()) tk.pid = dt.group(1);
                     }
                 } catch (Throwable ignored) {}
+                if (tk.pid == null) tk.pid = "t" + System.currentTimeMillis();
                 ensureEngine();
                 File cache = getExternalCacheDir() != null ? getExternalCacheDir() : getCacheDir();
                 File out = new File(cache, "vdl_%(id)s.%(ext)s");
@@ -451,7 +452,7 @@ public class VideoDlActivity extends Activity {
                                 try { Thread.sleep(500); } catch (Throwable e) { return; }
                             }
                         }}).start();
-                        com.yausername.youtubedl_android.YoutubeDL.getInstance().execute(req);
+                        com.yausername.youtubedl_android.YoutubeDL.getInstance().execute(req, tk.pid, false, null);
                         File done = null;
                         if (isBili) {
                             File vfile = null;
@@ -475,7 +476,7 @@ public class VideoDlActivity extends Activity {
                             java.util.Set<String> before2 = new java.util.HashSet<String>();
                             for (File f0 : cache.listFiles()) if (f0.getName().startsWith("vdl_")) before2.add(f0.getName());
                             before2.add(vfile.getName());
-                            com.yausername.youtubedl_android.YoutubeDL.getInstance().execute(ra);
+                            com.yausername.youtubedl_android.YoutubeDL.getInstance().execute(ra, tk.pid + "_a", false, null);
                             File afile = null;
                             for (File f : cache.listFiles())
                                 if (f.getName().startsWith("vdl_") && tk.pid != null && f.getName().contains(tk.pid)
@@ -748,18 +749,47 @@ public class VideoDlActivity extends Activity {
         if (tk.percent >= 0 && tk.percent < 100) {
             LinearLayout r4 = new LinearLayout(this);
             r4.setGravity(Gravity.CENTER_VERTICAL);
+            r4.setPadding(0, dp(6), 0, dp(2));
             TextView pauseBtn = new TextView(this);
             pauseBtn.setText("⏸ 暂停"); pauseBtn.setTextSize(15);
             pauseBtn.setTextColor(0xFFFFB74D);
-            pauseBtn.setPadding(0, dp(8), dp(20), dp(4));
+            pauseBtn.setGravity(Gravity.CENTER);
+            GradientDrawable pb0 = new GradientDrawable();
+            pb0.setCornerRadius(dp(14)); pb0.setColor(0xFF232A38);
+            pauseBtn.setBackground(pb0);
+            pauseBtn.setPadding(dp(12), dp(10), dp(12), dp(10));
             pauseBtn.setOnClickListener(new OnClickListener() { public void onClick(View v) {
                 tk.paused = true;
+                try { com.yausername.youtubedl_android.YoutubeDL.getInstance().destroyProcessById(tk.pid); } catch (Throwable ignored) {}
                 try {
                     String tok = tk.pid;
                     if (tok != null) Runtime.getRuntime().exec(new String[]{"pkill", "-f", tok});
                 } catch (Throwable ignored) {}
             }});
-            r4.addView(pauseBtn);
+            TextView stopBtn = new TextView(this);
+            stopBtn.setText("⏹ 停止"); stopBtn.setTextSize(15);
+            stopBtn.setTextColor(0xFFFF7B8A);
+            stopBtn.setGravity(Gravity.CENTER);
+            GradientDrawable sb0 = new GradientDrawable();
+            sb0.setCornerRadius(dp(14)); sb0.setColor(0xFF232A38);
+            stopBtn.setBackground(sb0);
+            stopBtn.setPadding(dp(12), dp(10), dp(12), dp(10));
+            stopBtn.setOnClickListener(new OnClickListener() { public void onClick(View v) {
+                tk.paused = true;
+                try { com.yausername.youtubedl_android.YoutubeDL.getInstance().destroyProcessById(tk.pid); } catch (Throwable ignored) {}
+                try {
+                    String tok = tk.pid;
+                    if (tok != null) Runtime.getRuntime().exec(new String[]{"pkill", "-f", tok});
+                } catch (Throwable ignored) {}
+                tk.percent = -2;
+                tk.err = "已手动停止";
+                saveTasks(VideoDlActivity.this);
+                runUi(new Runnable() { public void run() { render(); }});
+            }});
+            r4.addView(pauseBtn, new LinearLayout.LayoutParams(0, -2, 1f));
+            LinearLayout.LayoutParams slp = new LinearLayout.LayoutParams(0, -2, 1f);
+            slp.leftMargin = dp(10);
+            r4.addView(stopBtn, slp);
             card.addView(r4, new LinearLayout.LayoutParams(-1, -2));
         }
         if (tk.percent == -3) {
@@ -768,12 +798,16 @@ public class VideoDlActivity extends Activity {
             TextView resumeBtn = new TextView(this);
             resumeBtn.setText("▶ 继续下载"); resumeBtn.setTextSize(15);
             resumeBtn.setTextColor(0xFF9CCC65);
-            resumeBtn.setPadding(0, dp(8), dp(20), dp(4));
+            resumeBtn.setGravity(Gravity.CENTER);
+            GradientDrawable rb0 = new GradientDrawable();
+            rb0.setCornerRadius(dp(14)); rb0.setColor(0xFF232A38);
+            resumeBtn.setBackground(rb0);
+            resumeBtn.setPadding(dp(12), dp(10), dp(12), dp(10));
             resumeBtn.setOnClickListener(new OnClickListener() { public void onClick(View v) {
                 tk.percent = 0; tk.paused = false;
                 runTask(tk);
             }});
-            r4.addView(resumeBtn);
+            r4.addView(resumeBtn, new LinearLayout.LayoutParams(-1, -2));
             card.addView(r4, new LinearLayout.LayoutParams(-1, -2));
         }
         LinearLayout r3 = new LinearLayout(this);
