@@ -459,6 +459,13 @@ public class VideoDlActivity extends Activity {
                                 if (f.getName().startsWith("vdl_") && !before.contains(f.getName()) && f.length() > 1024) news.add(f);
                             File vfile = null;
                             for (File f : news) if (vfile == null || f.lastModified() > vfile.lastModified()) vfile = f;
+                            if (vfile == null) {
+                                // 无新文件: 可能之前已下完, 找该任务已有成品
+                                for (File f : cache.listFiles())
+                                    if (f.getName().startsWith("vdl_") && tk.pid != null && f.getName().contains(tk.pid)
+                                        && !f.getName().endsWith(".part") && f.length() > 1024)
+                                        if (vfile == null || f.lastModified() > vfile.lastModified()) vfile = f;
+                            }
                             if (vfile == null) throw new Exception("B站视频流下载失败");
                             // 音频段
                             com.yausername.youtubedl_android.YoutubeDLRequest ra =
