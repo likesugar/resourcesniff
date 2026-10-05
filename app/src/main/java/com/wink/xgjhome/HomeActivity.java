@@ -16,6 +16,24 @@ import android.widget.TextView;
 public class HomeActivity extends Activity {
 
     // ---------- 主题（纯黑 / 冰蓝） ----------
+    private CalendarCardView calCard;
+
+    private void setupCalendar() {
+        try {
+            android.view.ViewGroup host = (android.view.ViewGroup) findViewById(R.id.calHost);
+            if (host.getChildCount() == 0) {
+                calCard = new CalendarCardView(this);
+                host.addView(calCard, new android.view.ViewGroup.LayoutParams(-1, -2));
+            }
+        } catch (Throwable ignored) {}
+    }
+
+    private final android.os.Handler calTick = new android.os.Handler();
+    private final Runnable calTickRun = new Runnable() { public void run() {
+        try { if (calCard != null) calCard.tick(); } catch (Throwable ignored) {}
+        calTick.postDelayed(this, 30_000);
+    }};
+
     private void applyTheme() {
         boolean dark = getSharedPreferences("settings", MODE_PRIVATE).getBoolean("dark", false);
         findViewById(R.id.toolRoot).setBackgroundColor(dark ? 0xFF000000 : 0xFFEEF4FF);
@@ -95,6 +113,7 @@ public class HomeActivity extends Activity {
             }
         });
         setContentView(R.layout.activity_toolbox);
+        setupCalendar();
         applyTheme();
         applyImmersive();
 
@@ -147,6 +166,13 @@ public class HomeActivity extends Activity {
     @Override
     protected void onResume() {
         super.onResume();
+        calTick.post(calTickRun);
+    }
+
+    @Override
+    protected void onPause() {
+        super.onPause();
+        calTick.removeCallbacks(calTickRun);
     }
 
     /** 🗄️ 局域网共享弹窗：开关 + 电脑访问地址 */

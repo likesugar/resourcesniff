@@ -97,6 +97,15 @@
                     </LinearLayout>
                 </LinearLayout>
 
+               <LinearLayout android:tag="card" android:id="@+id/calendarCard"
+                    android:layout_width="match_parent" android:layout_height="wrap_content"
+                    android:layout_marginTop="14dp"
+                    android:background="@drawable/bg_card" android:orientation="vertical">
+                    <LinearLayout android:id="@+id/calHost"
+                        android:layout_width="match_parent" android:layout_height="wrap_content"
+                        android:orientation="vertical"/>
+               </LinearLayout>
+
                <LinearLayout android:tag="card" android:id="@+id/cardShortcut"
                     android:layout_width="match_parent" android:layout_height="wrap_content"
                     android:layout_marginTop="14dp"
