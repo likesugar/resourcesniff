@@ -501,6 +501,14 @@ public class VideoDlActivity extends Activity {
                         runUi(new Runnable() { public void run() { render(); }});
                         return;  // 成功收工
                     } catch (Throwable e) {
+                        String em = e.getMessage() == null ? "" : e.getMessage();
+                        if (em.contains("416")) {
+                            // 断点分片与远端Range不匹配: 清.part重试本策略一次
+                            try {
+                                for (File f : cache.listFiles()) if (f.getName().endsWith(".part")) f.delete();
+                            } catch (Throwable ignored) {}
+                            si--; continue;
+                        }
                         if (tk.paused) {
                             tk.percent = -3;   // 用户暂停
                             runUi(new Runnable() { public void run() { render(); }});
