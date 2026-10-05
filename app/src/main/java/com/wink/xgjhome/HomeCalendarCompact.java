@@ -182,7 +182,7 @@ public class HomeCalendarCompact extends LinearLayout {
             SimpleDateFormat df = new SimpleDateFormat("yyyy-MM-dd", Locale.US);
             Date now = new Date();
             String today = df.format(now);
-            dateText.setText(new SimpleDateFormat("M月d日 EEEE", Locale.CHINA).format(now));
+            dateText.setText("日历");
             // 节假日标记(读缓存)
             String hol = "";
             try {
