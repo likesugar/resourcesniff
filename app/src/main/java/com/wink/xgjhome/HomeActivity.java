@@ -130,6 +130,7 @@ public class HomeActivity extends Activity {
         setContentView(R.layout.activity_toolbox);
         setupCalendar();
         applyTheme();
+        if (compact != null) compact.setDark(getSharedPreferences("settings", MODE_PRIVATE).getBoolean("dark", false));
         applyImmersive();
 
         findViewById(R.id.themeToggle).setOnClickListener(new View.OnClickListener() {

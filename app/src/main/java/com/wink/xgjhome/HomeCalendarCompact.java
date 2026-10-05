@@ -23,6 +23,7 @@ import java.util.Locale;
 public class HomeCalendarCompact extends LinearLayout {
 
     private final Activity act;
+    private boolean dark;
     private TextView dateText, holidayText, signText, remindText;
     private LinearLayout signBtn;
     private LinearLayout medHost;
@@ -34,7 +35,7 @@ public class HomeCalendarCompact extends LinearLayout {
         int pad = (int) (16 * getResources().getDisplayMetrics().density);
         setPadding(pad, pad, pad, pad);
 
-        boolean dark = a.getSharedPreferences("settings", 0).getBoolean("dark", false);
+        dark = a.getSharedPreferences("settings", 0).getBoolean("dark", false);
         int fgMain = dark ? Color.WHITE : 0xFF1F2329;
         int fgSub = dark ? 0xFF9AA3AE : 0xFF8A94A6;
 
@@ -177,8 +178,21 @@ public class HomeCalendarCompact extends LinearLayout {
         } catch (Throwable ignored) {}
     }
 
+    public void setDark(boolean d) {
+        dark = d;
+        int fgMain = d ? Color.WHITE : 0xFF1F2329;
+        int fgSub = d ? 0xFF9AA3AE : 0xFF8A94A6;
+        if (dateText != null) dateText.setTextColor(fgMain);
+        if (holidayText != null) holidayText.setTextColor(fgSub);
+        if (signText != null) signText.setTextColor(d ? 0xFFB4C5FF : 0xFF315CDE);
+        if (remindText != null) remindText.setTextColor(fgSub);
+        if (medHost != null) buildMedQuick();
+        refresh();
+    }
+
     public void refresh() {
         try {
+            dark = act.getSharedPreferences("settings", 0).getBoolean("dark", false);
             SimpleDateFormat df = new SimpleDateFormat("yyyy-MM-dd", Locale.US);
             Date now = new Date();
             String today = df.format(now);
