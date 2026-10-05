@@ -432,6 +432,10 @@ public class VideoDlActivity extends Activity {
                         req.addOption("--user-agent", st[0]);
                         req.addOption("--add-headers", "Referer: " + ref);
                         if (st[2].equals("1")) req.addOption("--cookies", cookies().getAbsolutePath());
+                        if (tk.url.contains("youtube.com") || tk.url.contains("youtu.be")) {
+                            String[] clients = {"tv,web_safari", "tv_embedded,web_safari", "web_embedded", "mweb"};
+                            req.addOption("--extractor-args", "youtube:player_client=" + clients[si % clients.length]);
+                        }
                     if (tk.gen != myGen) return;
                         req.addOption("-o", out.getAbsolutePath());
                         req.addOption("--restrict-filenames");
@@ -604,6 +608,19 @@ public class VideoDlActivity extends Activity {
                 String[] kv = kv0.split("=", 2);
                 if (kv.length == 2 && (kv[0].startsWith("buvid") || kv[0].equals("b_nut")))
                     pw.println(".bilibili.com\tTRUE\t/\tTRUE\t0\t" + kv[0] + "\t" + kv[1]);
+            }
+        } catch (Throwable ignored) {}
+        // youtube 预热(匿名 Cookie: VISITOR_INFO1_LIVE/YSC)
+        try {
+            java.net.HttpURLConnection c = (java.net.HttpURLConnection) new java.net.URL("https://www.youtube.com/").openConnection();
+            c.setRequestProperty("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36");
+            c.setConnectTimeout(8000); c.setReadTimeout(8000);
+            c.getInputStream();
+            for (String sc : c.getHeaderFields().getOrDefault("set-cookie", java.util.Collections.<String>emptyList())) {
+                String kv0 = sc.split(";", 2)[0];
+                String[] kv = kv0.split("=", 2);
+                if (kv.length == 2 && kv[0].length() > 0)
+                    pw.println(".youtube.com\tTRUE\t/\tTRUE\t0\t" + kv[0] + "\t" + kv[1]);
             }
         } catch (Throwable ignored) {}
         // douyin 域(原生 GET 首页拿 ttwid 等匿名 Cookie)
