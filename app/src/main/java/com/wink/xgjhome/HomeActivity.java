@@ -21,11 +21,26 @@ public class HomeActivity extends Activity {
     private void setupCalendar() {
         try {
             android.view.ViewGroup host = (android.view.ViewGroup) findViewById(R.id.calHost);
+            if (host == null) throw new IllegalStateException("calHost not found");
             if (host.getChildCount() == 0) {
                 calCard = new CalendarCardView(this);
                 host.addView(calCard, new android.view.ViewGroup.LayoutParams(-1, -2));
             }
-        } catch (Throwable ignored) {}
+        } catch (Throwable t) {
+            try {
+                android.view.ViewGroup host = (android.view.ViewGroup) findViewById(R.id.calHost);
+                if (host != null && host.getChildCount() == 0) {
+                    TextView err = new TextView(this);
+                    err.setText("日历加载失败: " + t);
+                    err.setTextColor(0xFFFF7B8A); err.setTextSize(13);
+                    err.setPadding(20, 20, 20, 20);
+                    host.addView(err);
+                }
+                java.io.FileWriter fw = new java.io.FileWriter(new java.io.File(getExternalFilesDir(null), "网页诊断.txt"), true);
+                fw.write("\n==== CAL ERR " + new java.util.Date() + " ====\n" + android.util.Log.getStackTraceString(t) + "\n");
+                fw.close();
+            } catch (Throwable ignored) {}
+        }
     }
 
     private final android.os.Handler calTick = new android.os.Handler();
