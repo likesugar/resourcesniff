@@ -365,8 +365,14 @@ public class VideoDlActivity extends Activity {
                 if (tk.pid == null) tk.pid = "t" + System.currentTimeMillis();
                 final int myGen = ++tk.gen;
                 tk.r416 = 0;
-                // YouTube: 先用后台WebView建立会话(JS/consent/风控), Cookie再交yt-dlp
+                // YouTube: 先IOS/VISIONOS直连提取(免PO Token), 失败再WebView清单, 再yt-dlp
                 if (tk.url.contains("youtube.com") || tk.url.contains("youtu.be")) {
+                    try {
+                        if (ytDirectDownload(tk)) {
+                            runUi(new Runnable() { public void run() { render(); }});
+                            return;  // 直连路径完成
+                        }
+                    } catch (Throwable ignored) {}
                     final java.util.concurrent.CountDownLatch latch = new java.util.concurrent.CountDownLatch(1);
                     runUi(new Runnable() { public void run() {
                         final android.webkit.WebView wv = new android.webkit.WebView(VideoDlActivity.this);
@@ -407,6 +413,7 @@ public class VideoDlActivity extends Activity {
                             if (murl.startsWith("http")) {
                                 File cacheDir = getExternalCacheDir() != null ? getExternalCacheDir() : getCacheDir();
                                 File out = new File(cacheDir, "vdl_" + tk.pid + "_w.mp4");
+                                tk.percent = 0; runUi(new Runnable() { public void run() { render(); }});
                                 String args = "-y " + (isDash ? "" : "") + "-i \"" + murl + "\" -c copy -movflags +faststart \"" + out.getAbsolutePath() + "\"";
                                 com.arthenica.ffmpegkit.FFmpegSession st = com.arthenica.ffmpegkit.FFmpegKit.executeWithArguments(
                                     com.arthenica.ffmpegkit.FFmpegKitConfig.parseArguments(args));
@@ -759,8 +766,124 @@ public class VideoDlActivity extends Activity {
         } catch (Throwable ignored) {}
     }
 
+    private static final String[][] YT_PROFILES = {
+        // {clientName, clientVersion, deviceMake, deviceModel, osName, osVersion, userAgent, clientNameId}
+        {"VISIONOS", "1.02", "Apple", "RealityDevice17,1", "visionOS", "26.5.23O471",
+         "Mozilla/5.0 (Macintosh; Intel Mac OS X 15_7_3) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.0 Safari/605.1.15", "101"},
+        {"IOS", "21.26.4", "Apple", "iPhone16,2", "iPhone", "18.3.2.22D82",
+         "com.google.ios.youtube/21.26.4 (iPhone16,2; U; CPU iOS 18_3_2 like Mac OS X;)", "5"}
+    };
+
+    /** DBdown式直连: innertube player API取直链, 双流下载+合并. 成功返回true */
+    private boolean ytDirectDownload(final Task tk) throws Exception {
+        final String vid = videoId(tk.url);
+        if (vid.isEmpty()) return false;
+        JSONObject pr = null; String ua = null;
+        for (String[] prof : YT_PROFILES) {
+            try {
+                JSONObject client = new JSONObject()
+                    .put("clientName", prof[0]).put("clientVersion", prof[1])
+                    .put("deviceMake", prof[2]).put("deviceModel", prof[3])
+                    .put("osName", prof[4]).put("osVersion", prof[5])
+                    .put("hl", "en").put("gl", "US");
+                JSONObject body = new JSONObject()
+                    .put("videoId", vid)
+                    .put("context", new JSONObject().put("client", client))
+                    .put("contentCheckOk", true).put("racyCheckOk", true);
+                java.net.HttpURLConnection c = (java.net.HttpURLConnection) new java.net.URL(
+                    "https://youtubei.googleapis.com/youtubei/v1/player?prettyPrint=false").openConnection();
+                c.setRequestMethod("POST");
+                c.setDoOutput(true);
+                c.setRequestProperty("Content-Type", "application/json");
+                c.setRequestProperty("User-Agent", prof[6]);
+                c.setRequestProperty("X-YouTube-Client-Name", prof[7]);
+                c.setRequestProperty("X-YouTube-Client-Version", prof[1]);
+                c.setConnectTimeout(12000); c.setReadTimeout(15000);
+                java.io.OutputStream os = c.getOutputStream();
+                os.write(body.toString().getBytes("UTF-8")); os.close();
+                if (c.getResponseCode() != 200) continue;
+                java.io.ByteArrayOutputStream bo = new java.io.ByteArrayOutputStream();
+                java.io.InputStream in = c.getInputStream();
+                byte[] bb = new byte[8192]; int r;
+                while ((r = in.read(bb)) > 0) bo.write(bb, 0, r);
+                in.close();
+                JSONObject resp = new JSONObject(bo.toString("UTF-8"));
+                if (!"OK".equals(resp.optJSONObject("playabilityStatus") == null ? "" :
+                    resp.optJSONObject("playabilityStatus").optString("status"))) continue;
+                pr = resp; ua = prof[6];
+                break;
+            } catch (Throwable e) { continue; }
+        }
+        if (pr == null) return false;
+        JSONObject sd = pr.optJSONObject("streamingData");
+        if (sd == null) return false;
+        org.json.JSONArray fmts = sd.optJSONArray("adaptiveFormats");
+        if (fmts == null) return false;
+        JSONObject bestV = null, bestA = null;
+        long bv = 0, ba = 0;
+        for (int i = 0; i < fmts.length(); i++) {
+            JSONObject f = fmts.getJSONObject(i);
+            String url = f.optString("url", "");
+            if (url.isEmpty()) continue;   // SABR-only 跳过
+            String mime = f.optString("mimeType", "");
+            long br = f.optLong("bitrate", 0);
+            if (mime.startsWith("video/mp4") && br > bv) { bv = br; bestV = f; }
+            else if (mime.startsWith("audio/mp4") && br > ba) { ba = br; bestA = f; }
+        }
+        if (bestV == null || !bestV.has("url")) return false;
+        File cacheDir = getExternalCacheDir() != null ? getExternalCacheDir() : getCacheDir();
+        File vf = new File(cacheDir, "vdl_" + tk.pid + "_yv.mp4");
+        File af = new File(cacheDir, "vdl_" + tk.pid + "_ya.m4a");
+        long total = bestV.optLong("contentLength", 0) + bestA.optLong("contentLength", 0);
+        tk.expect = total; tk.percent = 0;
+        runUi(new Runnable() { public void run() { render(); }});
+        // 下载
+        if (!dlUrl(bestV.optString("url"), ua, vf, tk, bestV.optLong("contentLength", 0), 0)) return false;
+        if (bestA != null && bestA.has("url") && !dlUrl(bestA.optString("url"), ua, af, tk, bestA.optLong("contentLength", 0), bestV.optLong("contentLength", 0))) return false;
+        // 合并
+        File out = new File(cacheDir, "vdl_" + tk.pid + "_y.mp4");
+        String args;
+        if (af.exists() && af.length() > 1024)
+            args = "-y -i \"" + vf.getAbsolutePath() + "\" -i \"" + af.getAbsolutePath() + "\" -c copy -movflags +faststart \"" + out.getAbsolutePath() + "\"";
+        else
+            args = "-y -i \"" + vf.getAbsolutePath() + "\" -c copy -movflags +faststart \"" + out.getAbsolutePath() + "\"";
+        com.arthenica.ffmpegkit.FFmpegSession st = com.arthenica.ffmpegkit.FFmpegKit.executeWithArguments(
+            com.arthenica.ffmpegkit.FFmpegKitConfig.parseArguments(args));
+        String rc = st.getReturnCode().toString();
+        if (!"0".equals(rc) || !out.exists() || out.length() < 1024) return false;
+        tk.percent = 100;
+        tk.title = pr.optJSONObject("videoDetails") == null ? ("YouTube " + vid)
+            : pr.optJSONObject("videoDetails").optString("title", "YouTube " + vid);
+        tk.size = fmtMB(out.length());
+        tk.saved = store(out, safeName(tk.title));
+        tk.out = out;
+        vf.delete(); if (af.exists()) af.delete();
+        return true;
+    }
+
+    private boolean dlUrl(String url, String ua, File out, Task tk, long contentLen, long baseBytes) throws Exception {
+        java.net.HttpURLConnection c = (java.net.HttpURLConnection) new java.net.URL(url).openConnection();
+        c.setRequestProperty("User-Agent", ua);
+        c.setConnectTimeout(15000); c.setReadTimeout(30000);
+        long expect = contentLen;
+        java.io.InputStream in = c.getInputStream();
+        java.io.FileOutputStream fo = new java.io.FileOutputStream(out);
+        byte[] b = new byte[65536]; int r; long done = 0;
+        while ((r = in.read(b)) > 0) {
+            fo.write(b, 0, r); done += r;
+            if (tk.expect > 0) {
+                int pc = (int)((100L * (baseBytes + done)) / tk.expect);
+                if (pc > 99) pc = 99; if (pc < 1) pc = 1;
+                if (pc > tk.percent) { tk.percent = pc; tk.size = fmtMB(baseBytes + done);
+                    runUi(new Runnable() { public void run() { render(); }}); }
+            }
+        }
+        fo.close(); in.close();
+        return out.length() > 1024;
+    }
+
     private static String videoId(String u) {
-        java.util.regex.Matcher m = java.util.regex.Pattern.compile("(?:v=|youtu[.]be/|shorts/|/watch.*?v=)([A-Za-z0-9_-]{6,20})").matcher(u);
+        java.util.regex.Matcher m = java.util.regex.Pattern.compile("(?:v=|youtu[.]be/|shorts/|live/|/watch.*?v=)([A-Za-z0-9_-]{6,20})").matcher(u);
         return m.find() ? m.group(1) : "";
     }
 
