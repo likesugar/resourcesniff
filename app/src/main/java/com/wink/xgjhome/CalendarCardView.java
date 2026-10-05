@@ -266,7 +266,7 @@ public class CalendarCardView extends LinearLayout {
         LinearLayout row = null;
         for (int day = 1; day <= maxDay; day++) {
             int pos = firstDow + day - 1;
-            if (pos % 7 == 0) { row = new LinearLayout(ctx); gridHost.addView(row, new LayoutParams(-1, -2)); }
+            if (row == null || pos % 7 == 0) { row = new LinearLayout(ctx); gridHost.addView(row, new LayoutParams(-1, -2)); }
             cal.set(year, month, day);
             String ds = df.format(cal.getTime());
             JSONObject hol = holidays.get(ds);
