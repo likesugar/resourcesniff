@@ -1,6 +1,7 @@
 package com.wink.xgjhome;
 
 import android.app.Activity;
+import android.widget.Toast;
 import android.graphics.Color;
 import android.graphics.Typeface;
 import android.os.Bundle;
@@ -18,6 +19,7 @@ public class CalendarActivity extends Activity {
     @Override
     protected void onCreate(Bundle b) {
         super.onCreate(b);
+        try {
         boolean dark = getSharedPreferences("settings", MODE_PRIVATE).getBoolean("dark", false);
         FrameLayout root = new FrameLayout(this);
         root.setBackgroundColor(dark ? 0xFF000000 : 0xFFEEF4FF);
@@ -75,6 +77,16 @@ public class CalendarActivity extends Activity {
         col.addView(host, lp);
 
         setContentView(root);
+        } catch (Throwable t) {
+            try {
+                java.io.File dir = getExternalFilesDir(null) != null ? getExternalFilesDir(null).getParentFile() : getFilesDir();
+                java.io.FileWriter fw = new java.io.FileWriter(new java.io.File(dir, "网页诊断.txt"), true);
+                fw.write("\n==== CAL ACT ERR " + new java.util.Date() + " ====\n" + android.util.Log.getStackTraceString(t) + "\n");
+                fw.close();
+            } catch (Throwable ignored) {}
+            Toast.makeText(this, "日历初始化失败: " + t.getClass().getSimpleName(), Toast.LENGTH_LONG).show();
+            finish();
+        }
     }
 
     @Override
