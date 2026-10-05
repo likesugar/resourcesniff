@@ -184,6 +184,59 @@ public class CalendarCardView extends LinearLayout {
         return t;
     }
 
+    // 当天提醒弹窗
+    private void showDayReminders(final String date) {
+        JSONArray arr = reminders();
+        SimpleDateFormat df = new SimpleDateFormat("yyyy-MM-dd", Locale.US);
+        LinearLayout box = new LinearLayout(ctx);
+        box.setOrientation(VERTICAL);
+        int p = dp(18);
+        box.setPadding(p, dp(10), p, 0);
+        int cnt = 0;
+        for (int i = 0; i < arr.length(); i++) {
+            try {
+                final JSONObject o = arr.getJSONObject(i);
+                if (!date.equals(df.format(new Date(o.optLong("ts"))))) continue;
+                cnt++;
+                LinearLayout row = new LinearLayout(ctx);
+                row.setGravity(Gravity.CENTER_VERTICAL);
+                row.setBackground(flatBg(cellBg(), 10));
+                row.setPadding(dp(12), dp(8), dp(12), dp(8));
+                LayoutParams rlp = new LayoutParams(-1, -2);
+                rlp.setMargins(0, dp(6), 0, 0);
+                TextView t = new TextView(ctx);
+                String when = new SimpleDateFormat("HH:mm", Locale.US).format(new Date(o.optLong("ts")));
+                t.setText(when + "  " + o.optString("t") + (o.optBoolean("daily") ? " · 每天" : ""));
+                t.setTextSize(13); t.setTextColor(fgMain());
+                row.addView(t, new LayoutParams(0, -2, 1f));
+                TextView ok = new TextView(ctx);
+                ok.setText("确认"); ok.setTextSize(13);
+                ok.setTextColor(Color.WHITE);
+                ok.setBackground(flatBg(ACCENT, 8));
+                ok.setPadding(dp(12), dp(6), dp(12), dp(6));
+                final int idx = i;
+                ok.setOnClickListener(new OnClickListener() { public void onClick(View v) {
+                    JSONArray arr2 = reminders();
+                    JSONArray out = new JSONArray();
+                    try { for (int j = 0; j < arr2.length(); j++) if (j != idx) out.put(arr2.getJSONObject(j)); } catch (Throwable ignored) {}
+                    saveReminders(out);
+                    Toast.makeText(ctx, "已完成", Toast.LENGTH_SHORT).show();
+                    buildGrid();
+                }});
+                row.addView(ok);
+                box.addView(row, rlp);
+            } catch (Throwable ignored) {}
+        }
+        if (cnt == 0) {
+            TextView e = new TextView(ctx);
+            e.setText("这一天没有提醒");
+            e.setTextSize(13); e.setTextColor(fgSub());
+            box.addView(e);
+        }
+        new AlertDialog.Builder(ctx).setTitle(date).setView(box)
+            .setPositiveButton("关闭", null).show();
+    }
+
     // ---------- holiday-cn ----------
     private void loadHolidaysAndBuildGrid() {
         monthLabel.setText(year + "年" + (month + 1) + "月");
@@ -297,6 +350,8 @@ public class CalendarCardView extends LinearLayout {
             else if (weekend) num.setTextColor(dark ? 0xFFC77 : RED);
             else num.setTextColor(fgMain());
             cell.addView(num);
+            final String fds = ds;
+            cell.setOnClickListener(new OnClickListener() { public void onClick(View v) { showDayReminders(fds); }});
 
             String mark = null; int markColor = fgSub();
             if (hol != null) {
@@ -374,50 +429,63 @@ public class CalendarCardView extends LinearLayout {
     private void refreshReminders() {
         remindList.removeAllViews();
         JSONArray arr = reminders();
+        if (arr.length() == 0) {
+            TextView e = new TextView(ctx);
+            e.setText("暂无提醒，点右上角＋新建");
+            e.setTextSize(13); e.setTextColor(fgSub());
+            e.setPadding(dp(12), dp(10), dp(12), dp(10));
+            remindList.addView(e);
+            return;
+        }
+        android.widget.ScrollView sv = new android.widget.ScrollView(ctx);
+        sv.setVerticalScrollBarEnabled(false);
+        LinearLayout inner = new LinearLayout(ctx);
+        inner.setOrientation(VERTICAL);
+        int rowH = dp(56);
+        sv.addView(inner, new LayoutParams(-1, android.view.ViewGroup.LayoutParams.WRAP_CONTENT));
         for (int i = 0; i < arr.length(); i++) {
             try {
                 final JSONObject o = arr.getJSONObject(i);
+                final int idx = i;
+                // 卡片框
+                LinearLayout card = new LinearLayout(ctx);
+                card.setOrientation(VERTICAL);
+                card.setBackground(flatBg(cellBg(), 12));
+                card.setPadding(dp(14), dp(10), dp(14), dp(10));
+                LayoutParams clp = new LayoutParams(-1, -2);
+                clp.setMargins(0, dp(6), 0, 0);
+                // 行1: 内容
                 LinearLayout row = new LinearLayout(ctx);
                 row.setGravity(Gravity.CENTER_VERTICAL);
-                row.setBackground(flatBg(cellBg(), 10));
-                row.setPadding(dp(12), dp(8), dp(12), dp(8));
-                LayoutParams rlp = new LayoutParams(-1, -2);
-                rlp.setMargins(0, dp(4), 0, 0);
                 TextView t = new TextView(ctx);
                 String when = new SimpleDateFormat("MM-dd HH:mm", Locale.US).format(new Date(o.optLong("ts")));
                 t.setText(o.optString("t") + (o.optBoolean("daily") ? " · 每天" : "") + "\n" + when);
                 t.setTextSize(13); t.setTextColor(fgMain());
                 row.addView(t, new LayoutParams(0, -2, 1f));
-                TextView del = new TextView(ctx);
-                del.setText("✕"); del.setTextSize(14);
-                del.setTextColor(fgSub());
-                del.setPadding(dp(10), dp(6), dp(6), dp(6));
-                del.setOnClickListener(new OnClickListener() { public void onClick(View v) {
+                // 确认按钮
+                TextView ok = new TextView(ctx);
+                ok.setText("✓ 确认"); ok.setTextSize(13);
+                ok.setTextColor(Color.WHITE);
+                ok.setGravity(Gravity.CENTER);
+                ok.setBackground(flatBg(ACCENT, 10));
+                ok.setPadding(dp(14), dp(7), dp(14), dp(7));
+                ok.setOnClickListener(new OnClickListener() { public void onClick(View v) {
                     JSONArray arr2 = reminders();
                     JSONArray out = new JSONArray();
-                    try {
-                        for (int j = 0; j < arr2.length(); j++) if (j != Integer.parseInt(o.optString("_idx", "-1"))) out.put(arr2.getJSONObject(j));
-                    } catch (Throwable ignored) {}
+                    try { for (int j = 0; j < arr2.length(); j++) if (j != idx) out.put(arr2.getJSONObject(j)); } catch (Throwable ignored) {}
                     saveReminders(out);
+                    Toast.makeText(ctx, "已完成", Toast.LENGTH_SHORT).show();
                     refreshReminders();
                 }});
-                row.addView(del);
-                // 传递索引供删除
-                row.setTag(String.valueOf(i));
-                del.setTag(row);
-                final int idx = i;
-                del.setOnClickListener(new OnClickListener() { public void onClick(View v) {
-                    JSONArray arr2 = reminders();
-                    JSONArray out = new JSONArray();
-                    try {
-                        for (int j = 0; j < arr2.length(); j++) if (j != idx) out.put(arr2.getJSONObject(j));
-                    } catch (Throwable ignored) {}
-                    saveReminders(out);
-                    refreshReminders();
-                }});
-                remindList.addView(row, rlp);
+                row.addView(ok);
+                card.addView(row);
+                inner.addView(card, new LayoutParams(-1, android.view.ViewGroup.LayoutParams.WRAP_CONTENT));
             } catch (Throwable ignored) {}
         }
+        // 超过4条限高可滑动
+        int maxH = rowH * 4 + dp(24);
+        LayoutParams svlp = new LayoutParams(-1, Math.min(maxH, android.view.ViewGroup.LayoutParams.WRAP_CONTENT));
+        remindList.addView(sv, svlp);
     }
 
     private void showAddReminder() {
@@ -466,7 +534,7 @@ public class CalendarCardView extends LinearLayout {
         }});
 
         new AlertDialog.Builder(ctx)
-            .setTitle("新建提醒")
+            .setTitle("新建日程")
             .setView(box)
             .setPositiveButton("确定", new android.content.DialogInterface.OnClickListener() {
                 public void onClick(android.content.DialogInterface dlg, int w) {
@@ -495,41 +563,59 @@ public class CalendarCardView extends LinearLayout {
         try {
             JSONArray arr = reminders();
             long now = System.currentTimeMillis();
-            JSONArray out = new JSONArray();
             boolean changed = false;
             for (int i = 0; i < arr.length(); i++) {
                 JSONObject o = arr.getJSONObject(i);
                 long ts = o.optLong("ts");
-                if (ts <= now) {
-                    notifyUser(o.optString("t"));
-                    if (o.optBoolean("daily")) {
-                        Calendar c = Calendar.getInstance();
-                        c.setTimeInMillis(ts); c.add(Calendar.DATE, 1);
-                        o.put("ts", c.getTimeInMillis());
-                        out.put(o);
-                    }
+                if (ts <= now && !o.optBoolean("fired")) {
+                    notifyUser(o.optString("t"), ts, o.optBoolean("daily"));
+                    o.put("fired", true);   // 待确认: 保留到用户确认
                     changed = true;
-                } else out.put(o);
+                }
             }
-            if (changed) { saveReminders(out); refreshReminders(); }
+            if (changed) { saveReminders(arr); refreshReminders(); }
         } catch (Throwable ignored) {}
     }
 
-    private void notifyUser(String text) {
+    public static void confirmById(Context c, long id, boolean daily) {
+        try {
+            JSONArray arr = new JSONArray(c.getSharedPreferences("cal", 0).getString("reminders", "[]"));
+            JSONArray out = new JSONArray();
+            for (int i = 0; i < arr.length(); i++) {
+                JSONObject o = arr.getJSONObject(i);
+                if (!daily && o.optLong("ts") == id) continue;
+                if (daily && o.optLong("ts") == id) {
+                    Calendar cc = Calendar.getInstance();
+                    cc.setTimeInMillis(id); cc.add(Calendar.DATE, 1);
+                    o.put("ts", cc.getTimeInMillis());
+                    o.put("fired", false);
+                }
+                out.put(o);
+            }
+            c.getSharedPreferences("cal", 0).edit().putString("reminders", out.toString()).apply();
+        } catch (Throwable ignored) {}
+    }
+
+    private void notifyUser(String text, long id, boolean daily) {
         try {
             NotificationManager nm = (NotificationManager) ctx.getSystemService(Context.NOTIFICATION_SERVICE);
             if (Build.VERSION.SDK_INT >= 26) {
                 NotificationChannel ch = new NotificationChannel("remind", "提醒", NotificationManager.IMPORTANCE_HIGH);
                 nm.createNotificationChannel(ch);
             }
+            Intent ci = new Intent(ctx, ConfirmReceiver.class);
+            ci.putExtra("id", id); ci.putExtra("daily", daily);
+            PendingIntent pi = PendingIntent.getBroadcast(ctx, (int) (id & 0x7fffffff), ci,
+                PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
             Notification.Builder b = Build.VERSION.SDK_INT >= 26
                 ? new Notification.Builder(ctx, "remind")
                 : new Notification.Builder(ctx);
             b.setSmallIcon(android.R.drawable.ic_dialog_info)
              .setContentTitle("提醒")
              .setContentText(text)
+             .addAction(new Notification.Action.Builder(null, "确认", pi).build())
              .setAutoCancel(true);
-            nm.notify((int) System.currentTimeMillis(), b.build());
+            nm.notify((int) (id & 0x7fffffff), b.build());
         } catch (Throwable ignored) {}
     }
 }
