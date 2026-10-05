@@ -774,6 +774,15 @@ public class VideoDlActivity extends Activity {
          "com.google.ios.youtube/21.26.4 (iPhone16,2; U; CPU iOS 18_3_2 like Mac OS X;)", "5"}
     };
 
+    private void ytDiag(String m) {
+        try {
+            java.io.File dir = getExternalFilesDir(null) != null ? getExternalFilesDir(null).getParentFile() : getFilesDir();
+            java.io.FileWriter fw = new java.io.FileWriter(new java.io.File(dir, "网页诊断.txt"), true);
+            fw.write("YTDIRECT " + m + "\n");
+            fw.close();
+        } catch (Throwable ignored) {}
+    }
+
     /** DBdown式直连: innertube player API取直链, 双流下载+合并. 成功返回true */
     private boolean ytDirectDownload(final Task tk) throws Exception {
         final String vid = videoId(tk.url);
@@ -801,15 +810,20 @@ public class VideoDlActivity extends Activity {
                 c.setConnectTimeout(12000); c.setReadTimeout(15000);
                 java.io.OutputStream os = c.getOutputStream();
                 os.write(body.toString().getBytes("UTF-8")); os.close();
-                if (c.getResponseCode() != 200) continue;
+                int code = c.getResponseCode();
+                if (code != 200) { ytDiag(tk.pid + " " + prof[0] + " http=" + code); continue; }
                 java.io.ByteArrayOutputStream bo = new java.io.ByteArrayOutputStream();
                 java.io.InputStream in = c.getInputStream();
                 byte[] bb = new byte[8192]; int r;
                 while ((r = in.read(bb)) > 0) bo.write(bb, 0, r);
                 in.close();
                 JSONObject resp = new JSONObject(bo.toString("UTF-8"));
-                if (!"OK".equals(resp.optJSONObject("playabilityStatus") == null ? "" :
-                    resp.optJSONObject("playabilityStatus").optString("status"))) continue;
+                String st = resp.optJSONObject("playabilityStatus") == null ? "" :
+                    resp.optJSONObject("playabilityStatus").optString("status");
+                int nf = resp.optJSONObject("streamingData") == null || resp.optJSONObject("streamingData").optJSONArray("adaptiveFormats") == null ? 0
+                    : resp.optJSONObject("streamingData").optJSONArray("adaptiveFormats").length();
+                ytDiag(tk.pid + " " + prof[0] + " http=" + code + " status=" + st + " fmts=" + nf);
+                if (!"OK".equals(st)) continue;
                 pr = resp; ua = prof[6];
                 break;
             } catch (Throwable e) { continue; }
@@ -830,6 +844,7 @@ public class VideoDlActivity extends Activity {
             if (mime.startsWith("video/mp4") && br > bv) { bv = br; bestV = f; }
             else if (mime.startsWith("audio/mp4") && br > ba) { ba = br; bestA = f; }
         }
+        ytDiag(tk.pid + " pick v=" + (bestV == null ? "none" : "yes") + " a=" + (bestA == null ? "none" : "yes"));
         if (bestV == null || !bestV.has("url")) return false;
         File cacheDir = getExternalCacheDir() != null ? getExternalCacheDir() : getCacheDir();
         File vf = new File(cacheDir, "vdl_" + tk.pid + "_yv.mp4");
