@@ -454,18 +454,12 @@ public class VideoDlActivity extends Activity {
                         com.yausername.youtubedl_android.YoutubeDL.getInstance().execute(req);
                         File done = null;
                         if (isBili) {
-                            java.util.List<File> news = new java.util.ArrayList<File>();
-                            for (File f : cache.listFiles())
-                                if (f.getName().startsWith("vdl_") && !before.contains(f.getName()) && f.length() > 1024) news.add(f);
                             File vfile = null;
-                            for (File f : news) if (vfile == null || f.lastModified() > vfile.lastModified()) vfile = f;
-                            if (vfile == null) {
-                                // 无新文件: 可能之前已下完, 找该任务已有成品
-                                for (File f : cache.listFiles())
-                                    if (f.getName().startsWith("vdl_") && tk.pid != null && f.getName().contains(tk.pid)
-                                        && !f.getName().endsWith(".part") && f.length() > 1024)
-                                        if (vfile == null || f.lastModified() > vfile.lastModified()) vfile = f;
-                            }
+                            for (File f : cache.listFiles())
+                                if (f.getName().startsWith("vdl_") && tk.pid != null && f.getName().contains(tk.pid)
+                                    && (f.getName().endsWith(".mp4") || f.getName().endsWith(".mkv"))
+                                    && !f.getName().endsWith(".part") && f.length() > 1024)
+                                    if (vfile == null || f.lastModified() > vfile.lastModified()) vfile = f;
                             if (vfile == null) throw new Exception("B站视频流下载失败");
                             // 音频段
                             com.yausername.youtubedl_android.YoutubeDLRequest ra =
@@ -484,7 +478,9 @@ public class VideoDlActivity extends Activity {
                             com.yausername.youtubedl_android.YoutubeDL.getInstance().execute(ra);
                             File afile = null;
                             for (File f : cache.listFiles())
-                                if (f.getName().startsWith("vdl_") && !before2.contains(f.getName()) && f.length() > 1024)
+                                if (f.getName().startsWith("vdl_") && tk.pid != null && f.getName().contains(tk.pid)
+                                    && (f.getName().endsWith(".m4a") || f.getName().endsWith(".aac"))
+                                    && !f.getName().endsWith(".part") && f.length() > 1024)
                                     if (afile == null || f.lastModified() > afile.lastModified()) afile = f;
                             if (afile != null) {
                                 String m = new File(cache, "vdl_m_" + System.currentTimeMillis() + ".mp4").getAbsolutePath();
@@ -493,7 +489,9 @@ public class VideoDlActivity extends Activity {
                                 if (mf.length() > 1024) done = mf;
                             }
                             if (done == null) done = vfile;  // 合并失败退回纯视频
-                            for (File f : news) if (f != done) f.delete();
+                            for (File f : cache.listFiles())
+                                if (f.getName().startsWith("vdl_") && tk.pid != null && f.getName().contains(tk.pid)
+                                    && f != done && !f.getName().endsWith(".part") && f != vfile && f != afile) f.delete();
                         } else {
                             for (File f : cache.listFiles()) {
                                 if (f.getName().startsWith("vdl_")) {
