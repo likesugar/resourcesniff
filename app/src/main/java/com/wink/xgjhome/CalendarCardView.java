@@ -354,26 +354,7 @@ public class CalendarCardView extends LinearLayout {
             else if (hol != null) num.setTextColor(BLUE_W);
             else if (weekend) num.setTextColor(dark ? 0xFFC77 : RED);
             else num.setTextColor(fgMain());
-            // 节气 > 农历日
-            String sub = SolarTermsUtil.getSolarTermName(year, month, day);
-            if (sub == null || sub.length() == 0) {
-                try {
-                    long[] l = com.wink.xgjhome.cal.LunarCalendar.computeLunar(year, month, day);
-                    sub = ChinaDate.getChinaDate((int) l[2]);
-                } catch (Throwable ignored) {}
-            }
-            TextView lunarT = new TextView(ctx);
-            lunarT.setText(sub == null ? "" : sub.trim());
-            lunarT.setTextSize(8);
-            lunarT.setGravity(Gravity.CENTER);
-            boolean isTerm = sub != null && sub.startsWith(" ");
-            lunarT.setTextColor(isTerm ? ACCENT : fgSub());
-            LinearLayout vcell = new LinearLayout(ctx);
-            vcell.setOrientation(VERTICAL);
-            vcell.setGravity(Gravity.CENTER);
-            vcell.addView(num);
-            vcell.addView(lunarT);
-            cell.addView(vcell);
+            cell.addView(num);
             final String fds = ds;
             cell.setOnClickListener(new OnClickListener() { public void onClick(View v) { showDayReminders(fds); }});
 
