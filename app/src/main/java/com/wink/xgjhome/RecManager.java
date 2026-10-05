@@ -98,6 +98,7 @@ public class RecManager {
     public static volatile String lastStreamUrl = null;
 
     private static void acquireWake() {
+        try { DownloadService.start(sCtx); } catch (Throwable ignored) {}
         try {
             if (recWake == null && sCtx != null) {
                 android.os.PowerManager pm = (android.os.PowerManager) sCtx.getSystemService(Context.POWER_SERVICE);

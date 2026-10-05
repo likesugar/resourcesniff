@@ -51,6 +51,7 @@ public class DlManager {
         j.file = new java.io.File(sCtx.getExternalFilesDir(null), "下载/dl_" + Integer.toHexString(url.hashCode()) + ".ts");
         try { j.file.getParentFile().mkdirs(); } catch (Throwable ignored) {}
         JOBS.put(j.id, j);
+        try { DownloadService.start(sCtx); } catch (Throwable ignored) {}
         DlKeepService.ensure(sCtx);
         new Thread(new Runnable() { public void run() { download(j); } }).start();
     }
@@ -65,6 +66,7 @@ public class DlManager {
         j.file = new java.io.File(sCtx.getExternalFilesDir(null), "下载/hls" + j.id);
         j.file.mkdirs();
         JOBS.put(j.id, j);
+        try { DownloadService.start(sCtx); } catch (Throwable ignored) {}
         DlKeepService.ensure(sCtx);
         launchSegmentFfmpeg(j);
     }
