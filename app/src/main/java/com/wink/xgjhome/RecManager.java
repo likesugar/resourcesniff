@@ -513,8 +513,8 @@ public class RecManager {
             acquireWake();
             // 抖音: 只录原画——兜底变体(_sd/_hd/_uhd)时, 构造_or4原画地址每2秒探测直到可用
             if (job.url != null && job.url.contains("douyin")) {
-                boolean isLow = job.url.matches(".*_(sd|hd|uhd)(/|\\.).*");
-                String or4 = isLow ? job.url.replaceFirst("_(sd|hd|uhd)/", "_or4/") : job.url;
+                boolean isLow = job.url.matches(".*_(sd|ld|hd|uhd|ocs)(/|\\.).*");
+                String or4 = isLow ? job.url.replaceFirst("_(sd|ld|hd|uhd)/", "_or4/") : job.url;
                 int waits = 0;
                 while (job.active && isLow) {
                     try {

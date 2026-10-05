@@ -385,8 +385,38 @@ public class CalendarCardView extends LinearLayout {
         LinearLayout head = new LinearLayout(ctx);
         head.setGravity(Gravity.CENTER_VERTICAL);
         head.setPadding(0, dp(16), 0, dp(4));
+String[] labels = {"早上", "中午", "晚上"};
         TextView ti = new TextView(ctx);
         ti.setText("💊 药物提醒(点时间可改, 点药名确认已吃)");
+        // 时间行: 早上/中午/晚上 三个可点时间(时间在本区顶部统一改)
+        LinearLayout times = new LinearLayout(ctx);
+        times.setGravity(Gravity.CENTER_VERTICAL);
+        times.setPadding(0, dp(8), 0, 0);
+        for (int i = 0; i < 3; i++) {
+            final int si = i;
+            int m0 = medMin(i);
+            TextView tt = new TextView(ctx);
+            tt.setText(labels[i] + " " + String.format(Locale.US, "%02d:%02d", m0 / 60, m0 % 60));
+            tt.setTextSize(13); tt.setTypeface(Typeface.DEFAULT_BOLD);
+            tt.setTextColor(ACCENT);
+            tt.setGravity(Gravity.CENTER);
+            tt.setBackground(flatBg(cellBg(), 8));
+            tt.setPadding(dp(10), dp(6), dp(10), dp(6));
+            LayoutParams tlp = new LayoutParams(0, -2, 1f);
+            if (i > 0) tlp.setMargins(dp(8), 0, 0, 0);
+            tt.setOnClickListener(new View.OnClickListener() { public void onClick(View v) {
+                int cur = medMin(si);
+                new TimePickerDialog(ctx, new TimePickerDialog.OnTimeSetListener() {
+                    public void onTimeSet(TimePicker tp, int hh, int mm) {
+                        setMedMin(si, hh * 60 + mm);
+                        saveMeds(medArr());
+                        rebuildMedsOnly();
+                    }
+                }, cur / 60, cur % 60, true).show();
+            }});
+            times.addView(tt, tlp);
+        }
+        sec.addView(times);
         ti.setTextSize(14); ti.setTypeface(Typeface.DEFAULT_BOLD);
         ti.setTextColor(fgMain());
         head.addView(ti, new LayoutParams(0, -2, 1f));
@@ -404,24 +434,6 @@ public class CalendarCardView extends LinearLayout {
             slot.setText(MED_SLOTS[i]); slot.setTextSize(14); slot.setTypeface(Typeface.DEFAULT_BOLD);
             slot.setTextColor(fgMain());
             row.addView(slot);
-            // 可点时间
-            TextView timeT = new TextView(ctx);
-            int mm0 = medMin(i);
-            timeT.setText(String.format(Locale.US, "%02d:%02d", mm0 / 60, mm0 % 60));
-            timeT.setTextSize(13); timeT.setTypeface(Typeface.DEFAULT_BOLD);
-            timeT.setTextColor(ACCENT);
-            timeT.setPadding(dp(12), 0, 0, 0);
-            timeT.setOnClickListener(new OnClickListener() { public void onClick(View v) {
-                int cur = medMin(si);
-                new TimePickerDialog(ctx, new TimePickerDialog.OnTimeSetListener() {
-                    public void onTimeSet(TimePicker tp, int h, int m) {
-                        setMedMin(si, h * 60 + m);
-                        saveMeds(medArr());
-                        rebuildMedsOnly();
-                    }
-                }, cur / 60, cur % 60, true).show();
-            }});
-            row.addView(timeT);
             // 药名: 每种一行, 黑色加大加粗, 点击确认吃没吃, 后跟✕删除
             LinearLayout drugBox = new LinearLayout(ctx);
             drugBox.setOrientation(VERTICAL);
