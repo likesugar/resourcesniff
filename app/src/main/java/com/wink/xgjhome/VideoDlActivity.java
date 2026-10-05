@@ -34,7 +34,6 @@ public class VideoDlActivity extends Activity {
         volatile boolean paused = false;   // 用户请求暂停
         String pid;                        // 文件匹配token(BV号/视频id)
         String runId;                      // 每次尝试唯一的进程id(库要求不复用)
-        String webManifest;                // WebView提取的streamingData清单
         int gen = 0;                       // 代数: 暂停/停止/重开时+1, 旧线程发现换代即退出
         int r416 = 0;                      // 416重试计数
         int percent = -1;            // -1解析中/等待 0-100下载中 100完成 -2失败
@@ -365,70 +364,6 @@ public class VideoDlActivity extends Activity {
                 if (tk.pid == null) tk.pid = "t" + System.currentTimeMillis();
                 final int myGen = ++tk.gen;
                 tk.r416 = 0;
-                // YouTube: 先IOS/VISIONOS直连提取(免PO Token), 失败再WebView清单, 再yt-dlp
-                if (tk.url.contains("youtube.com") || tk.url.contains("youtu.be")) {
-                    try {
-                        if (ytDirectDownload(tk)) {
-                            runUi(new Runnable() { public void run() { render(); }});
-                            return;  // 直连路径完成
-                        }
-                    } catch (Throwable ignored) {}
-                    final java.util.concurrent.CountDownLatch latch = new java.util.concurrent.CountDownLatch(1);
-                    runUi(new Runnable() { public void run() {
-                        final android.webkit.WebView wv = new android.webkit.WebView(VideoDlActivity.this);
-                        wv.setVisibility(View.GONE);
-                        android.webkit.WebSettings ws = wv.getSettings();
-                        ws.setJavaScriptEnabled(true);
-                        ws.setDomStorageEnabled(true);
-                        ws.setUserAgentString("Mozilla/5.0 (Linux; Android 13) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Mobile Safari/537.36");
-                        android.webkit.CookieManager.getInstance().setAcceptCookie(true);
-                        android.webkit.CookieManager.getInstance().setAcceptThirdPartyCookies(wv, true);
-                        wv.setWebViewClient(new android.webkit.WebViewClient() {
-                            @Override public void onPageFinished(android.webkit.WebView v, String u) {
-                                android.webkit.CookieManager.getInstance().flush();
-                                v.evaluateJavascript(
-                                    "(function(){try{var pr=window.ytInitialPlayerResponse;if(pr&&pr.streamingData){return JSON.stringify({d:pr.streamingData.dashManifestUrl||'',h:pr.streamingData.hlsManifestUrl||''});}var m=document.documentElement.innerHTML.match(/ytInitialPlayerResponse\\s*=\\s*(\\{.+?\\});/);if(m){var p2=JSON.parse(m[1]);if(p2.streamingData)return JSON.stringify({d:p2.streamingData.dashManifestUrl||'',h:p2.streamingData.hlsManifestUrl||''});}}catch(e){}return '{}';})()",
-                                    new android.webkit.ValueCallback<String>() {
-                                        @Override public void onReceiveValue(String val) {
-                                            tk.webManifest = val == null ? "{}" : val;
-                                            latch.countDown();
-                                        }
-                                    });
-                            }
-                        });
-                        wv.loadUrl("https://m.youtube.com/watch?v=" + videoId(tk.url));
-                        new Thread(new Runnable() { public void run() {
-                            try { latch.await(20, java.util.concurrent.TimeUnit.SECONDS); } catch (Throwable ignored) {}
-                            runUi(new Runnable() { public void run() { wv.destroy(); }});
-                        }}).start();
-                    }});
-                    try { latch.await(22, java.util.concurrent.TimeUnit.SECONDS); } catch (Throwable ignored) {}
-                    // 清单直下: 不需要n-challenge/PO Token
-                    try {
-                        if (tk.webManifest != null && tk.webManifest.contains("http")) {
-                            JSONObject wm = new JSONObject(tk.webManifest);
-                            String murl = wm.optString("d", "");
-                            boolean isDash = true;
-                            if (murl.isEmpty()) { murl = wm.optString("h", ""); isDash = false; }
-                            if (murl.startsWith("http")) {
-                                File cacheDir = getExternalCacheDir() != null ? getExternalCacheDir() : getCacheDir();
-                                File out = new File(cacheDir, "vdl_" + tk.pid + "_w.mp4");
-                                tk.percent = 0; runUi(new Runnable() { public void run() { render(); }});
-                                String args = "-y " + (isDash ? "" : "") + "-i \"" + murl + "\" -c copy -movflags +faststart \"" + out.getAbsolutePath() + "\"";
-                                com.arthenica.ffmpegkit.FFmpegSession st = com.arthenica.ffmpegkit.FFmpegKit.executeWithArguments(
-                                    com.arthenica.ffmpegkit.FFmpegKitConfig.parseArguments(args));
-                                if (out.exists() && out.length() > 1024) {
-                                    tk.percent = 100;
-                                    tk.title = "YouTube " + tk.pid;
-                                    tk.saved = store(out, safeName(tk.title));
-                                    tk.out = out;
-                                    runUi(new Runnable() { public void run() { render(); }});
-                                    return;  // 完成
-                                }
-                            }
-                        }
-                    } catch (Throwable ignored) {}
-                }
                 tk.runId = tk.pid + "#" + System.currentTimeMillis();
                 ensureEngine();
                 File cache = getExternalCacheDir() != null ? getExternalCacheDir() : getCacheDir();
@@ -497,12 +432,7 @@ public class VideoDlActivity extends Activity {
                         req.addOption("--user-agent", st[0]);
                         req.addOption("--add-headers", "Referer: " + ref);
                         if (st[2].equals("1")) req.addOption("--cookies", cookies().getAbsolutePath());
-                        if (tk.url.contains("youtube.com") || tk.url.contains("youtu.be")) {
-                            req.addOption("--extractor-args", "youtube:player_client=tv");
-                            req.addOption("--retries", "10");
-                            req.addOption("--fragment-retries", "10");
-                            req.addOption("--socket-timeout", "30");
-                        }
+
                     if (tk.gen != myGen) return;
                         req.addOption("-o", out.getAbsolutePath());
                         req.addOption("--restrict-filenames");
@@ -677,53 +607,6 @@ public class VideoDlActivity extends Activity {
                     pw.println(".bilibili.com\tTRUE\t/\tTRUE\t0\t" + kv[0] + "\t" + kv[1]);
             }
         } catch (Throwable ignored) {}
-        // youtube 预热: 原生GET拿新鲜匿名Cookie, 后面CookieManager登录态覆盖同名项
-        java.util.LinkedHashMap<String, String> ytPrewarm = new java.util.LinkedHashMap<String, String>();
-        try {
-            java.net.HttpURLConnection yc = (java.net.HttpURLConnection) new java.net.URL("https://www.youtube.com/").openConnection();
-            yc.setRequestProperty("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36");
-            yc.setConnectTimeout(8000); yc.setReadTimeout(8000);
-            yc.getInputStream();
-            for (String sc : yc.getHeaderFields().getOrDefault("set-cookie", java.util.Collections.<String>emptyList())) {
-                String kv0 = sc.split(";", 2)[0];
-                String[] kv2 = kv0.split("=", 2);
-                if (kv2.length == 2 && kv2[0].length() > 0) ytPrewarm.put(kv2[0], kv2[1]);
-            }
-        } catch (Throwable ignored) {}
-        // douyin 域(原生 GET 首页拿 ttwid 等匿名 Cookie)
-        try {
-            java.net.HttpURLConnection c = (java.net.HttpURLConnection) new java.net.URL("https://www.douyin.com/").openConnection();
-            c.setRequestProperty("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36");
-            c.setConnectTimeout(8000); c.setReadTimeout(8000);
-            c.getInputStream();
-            for (String sc : c.getHeaderFields().getOrDefault("set-cookie", java.util.Collections.<String>emptyList())) {
-                String kv0 = sc.split(";", 2)[0];
-                String[] kv = kv0.split("=", 2);
-                if (kv.length == 2 && kv[0].length() > 0)
-                    pw.println(".douyin.com\tTRUE\t/\tTRUE\t0\t" + kv[0] + "\t" + kv[1]);
-            }
-        } catch (Throwable ignored) {}
-        // youtube登录态全域导出(仅youtube域, 去重: CookieManager优先)
-        java.util.LinkedHashMap<String, String> ycm = new java.util.LinkedHashMap<String, String>();
-        for (String dom : new String[]{"https://m.youtube.com", "https://www.youtube.com"}) {
-            String craw = cm.getCookie(dom);
-            if (craw == null) continue;
-            for (String p : craw.split(";")) {
-                String[] kv = p.trim().split("=", 2);
-                if (kv.length == 2 && kv[0].length() > 0) ycm.put(kv[0], kv[1]);
-            }
-        }
-        for (String k : ytPrewarm.keySet()) if (!ycm.containsKey(k)) ycm.put(k, ytPrewarm.get(k));
-        for (java.util.Map.Entry<String, String> e : ycm.entrySet()) {
-            pw.println(".youtube.com\tTRUE\t/\tTRUE\t0\t" + e.getKey() + "\t" + e.getValue());
-        }
-        int ytCount = ycm.size();
-        try {
-            java.io.File dbg = new java.io.File(getExternalFilesDir(null) != null ? getExternalFilesDir(null).getParentFile() : getFilesDir(), "网页诊断.txt");
-            java.io.FileWriter fw = new java.io.FileWriter(dbg, true);
-            fw.write("YT-COOKIES exported: " + ytCount + " @ " + new java.util.Date() + "\n");
-            fw.close();
-        } catch (Throwable ignored) {}
         String draw = cm.getCookie("https://www.douyin.com");
         if (draw != null) for (String p : draw.split(";")) {
             String[] kv = p.trim().split("=", 2);
@@ -764,142 +647,6 @@ public class VideoDlActivity extends Activity {
                 } catch (Throwable ignored) {}
             }
         } catch (Throwable ignored) {}
-    }
-
-    private static final String[][] YT_PROFILES = {
-        // {clientName, clientVersion, deviceMake, deviceModel, osName, osVersion, userAgent, clientNameId}
-        {"VISIONOS", "1.02", "Apple", "RealityDevice17,1", "visionOS", "26.5.23O471",
-         "Mozilla/5.0 (Macintosh; Intel Mac OS X 15_7_3) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.0 Safari/605.1.15", "101"},
-        {"IOS", "21.26.4", "Apple", "iPhone16,2", "iPhone", "18.3.2.22D82",
-         "com.google.ios.youtube/21.26.4 (iPhone16,2; U; CPU iOS 18_3_2 like Mac OS X;)", "5"}
-    };
-
-    private void ytDiag(String m) {
-        try {
-            java.io.File dir = getExternalFilesDir(null) != null ? getExternalFilesDir(null).getParentFile() : getFilesDir();
-            java.io.FileWriter fw = new java.io.FileWriter(new java.io.File(dir, "网页诊断.txt"), true);
-            fw.write("YTDIRECT " + m + "\n");
-            fw.close();
-        } catch (Throwable ignored) {}
-    }
-
-    /** DBdown式直连: innertube player API取直链, 双流下载+合并. 成功返回true */
-    private boolean ytDirectDownload(final Task tk) throws Exception {
-        final String vid = videoId(tk.url);
-        if (vid.isEmpty()) return false;
-        JSONObject pr = null; String ua = null;
-        for (String[] prof : YT_PROFILES) {
-            try {
-                JSONObject client = new JSONObject()
-                    .put("clientName", prof[0]).put("clientVersion", prof[1])
-                    .put("deviceMake", prof[2]).put("deviceModel", prof[3])
-                    .put("osName", prof[4]).put("osVersion", prof[5])
-                    .put("hl", "en").put("gl", "US");
-                JSONObject body = new JSONObject()
-                    .put("videoId", vid)
-                    .put("context", new JSONObject().put("client", client))
-                    .put("contentCheckOk", true).put("racyCheckOk", true);
-                java.net.HttpURLConnection c = (java.net.HttpURLConnection) new java.net.URL(
-                    "https://youtubei.googleapis.com/youtubei/v1/player?prettyPrint=false").openConnection();
-                c.setRequestMethod("POST");
-                c.setDoOutput(true);
-                c.setRequestProperty("Content-Type", "application/json");
-                c.setRequestProperty("User-Agent", prof[6]);
-                c.setRequestProperty("X-YouTube-Client-Name", prof[7]);
-                c.setRequestProperty("X-YouTube-Client-Version", prof[1]);
-                c.setConnectTimeout(12000); c.setReadTimeout(15000);
-                java.io.OutputStream os = c.getOutputStream();
-                os.write(body.toString().getBytes("UTF-8")); os.close();
-                int code = c.getResponseCode();
-                if (code != 200) { ytDiag(tk.pid + " " + prof[0] + " http=" + code); continue; }
-                java.io.ByteArrayOutputStream bo = new java.io.ByteArrayOutputStream();
-                java.io.InputStream in = c.getInputStream();
-                byte[] bb = new byte[8192]; int r;
-                while ((r = in.read(bb)) > 0) bo.write(bb, 0, r);
-                in.close();
-                JSONObject resp = new JSONObject(bo.toString("UTF-8"));
-                String st = resp.optJSONObject("playabilityStatus") == null ? "" :
-                    resp.optJSONObject("playabilityStatus").optString("status");
-                int nf = resp.optJSONObject("streamingData") == null || resp.optJSONObject("streamingData").optJSONArray("adaptiveFormats") == null ? 0
-                    : resp.optJSONObject("streamingData").optJSONArray("adaptiveFormats").length();
-                ytDiag(tk.pid + " " + prof[0] + " http=" + code + " status=" + st + " fmts=" + nf);
-                if (!"OK".equals(st)) continue;
-                pr = resp; ua = prof[6];
-                break;
-            } catch (Throwable e) { continue; }
-        }
-        if (pr == null) return false;
-        JSONObject sd = pr.optJSONObject("streamingData");
-        if (sd == null) return false;
-        org.json.JSONArray fmts = sd.optJSONArray("adaptiveFormats");
-        if (fmts == null) return false;
-        JSONObject bestV = null, bestA = null;
-        long bv = 0, ba = 0;
-        for (int i = 0; i < fmts.length(); i++) {
-            JSONObject f = fmts.getJSONObject(i);
-            String url = f.optString("url", "");
-            if (url.isEmpty()) continue;   // SABR-only 跳过
-            String mime = f.optString("mimeType", "");
-            long br = f.optLong("bitrate", 0);
-            if (mime.startsWith("video/mp4") && br > bv) { bv = br; bestV = f; }
-            else if (mime.startsWith("audio/mp4") && br > ba) { ba = br; bestA = f; }
-        }
-        ytDiag(tk.pid + " pick v=" + (bestV == null ? "none" : "yes") + " a=" + (bestA == null ? "none" : "yes"));
-        if (bestV == null || !bestV.has("url")) return false;
-        File cacheDir = getExternalCacheDir() != null ? getExternalCacheDir() : getCacheDir();
-        File vf = new File(cacheDir, "vdl_" + tk.pid + "_yv.mp4");
-        File af = new File(cacheDir, "vdl_" + tk.pid + "_ya.m4a");
-        long total = bestV.optLong("contentLength", 0) + bestA.optLong("contentLength", 0);
-        tk.expect = total; tk.percent = 0;
-        runUi(new Runnable() { public void run() { render(); }});
-        // 下载
-        if (!dlUrl(bestV.optString("url"), ua, vf, tk, bestV.optLong("contentLength", 0), 0)) return false;
-        if (bestA != null && bestA.has("url") && !dlUrl(bestA.optString("url"), ua, af, tk, bestA.optLong("contentLength", 0), bestV.optLong("contentLength", 0))) return false;
-        // 合并
-        File out = new File(cacheDir, "vdl_" + tk.pid + "_y.mp4");
-        String args;
-        if (af.exists() && af.length() > 1024)
-            args = "-y -i \"" + vf.getAbsolutePath() + "\" -i \"" + af.getAbsolutePath() + "\" -c copy -movflags +faststart \"" + out.getAbsolutePath() + "\"";
-        else
-            args = "-y -i \"" + vf.getAbsolutePath() + "\" -c copy -movflags +faststart \"" + out.getAbsolutePath() + "\"";
-        com.arthenica.ffmpegkit.FFmpegSession st = com.arthenica.ffmpegkit.FFmpegKit.executeWithArguments(
-            com.arthenica.ffmpegkit.FFmpegKitConfig.parseArguments(args));
-        String rc = st.getReturnCode().toString();
-        if (!"0".equals(rc) || !out.exists() || out.length() < 1024) return false;
-        tk.percent = 100;
-        tk.title = pr.optJSONObject("videoDetails") == null ? ("YouTube " + vid)
-            : pr.optJSONObject("videoDetails").optString("title", "YouTube " + vid);
-        tk.size = fmtMB(out.length());
-        tk.saved = store(out, safeName(tk.title));
-        tk.out = out;
-        vf.delete(); if (af.exists()) af.delete();
-        return true;
-    }
-
-    private boolean dlUrl(String url, String ua, File out, Task tk, long contentLen, long baseBytes) throws Exception {
-        java.net.HttpURLConnection c = (java.net.HttpURLConnection) new java.net.URL(url).openConnection();
-        c.setRequestProperty("User-Agent", ua);
-        c.setConnectTimeout(15000); c.setReadTimeout(30000);
-        long expect = contentLen;
-        java.io.InputStream in = c.getInputStream();
-        java.io.FileOutputStream fo = new java.io.FileOutputStream(out);
-        byte[] b = new byte[65536]; int r; long done = 0;
-        while ((r = in.read(b)) > 0) {
-            fo.write(b, 0, r); done += r;
-            if (tk.expect > 0) {
-                int pc = (int)((100L * (baseBytes + done)) / tk.expect);
-                if (pc > 99) pc = 99; if (pc < 1) pc = 1;
-                if (pc > tk.percent) { tk.percent = pc; tk.size = fmtMB(baseBytes + done);
-                    runUi(new Runnable() { public void run() { render(); }}); }
-            }
-        }
-        fo.close(); in.close();
-        return out.length() > 1024;
-    }
-
-    private static String videoId(String u) {
-        java.util.regex.Matcher m = java.util.regex.Pattern.compile("(?:v=|youtu[.]be/|shorts/|live/|/watch.*?v=)([A-Za-z0-9_-]{6,20})").matcher(u);
-        return m.find() ? m.group(1) : "";
     }
 
     private int shapeOf(Task tk) {
