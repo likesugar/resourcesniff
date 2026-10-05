@@ -511,44 +511,35 @@ public class RecManager {
             recJobs.put(job.id, job);
             saveLiveRec(job);
             acquireWake();
-            // 抖音: 只录原画——若拿到的是master/兜底清单, 每2秒刷新直到_or4原画出现
+            // 抖音: 只录原画——兜底变体(_sd/_hd/_uhd)时, 构造_or4原画地址每2秒探测直到可用
             if (job.url != null && job.url.contains("douyin")) {
+                boolean isLow = job.url.matches(".*_(sd|hd|uhd)(/|\\.).*");
+                String or4 = isLow ? job.url.replaceFirst("_(sd|hd|uhd)/", "_or4/") : job.url;
                 int waits = 0;
-                while (job.active) {
+                while (job.active && isLow) {
                     try {
-                        java.net.HttpURLConnection pc = (java.net.HttpURLConnection) new java.net.URL(job.url).openConnection();
+                        java.net.HttpURLConnection pc = (java.net.HttpURLConnection) new java.net.URL(or4).openConnection();
+                        pc.setRequestMethod("HEAD");
                         pc.setConnectTimeout(8000); pc.setReadTimeout(8000);
                         pc.setRequestProperty("User-Agent", "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36");
                         pc.setRequestProperty("Referer", "https://live.douyin.com/");
-                        java.io.BufferedReader br = new java.io.BufferedReader(new java.io.InputStreamReader(pc.getInputStream()));
-                        java.util.List<String> variants = new java.util.ArrayList<String>();
-                        boolean inVar = false;
-                        String ln;
-                        while ((ln = br.readLine()) != null) {
-                            if (ln.startsWith("#EXT-X-STREAM-INF")) inVar = true;
-                            else if (inVar && !ln.startsWith("#")) { variants.add(ln.trim()); inVar = false; }
+                        int rc = pc.getResponseCode();
+                        pc.disconnect();
+                        if (rc == 200) {
+                            job.url = or4;
+                            job.state = null;
+                            break;
                         }
-                        br.close(); pc.disconnect();
-                        if (variants.isEmpty()) break;
-                        String pick = null;
-                        for (String v : variants) if (v.contains("_or4")) { pick = v; break; }
-                        if (pick == null) {
-                            job.state = "兜底画质, 等待原画(2s刷新)…";
-                            if (job.finishNow) break;
-                            Thread.sleep(2000);
-                            waits++;
-                            if (waits > 900) break;
-                            continue;
-                        }
-                        if (!pick.startsWith("http")) pick = new java.net.URL(new java.net.URL(job.url), pick).toString();
-                        job.url = pick;
-                        job.state = null;
+                        job.state = "兜底画质, 等待原画(2s刷新)…";
+                        if (job.finishNow) break;
+                        Thread.sleep(2000);
+                        waits++;
+                        if (waits > 900) break;
                     } catch (Throwable e2) {
                         if (!job.active || job.finishNow) break;
                         try { Thread.sleep(2000); } catch (Throwable ignored) {}
                         continue;
                     }
-                    break;
                 }
             }
             startBgPlayer(job);
