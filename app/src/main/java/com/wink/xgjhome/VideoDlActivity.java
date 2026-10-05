@@ -243,18 +243,7 @@ public class VideoDlActivity extends Activity {
         input.setHintTextColor(dark ? 0xFF6B7684 : 0xFF9AA3AE);
         input.setPadding(dp(10), 0, 0, 0);
         box.addView(input, new LinearLayout.LayoutParams(0, -2, 1f));
-        try {
-            android.content.ClipboardManager cm = (android.content.ClipboardManager) getSystemService(CLIPBOARD_SERVICE);
-            if (cm != null && cm.getPrimaryClip() != null && cm.getPrimaryClip().getItemAt(0) != null && cm.getPrimaryClip().getItemAt(0).getText() != null) {
-                String cu = cm.getPrimaryClip().getItemAt(0).getText().toString().trim();
-                java.util.regex.Matcher m = java.util.regex.Pattern.compile("https?://\\S+").matcher(cu);
-                if (m.find()) {
-                    String cu2 = m.group();
-                    cu2 = cu2.replaceAll("[\\u4e00-\\u9fff，。！？、：；【】（）\\u3000-\\u303f\\uff00-\\uffef]+$", "");
-                    input.setText(cu2);
-                }
-            }
-        } catch (Throwable ignored) {}
+        final EditText inputF = input;
         TextView go = new TextView(this);
         go.setText("→"); go.setTextSize(20);
         go.setTextColor(dark ? 0xFFB4C5FF : 0xFF315CDE);
@@ -265,29 +254,33 @@ public class VideoDlActivity extends Activity {
             if (u.length() > 0) { dlg.dismiss(); submit(u); }
         }});
         box.addView(go);
-        LinearLayout dlgWrap = new LinearLayout(this);
-        dlgWrap.setOrientation(LinearLayout.VERTICAL);
-        dlgWrap.addView(box);
-        try {
-            java.util.Set<String> hs = CookieHosts.hosts(this);
-            if (hs != null && !hs.isEmpty()) {
-                StringBuilder sb = new StringBuilder("已登录站点: ");
-                for (String h : hs) sb.append(h.replaceFirst("^www[.]", "")).append("  ");
-                TextView sites = new TextView(this);
-                sites.setText(sb.toString().trim());
-                sites.setTextSize(12);
-                sites.setTextColor(0xFF8A94A6);
-                sites.setPadding(dp(20), dp(10), dp(20), 0);
-                dlgWrap.addView(sites);
-            }
-        } catch (Throwable ignored) {}
-        dlg.setView(dlgWrap, dp(18), dp(24), dp(18), dp(6));
+        dlg.setView(box, dp(18), dp(24), dp(18), dp(6));
         dlg.show();
         if (dlg.getWindow() != null) {
             dlg.getWindow().setBackgroundDrawableResource(android.R.color.transparent);
             dlg.getWindow().setLayout(android.view.ViewGroup.LayoutParams.MATCH_PARENT, android.view.ViewGroup.LayoutParams.WRAP_CONTENT);
         }
         input.requestFocus();
+        // 剪贴板预填: 立即一次 + 窗口拿到焦点后再补填(否则Android10+读到空)
+        final Runnable[] fillRef = new Runnable[1];
+        fillRef[0] = new Runnable() { public void run() {
+            try {
+                if (inputF.getText().length() > 0) return;
+                android.content.ClipboardManager cm = (android.content.ClipboardManager) getSystemService(CLIPBOARD_SERVICE);
+                if (cm != null && cm.getPrimaryClip() != null && cm.getPrimaryClip().getItemAt(0) != null && cm.getPrimaryClip().getItemAt(0).getText() != null) {
+                    String cu = cm.getPrimaryClip().getItemAt(0).getText().toString().trim();
+                    java.util.regex.Matcher m = java.util.regex.Pattern.compile("https?://\\S+").matcher(cu);
+                    if (m.find()) {
+                        String cu2 = m.group();
+                        cu2 = cu2.replaceAll("[\\u4e00-\\u9fff，。！？、：；【】（）\\u3000-\\u303f\\uff00-\\uffef]+$", "");
+                        inputF.setText(cu2);
+                    }
+                }
+            } catch (Throwable ignored) {}
+        }};
+        fillRef[0].run();
+        box.postDelayed(fillRef[0], 400);
+        box.postDelayed(fillRef[0], 1000);
     }
 
     private void submit() { submit(null); }
