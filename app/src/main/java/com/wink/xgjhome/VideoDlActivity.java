@@ -610,17 +610,17 @@ public class VideoDlActivity extends Activity {
                     pw.println(".bilibili.com\tTRUE\t/\tTRUE\t0\t" + kv[0] + "\t" + kv[1]);
             }
         } catch (Throwable ignored) {}
-        // youtube 预热(匿名 Cookie: VISITOR_INFO1_LIVE/YSC)
+        // youtube 预热: 原生GET拿新鲜匿名Cookie, 后面CookieManager登录态覆盖同名项
+        java.util.LinkedHashMap<String, String> ytPrewarm = new java.util.LinkedHashMap<String, String>();
         try {
-            java.net.HttpURLConnection c = (java.net.HttpURLConnection) new java.net.URL("https://www.youtube.com/").openConnection();
-            c.setRequestProperty("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36");
-            c.setConnectTimeout(8000); c.setReadTimeout(8000);
-            c.getInputStream();
-            for (String sc : c.getHeaderFields().getOrDefault("set-cookie", java.util.Collections.<String>emptyList())) {
+            java.net.HttpURLConnection yc = (java.net.HttpURLConnection) new java.net.URL("https://www.youtube.com/").openConnection();
+            yc.setRequestProperty("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36");
+            yc.setConnectTimeout(8000); yc.setReadTimeout(8000);
+            yc.getInputStream();
+            for (String sc : yc.getHeaderFields().getOrDefault("set-cookie", java.util.Collections.<String>emptyList())) {
                 String kv0 = sc.split(";", 2)[0];
-                String[] kv = kv0.split("=", 2);
-                if (kv.length == 2 && kv[0].length() > 0)
-                    pw.println(".youtube.com\tTRUE\t/\tTRUE\t0\t" + kv[0] + "\t" + kv[1]);
+                String[] kv2 = kv0.split("=", 2);
+                if (kv2.length == 2 && kv2[0].length() > 0) ytPrewarm.put(kv2[0], kv2[1]);
             }
         } catch (Throwable ignored) {}
         // douyin 域(原生 GET 首页拿 ttwid 等匿名 Cookie)
@@ -636,21 +636,21 @@ public class VideoDlActivity extends Activity {
                     pw.println(".douyin.com\tTRUE\t/\tTRUE\t0\t" + kv[0] + "\t" + kv[1]);
             }
         } catch (Throwable ignored) {}
-        // youtube登录态全域导出(google域的SID/SAPISID也是YouTube登录Cookie)
-        int ytCount = 0;
-        String[] yd = {"https://www.youtube.com", "https://m.youtube.com", "https://accounts.google.com", "https://www.google.com"};
-        for (String dom : yd) {
+        // youtube登录态全域导出(仅youtube域, 去重: CookieManager优先)
+        java.util.LinkedHashMap<String, String> ycm = new java.util.LinkedHashMap<String, String>();
+        for (String dom : new String[]{"https://m.youtube.com", "https://www.youtube.com"}) {
             String craw = cm.getCookie(dom);
             if (craw == null) continue;
             for (String p : craw.split(";")) {
                 String[] kv = p.trim().split("=", 2);
-                if (kv.length == 2 && kv[0].length() > 0) {
-                    pw.println(".youtube.com\tTRUE\t/\tTRUE\t0\t" + kv[0] + "\t" + kv[1]);
-                    if (dom.contains("google.com")) pw.println(".google.com\tTRUE\t/\tTRUE\t0\t" + kv[0] + "\t" + kv[1]);
-                    ytCount++;
-                }
+                if (kv.length == 2 && kv[0].length() > 0) ycm.put(kv[0], kv[1]);
             }
         }
+        for (String k : ytPrewarm.keySet()) if (!ycm.containsKey(k)) ycm.put(k, ytPrewarm.get(k));
+        for (java.util.Map.Entry<String, String> e : ycm.entrySet()) {
+            pw.println(".youtube.com\tTRUE\t/\tTRUE\t0\t" + e.getKey() + "\t" + e.getValue());
+        }
+        int ytCount = ycm.size();
         try {
             java.io.File dbg = new java.io.File(getExternalFilesDir(null) != null ? getExternalFilesDir(null).getParentFile() : getFilesDir(), "网页诊断.txt");
             java.io.FileWriter fw = new java.io.FileWriter(dbg, true);
