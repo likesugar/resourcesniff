@@ -144,7 +144,11 @@ public class VideoDlActivity extends Activity {
             if (cm != null && cm.getPrimaryClip() != null && cm.getPrimaryClip().getItemAt(0) != null && cm.getPrimaryClip().getItemAt(0).getText() != null) {
                 String cu = cm.getPrimaryClip().getItemAt(0).getText().toString().trim();
                 java.util.regex.Matcher m = java.util.regex.Pattern.compile("https?://\\S+").matcher(cu);
-                if (m.find()) input.setText(m.group());
+                if (m.find()) {
+                    String cu2 = m.group();
+                    cu2 = cu2.replaceAll("[\\u4e00-\\u9fff，。！？、：；【】（）\\u3000-\\u303f\\uff00-\\uffef]+$", "");
+                    input.setText(cu2);
+                }
             }
         } catch (Throwable ignored) {}
         TextView go = new TextView(this);
@@ -244,7 +248,11 @@ public class VideoDlActivity extends Activity {
             if (cm != null && cm.getPrimaryClip() != null && cm.getPrimaryClip().getItemAt(0) != null && cm.getPrimaryClip().getItemAt(0).getText() != null) {
                 String cu = cm.getPrimaryClip().getItemAt(0).getText().toString().trim();
                 java.util.regex.Matcher m = java.util.regex.Pattern.compile("https?://\\S+").matcher(cu);
-                if (m.find()) input.setText(m.group());
+                if (m.find()) {
+                    String cu2 = m.group();
+                    cu2 = cu2.replaceAll("[\\u4e00-\\u9fff，。！？、：；【】（）\\u3000-\\u303f\\uff00-\\uffef]+$", "");
+                    input.setText(cu2);
+                }
             }
         } catch (Throwable ignored) {}
         TextView go = new TextView(this);
@@ -257,7 +265,23 @@ public class VideoDlActivity extends Activity {
             if (u.length() > 0) { dlg.dismiss(); submit(u); }
         }});
         box.addView(go);
-        dlg.setView(box, dp(18), dp(24), dp(18), dp(6));
+        LinearLayout dlgWrap = new LinearLayout(this);
+        dlgWrap.setOrientation(LinearLayout.VERTICAL);
+        dlgWrap.addView(box);
+        try {
+            java.util.Set<String> hs = CookieHosts.hosts(this);
+            if (hs != null && !hs.isEmpty()) {
+                StringBuilder sb = new StringBuilder("已登录站点: ");
+                for (String h : hs) sb.append(h.replaceFirst("^www[.]", "")).append("  ");
+                TextView sites = new TextView(this);
+                sites.setText(sb.toString().trim());
+                sites.setTextSize(12);
+                sites.setTextColor(0xFF8A94A6);
+                sites.setPadding(dp(20), dp(10), dp(20), 0);
+                dlgWrap.addView(sites);
+            }
+        } catch (Throwable ignored) {}
+        dlg.setView(dlgWrap, dp(18), dp(24), dp(18), dp(6));
         dlg.show();
         if (dlg.getWindow() != null) {
             dlg.getWindow().setBackgroundDrawableResource(android.R.color.transparent);
