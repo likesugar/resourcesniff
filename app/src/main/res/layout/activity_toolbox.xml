@@ -95,11 +95,6 @@
                             android:textColor="#C3CAD6"
                             android:layout_width="wrap_content" android:layout_height="wrap_content"/>
                     </LinearLayout>
-                    <TextView
-                        android:layout_width="wrap_content" android:layout_height="wrap_content"
-                        android:layout_marginLeft="12dp" android:layout_marginTop="4dp"
-                        android:text="yt-dlp 解析 · 粘贴链接极速下载" android:textSize="13sp"
-                        android:tag="sub" android:textColor="@color/textSub"/>
                 </LinearLayout>
 
                <LinearLayout android:tag="card" android:id="@+id/cardShortcut"

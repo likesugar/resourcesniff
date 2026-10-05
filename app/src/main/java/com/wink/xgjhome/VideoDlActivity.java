@@ -31,6 +31,8 @@ public class VideoDlActivity extends Activity {
     static class Task {
         String url, title = "解析中…", size = "", res = "";
         long expect = 0;               // 预期总字节数(视频+音频)
+        volatile boolean paused = false;   // 用户请求暂停
+        String pid;                        // 暂停用的进程匹配token(BV号/视频id)
         int percent = -1;            // -1解析中/等待 0-100下载中 100完成 -2失败
         String err; Uri saved; File out;
     }
@@ -342,6 +344,14 @@ public class VideoDlActivity extends Activity {
                     java.util.regex.Matcher dm = java.util.regex.Pattern.compile("douyin\\.com/(?:share/)?(?:note|video)/(\\d+)").matcher(tk.url);
                     if (dm.find()) tk.url = "https://www.douyin.com/video/" + dm.group(1);
                 } catch (Throwable ignored) {}
+                try {
+                    java.util.regex.Matcher bt = java.util.regex.Pattern.compile("(BV[0-9A-Za-z]{8,12})").matcher(tk.url);
+                    if (bt.find()) tk.pid = bt.group(1);
+                    else {
+                        java.util.regex.Matcher dt = java.util.regex.Pattern.compile("video/(\\d{10,25})").matcher(tk.url);
+                        if (dt.find()) tk.pid = dt.group(1);
+                    }
+                } catch (Throwable ignored) {}
                 ensureEngine();
                 File cache = getExternalCacheDir() != null ? getExternalCacheDir() : getCacheDir();
                 File out = new File(cache, "vdl_%(id)s.%(ext)s");
@@ -485,6 +495,11 @@ public class VideoDlActivity extends Activity {
                         runUi(new Runnable() { public void run() { render(); }});
                         return;  // 成功收工
                     } catch (Throwable e) {
+                        if (tk.paused) {
+                            tk.percent = -3;   // 用户暂停
+                            runUi(new Runnable() { public void run() { render(); }});
+                            return;
+                        }
                         last = e;
                         try {
                             java.io.File dir = getExternalFilesDir(null) != null ? getExternalFilesDir(null).getParentFile() : getFilesDir();
@@ -637,6 +652,37 @@ public class VideoDlActivity extends Activity {
             tTitle.setPadding(0, dp2(10), 0, 0);
             card.addView(tTitle, new LinearLayout.LayoutParams(-1, -2));
             // 行3: 分辨率 + 播放 + 分享
+            if (tk.percent >= 0 && tk.percent < 100) {
+                LinearLayout r4 = new LinearLayout(this);
+                r4.setGravity(Gravity.CENTER_VERTICAL);
+                TextView pauseBtn = new TextView(this);
+                pauseBtn.setText("⏸ 暂停"); pauseBtn.setTextSize(15);
+                pauseBtn.setTextColor(0xFFFFB74D);
+                pauseBtn.setPadding(0, dp(8), dp(20), dp(4));
+                pauseBtn.setOnClickListener(new OnClickListener() { public void onClick(View v) {
+                    tk.paused = true;
+                    try {
+                        String tok = tk.pid;
+                        if (tok != null) Runtime.getRuntime().exec(new String[]{"pkill", "-f", tok});
+                    } catch (Throwable ignored) {}
+                }});
+                r4.addView(pauseBtn);
+                card.addView(r4, new LinearLayout.LayoutParams(-1, -2));
+            }
+            if (tk.percent == -3) {
+                LinearLayout r4 = new LinearLayout(this);
+                r4.setGravity(Gravity.CENTER_VERTICAL);
+                TextView resumeBtn = new TextView(this);
+                resumeBtn.setText("▶ 继续下载"); resumeBtn.setTextSize(15);
+                resumeBtn.setTextColor(0xFF9CCC65);
+                resumeBtn.setPadding(0, dp(8), dp(20), dp(4));
+                resumeBtn.setOnClickListener(new OnClickListener() { public void onClick(View v) {
+                    tk.percent = 0; tk.paused = false;
+                    runTask(tk);
+                }});
+                r4.addView(resumeBtn);
+                card.addView(r4, new LinearLayout.LayoutParams(-1, -2));
+            }
             LinearLayout r3 = new LinearLayout(this);
             r3.setGravity(Gravity.CENTER_VERTICAL);
             r3.setPadding(0, dp2(12), 0, 0);
