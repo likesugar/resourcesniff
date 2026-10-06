@@ -16,7 +16,7 @@ public class CapsuleBottomBar extends FrameLayout {
     public interface OnItem { void onItem(int index); }
 
     private final View pill;
-    private final TextView[] items = new TextView[2];
+    private final TextView[] items = new TextView[3];
     private final boolean dark;
     private final int itemW;
     private int active = 0;
@@ -26,10 +26,10 @@ public class CapsuleBottomBar extends FrameLayout {
         super(c);
         dark = darkMode;
         cb = callback;
-        itemW = dp(72);
+        itemW = dp(64);
 
-        int barBg = dark ? 0xF01A1E28 : 0xF2FFFFFF;
-        int pillBg = dark ? 0xFF232C40 : 0xFFE1ECFF;
+        int barBg = dark ? 0xF01A1E28 : 0xFFE1ECFF;
+        int pillBg = dark ? 0xFF2A3242 : 0xFFFFFFFF;
         int activeTx = dark ? 0xFFB4C5FF : 0xFF315CDE;
         int inactiveTx = dark ? 0xFF8A94A6 : 0xFF7C8694;
 
@@ -57,20 +57,8 @@ public class CapsuleBottomBar extends FrameLayout {
         LinearLayout row = new LinearLayout(c);
         row.setOrientation(LinearLayout.HORIZONTAL);
         capsule.addView(row, new FrameLayout.LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT));
-        String[] labels = {"🏠 首页", "📡 播放器"};
-        // 左右滑动切换页面
-        capsule.setOnTouchListener(new OnTouchListener() {
-            private float downX;
-            public boolean onTouch(View v, android.view.MotionEvent ev) {
-                if (ev.getAction() == android.view.MotionEvent.ACTION_DOWN) downX = ev.getX();
-                else if (ev.getAction() == android.view.MotionEvent.ACTION_UP) {
-                    float dx = ev.getX() - downX;
-                    if (Math.abs(dx) > dp(50)) select(dx < 0 ? 1 : 0, true);
-                }
-                return false;
-            }
-        });
-        for (int i = 0; i < 2; i++) {
+        String[] labels = {"🏠 首页", "⚙️ 设置", "📡 播放器"};
+        for (int i = 0; i < 3; i++) {
             final int idx = i;
             TextView t = new TextView(c);
             t.setText(labels[i]);
@@ -84,6 +72,17 @@ public class CapsuleBottomBar extends FrameLayout {
             });
         }
     }
+
+    @Override
+    public boolean dispatchTouchEvent(android.view.MotionEvent ev) {
+        if (ev.getAction() == android.view.MotionEvent.ACTION_DOWN) { downX = ev.getX(); swiped = false; }
+        else if (ev.getAction() == android.view.MotionEvent.ACTION_MOVE) {
+            float dx = ev.getX() - downX;
+            if (!swiped && Math.abs(dx) > dp(50)) { swiped = true; select(dx < 0 ? (active == 2 ? 0 : active + 1) : (active == 0 ? 2 : active - 1), true); }
+        }
+        return super.dispatchTouchEvent(ev);
+    }
+    private float downX; private boolean swiped;
 
     public void select(int idx, boolean fire) {
         if (idx == active) { if (fire && cb != null) cb.onItem(idx); return; }

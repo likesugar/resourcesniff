@@ -56,7 +56,8 @@ public class HomeActivity extends Activity {
         ((android.view.ViewGroup) findViewById(R.id.toolRoot)).addView(
             new CapsuleBottomBar(this, dark, new CapsuleBottomBar.OnItem() {
                 public void onItem(int idx) {
-                    if (idx == 1) showPlayChoice();
+                    if (idx == 1) startActivity(new Intent(HomeActivity.this, SettingsActivity.class));
+                    else if (idx == 2) showPlayChoice();
                 }
             }));
         findViewById(R.id.toolColumn).setBackgroundColor(dark ? 0xFF000000 : 0xFFEEF4FF);
