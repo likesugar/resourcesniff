@@ -14,6 +14,7 @@ public class ScheduleReceiver extends BroadcastReceiver {
         if (Intent.ACTION_BOOT_COMPLETED.equals(intent.getAction())) {
             try { CalendarCardView.scheduleSchedules(context); } catch (Throwable ignored) {}
             try { CalendarCardView.scheduleMedsAll(context); } catch (Throwable ignored) {}
+            try { MedPlanActivity.scheduleAll(context); } catch (Throwable ignored) {}
             return;
         }
         try {

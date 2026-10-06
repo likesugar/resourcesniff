@@ -21,7 +21,7 @@ public class HomeActivity extends Activity {
             public void onClick(View v) { startActivity(new Intent(HomeActivity.this, CalendarActivity.class)); }
         });
         findViewById(R.id.cardMed).setOnClickListener(new View.OnClickListener() {
-            public void onClick(View v) { startActivity(new Intent(HomeActivity.this, CalendarActivity.class)); }
+            public void onClick(View v) { startActivity(new Intent(HomeActivity.this, MedPlanActivity.class)); }
         });
     }
 
