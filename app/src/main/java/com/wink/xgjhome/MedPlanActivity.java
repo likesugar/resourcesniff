@@ -583,6 +583,19 @@ public class MedPlanActivity extends Activity {
         }
     }
 
+    /** 创建通知渠道(启动即调, 保证系统设置可见可配) */
+    public static void ensureChannel(Context c) {
+        NotificationManager nm = (NotificationManager) c.getSystemService(Context.NOTIFICATION_SERVICE);
+        NotificationChannel ch = new NotificationChannel(CH, "用药提醒", NotificationManager.IMPORTANCE_HIGH);
+        ch.enableVibration(true);
+        ch.enableLights(true);
+        ch.setLockscreenVisibility(Notification.VISIBILITY_PUBLIC);
+        nm.createNotificationChannel(ch);
+        NotificationChannel r2 = new NotificationChannel("remind", "日程提醒", NotificationManager.IMPORTANCE_HIGH);
+        r2.enableVibration(true);
+        nm.createNotificationChannel(r2);
+    }
+
     static int medNotifId(int planIdx, int timeIdx) { return 990200 + planIdx * 20 + timeIdx; }
 
     /** 到点提醒: 常驻通知, 只有确认才消失 */
