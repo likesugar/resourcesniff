@@ -28,8 +28,8 @@ public class CapsuleBottomBar extends FrameLayout {
         cb = callback;
         itemW = dp(72);
 
-        int barBg = dark ? 0xE61A2130 : 0xE8FFFFFF;
-        int pillBg = dark ? 0xFF2A3242 : 0xFFDCE6FA;
+        int barBg = dark ? 0xF01A1E28 : 0xF2FFFFFF;
+        int pillBg = dark ? 0xFF232C40 : 0xFFE1ECFF;
         int activeTx = dark ? 0xFFB4C5FF : 0xFF315CDE;
         int inactiveTx = dark ? 0xFF8A94A6 : 0xFF7C8694;
 
@@ -37,7 +37,6 @@ public class CapsuleBottomBar extends FrameLayout {
         GradientDrawable bg = new GradientDrawable();
         bg.setCornerRadius(dp(17));
         bg.setColor(barBg);
-        if (!dark) bg.setStroke(dp(1), 0xFFE4EAF5);
         capsule.setBackground(bg);
         capsule.setElevation(dp(8));
         LayoutParams clp = new LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT,
@@ -59,6 +58,18 @@ public class CapsuleBottomBar extends FrameLayout {
         row.setOrientation(LinearLayout.HORIZONTAL);
         capsule.addView(row, new FrameLayout.LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT));
         String[] labels = {"🏠 首页", "📡 播放器"};
+        // 左右滑动切换页面
+        capsule.setOnTouchListener(new OnTouchListener() {
+            private float downX;
+            public boolean onTouch(View v, android.view.MotionEvent ev) {
+                if (ev.getAction() == android.view.MotionEvent.ACTION_DOWN) downX = ev.getX();
+                else if (ev.getAction() == android.view.MotionEvent.ACTION_UP) {
+                    float dx = ev.getX() - downX;
+                    if (Math.abs(dx) > dp(50)) select(dx < 0 ? 1 : 0, true);
+                }
+                return false;
+            }
+        });
         for (int i = 0; i < 2; i++) {
             final int idx = i;
             TextView t = new TextView(c);

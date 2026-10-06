@@ -164,9 +164,6 @@ public class HomeActivity extends Activity {
             public void onClick(View v) { startActivity(new Intent(HomeActivity.this, VideoDlActivity.class).putExtra("auto_dialog", true)); }
         });
 
-        findViewById(R.id.cardAppSettings).setOnClickListener(new View.OnClickListener() {
-            public void onClick(View v) { startActivity(new Intent(HomeActivity.this, SettingsActivity.class)); }
-        });
         findViewById(R.id.lanToggle).setOnClickListener(new View.OnClickListener() {
             public void onClick(View v) { showLanDialog(); }
         });

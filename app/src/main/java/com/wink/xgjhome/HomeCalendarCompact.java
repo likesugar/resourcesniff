@@ -25,6 +25,7 @@ public class HomeCalendarCompact extends LinearLayout {
     private final Activity act;
     private boolean dark;
     private TextView dateText, holidayText, signText, remindText;
+    private TextView calIcon;
     private LinearLayout signBtn;
     private LinearLayout medHost;
 
@@ -42,9 +43,19 @@ public class HomeCalendarCompact extends LinearLayout {
         // 行1: 日期 + 休/班 + ›
         LinearLayout r1 = new LinearLayout(a);
         r1.setGravity(Gravity.CENTER_VERTICAL);
+        calIcon = new TextView(a);
+        calIcon.setText("📅"); calIcon.setTextSize(20);
+        calIcon.setGravity(Gravity.CENTER);
+        android.util.TypedValue tvv = new android.util.TypedValue();
+        android.util.TypedValue.complexToDimensionPixelSize(48, getResources().getDisplayMetrics());
+        int ic = (int) (48 * getResources().getDisplayMetrics().density);
+        calIcon.setBackground(circleBg(dark));
+        LayoutParams ilp = new LayoutParams(ic, ic);
+        r1.addView(calIcon, ilp);
         dateText = new TextView(a);
         dateText.setTextSize(20); dateText.setTypeface(Typeface.DEFAULT_BOLD);
         dateText.setTextColor(fgMain);
+        dateText.setPadding((int) (10 * getResources().getDisplayMetrics().density), 0, 0, 0);
         r1.addView(dateText);
         holidayText = new TextView(a);
         holidayText.setTextSize(13);
@@ -182,6 +193,7 @@ public class HomeCalendarCompact extends LinearLayout {
         dark = d;
         int fgMain = d ? Color.WHITE : 0xFF1F2329;
         int fgSub = d ? 0xFF9AA3AE : 0xFF8A94A6;
+        if (calIcon != null) calIcon.setBackground(circleBg(d));
         if (dateText != null) dateText.setTextColor(fgMain);
         if (holidayText != null) holidayText.setTextColor(fgSub);
         if (signText != null) signText.setTextColor(d ? 0xFFB4C5FF : 0xFF315CDE);
@@ -196,7 +208,7 @@ public class HomeCalendarCompact extends LinearLayout {
             SimpleDateFormat df = new SimpleDateFormat("yyyy-MM-dd", Locale.US);
             Date now = new Date();
             String today = df.format(now);
-            dateText.setText("📅 日历");
+            dateText.setText("日历");
             // 节假日标记(读缓存)
             String hol = "";
             try {
@@ -253,6 +265,13 @@ public class HomeCalendarCompact extends LinearLayout {
             }
             return true;
         } catch (Throwable e) { return false; }
+    }
+
+    private android.graphics.drawable.GradientDrawable circleBg(boolean d) {
+        android.graphics.drawable.GradientDrawable g = new android.graphics.drawable.GradientDrawable();
+        g.setShape(android.graphics.drawable.GradientDrawable.OVAL);
+        g.setColor(d ? 0xFF232C40 : 0xFFE1ECFF);
+        return g;
     }
 
     private void doSign() {
