@@ -422,7 +422,7 @@ String[] labels = {"早上", "中午", "晚上"};
             final int si = i;
             LinearLayout row = new LinearLayout(ctx);
             row.setGravity(Gravity.CENTER_VERTICAL);
-            row.setBackground(flatBg(cellBg(), 10));
+            row.setBackground(flatBg(dark ? 0xFF232A38 : 0xFFE8EEFF, 10));
             row.setPadding(dp(12), dp(8), dp(12), dp(8));
             LayoutParams rlp = new LayoutParams(-1, -2);
             rlp.setMargins(0, dp(6), 0, 0);
