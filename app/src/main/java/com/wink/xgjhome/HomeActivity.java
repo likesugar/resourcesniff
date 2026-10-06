@@ -233,6 +233,7 @@ public class HomeActivity extends Activity {
     protected void onResume() {
         super.onResume();
         calTick.post(calTickRun);
+        updateMedStatus();
     }
 
     @Override
