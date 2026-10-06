@@ -90,7 +90,18 @@ public class MedPlanActivity extends Activity {
         });
         LinearLayout.LayoutParams a2 = new LinearLayout.LayoutParams(0, -2, 1f);
         a2.leftMargin = dp(12);
-        bottomBar2.addView(add, a1); bottomBar2.addView(test, a2);
+        TextView clean = mkText("🧹 清标记", 16, false, 0xFF8A94A6);
+        clean.setGravity(Gravity.CENTER);
+        clean.setBackgroundResource(R.drawable.bg_btn_outline);
+        clean.setPadding(dp(8), dp(16), dp(8), dp(16));
+        clean.setOnClickListener(v -> {
+            getSharedPreferences("medplan", 0).edit()
+                .remove("ntf_" + new SimpleDateFormat("yyyy-MM-dd", Locale.US).format(new Date())).apply();
+            toast("已清今日标记，到点会重新提醒");
+        });
+        LinearLayout.LayoutParams a3 = new LinearLayout.LayoutParams(0, -2, 1f);
+        a3.leftMargin = dp(10);
+        bottomBar2.addView(add, a1); bottomBar2.addView(test, a2); bottomBar2.addView(clean, a3);
         FrameLayout.LayoutParams alp = new FrameLayout.LayoutParams(-1, -2, Gravity.BOTTOM);
         alp.leftMargin = dp(16); alp.rightMargin = dp(16); alp.bottomMargin = dp(24);
         root.addView(bottomBar2, alp);
@@ -103,6 +114,7 @@ public class MedPlanActivity extends Activity {
         setContentView(root);
         Immersive.hide(this);
         renderList();
+        cleanFutureMarks();
         // 精确闹钟权限(Android 12+): 不批的话提醒会延迟
         AlarmManager am = (AlarmManager) getSystemService(Context.ALARM_SERVICE);
         if (android.os.Build.VERSION.SDK_INT >= 31 && am != null && !am.canScheduleExactAlarms()) {
@@ -111,6 +123,29 @@ public class MedPlanActivity extends Activity {
                     android.net.Uri.parse("package:" + getPackageName())));
             } catch (Throwable ignored) {}
         }
+    }
+
+    private void cleanFutureMarks() {
+        try {
+            String today = new SimpleDateFormat("yyyy-MM-dd", Locale.US).format(new Date());
+            String now = new SimpleDateFormat("HH:mm", Locale.US).format(new Date());
+            android.content.SharedPreferences pf = getSharedPreferences("medplan", 0);
+            android.content.SharedPreferences.Editor e = pf.edit();
+            boolean changed = false;
+            for (int i = 0; i < plans.length(); i++) {
+                JSONObject o = plans.optJSONObject(i);
+                JSONArray ts = o == null ? null : o.optJSONArray("times");
+                if (ts == null) continue;
+                for (int t = 0; t < ts.length(); t++) {
+                    String tt = ts.optString(t);
+                    if (tt.compareTo(now) > 0 && pf.getBoolean("ntf_" + today + "_" + i + "_" + t, false)) {
+                        e.remove("ntf_" + today + "_" + i + "_" + t);
+                        changed = true;
+                    }
+                }
+            }
+            if (changed) e.apply();
+        } catch (Throwable ignored) {}
     }
 
     private void renderList() {
