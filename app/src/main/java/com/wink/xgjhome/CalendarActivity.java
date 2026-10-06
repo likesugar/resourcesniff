@@ -1,7 +1,6 @@
 package com.wink.xgjhome;
 
 import android.app.Activity;
-import android.widget.Toast;
 import android.graphics.Color;
 import android.graphics.Typeface;
 import android.os.Bundle;
@@ -19,7 +18,6 @@ public class CalendarActivity extends Activity {
     @Override
     protected void onCreate(Bundle b) {
         super.onCreate(b);
-        try {
         boolean dark = getSharedPreferences("settings", MODE_PRIVATE).getBoolean("dark", false);
         FrameLayout root = new FrameLayout(this);
         root.setBackgroundColor(dark ? 0xFF000000 : 0xFFEEF4FF);
@@ -47,29 +45,6 @@ public class CalendarActivity extends Activity {
         head.addView(title, new LinearLayout.LayoutParams(0, -2, 1f));
         col.addView(head);
 
-        // 星期表头
-        LinearLayout week = new LinearLayout(this);
-        week.setGravity(Gravity.CENTER_VERTICAL);
-        int pw = (int) (10 * getResources().getDisplayMetrics().density);
-        week.setPadding(pw, (int) (10 * getResources().getDisplayMetrics().density), pw, (int) (4 * getResources().getDisplayMetrics().density));
-        String[] wd = {"日", "一", "二", "三", "四", "五", "六"};
-        for (int i = 0; i < 7; i++) {
-            TextView t = new TextView(this);
-            t.setText(wd[i]); t.setTextSize(12);
-            t.setGravity(Gravity.CENTER);
-            t.setTextColor(i == 0 || i == 6 ? 0xFFFF6B6B : (dark ? 0xFF9AA3AE : 0xFF8A94A6));
-            week.addView(t, new LinearLayout.LayoutParams(0, -2, 1f));
-        }
-        col.addView(week);
-
-        // NCalendar 完整容器(周条+月视图+周翻页): 农历/节气/选中/月周切换
-        com.necer.calendar.NCalendar nc = new com.necer.calendar.NCalendar(this, null);
-        nc.setOnCalendarChangedListener(new com.necer.listener.OnCalendarChangedListener() {
-            @Override public void onCalendarChange(int year, int month, java.time.LocalDate localDate, com.necer.enumeration.DateChangeBehavior b2) {}
-        });
-        LinearLayout.LayoutParams nlp = new LinearLayout.LayoutParams(-1, (int) (310 * getResources().getDisplayMetrics().density));
-        col.addView(nc, nlp);
-
         LinearLayout host = new LinearLayout(this);
         host.setOrientation(LinearLayout.VERTICAL);
         LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(-1, -2);
@@ -79,16 +54,6 @@ public class CalendarActivity extends Activity {
         col.addView(host, lp);
 
         setContentView(root);
-        } catch (Throwable t) {
-            try {
-                java.io.File dir = getExternalFilesDir(null) != null ? getExternalFilesDir(null).getParentFile() : getFilesDir();
-                java.io.FileWriter fw = new java.io.FileWriter(new java.io.File(dir, "网页诊断.txt"), true);
-                fw.write("\n==== CAL ACT ERR " + new java.util.Date() + " ====\n" + android.util.Log.getStackTraceString(t) + "\n");
-                fw.close();
-            } catch (Throwable ignored) {}
-            Toast.makeText(this, "日历初始化失败: " + t.getClass().getSimpleName(), Toast.LENGTH_LONG).show();
-            finish();
-        }
     }
 
     @Override

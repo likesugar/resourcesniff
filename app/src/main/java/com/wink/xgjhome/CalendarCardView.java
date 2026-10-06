@@ -641,6 +641,22 @@ String[] labels = {"早上", "中午", "晚上"};
                 if (isToday) markColor = Color.WHITE;
             } else if (isToday) {
                 mark = "今"; markColor = Color.WHITE;
+            } else {
+                // 农历/节气/节日 副行 (NCalendar同款优先级: 节气/节日高亮, 农历日灰)
+                try {
+                    String lunar = ChinaDate.getChinaDay(year, month + 1, day);
+                    if (lunar != null && lunar.trim().length() > 0) {
+                        lunar = lunar.trim();
+                        String term = SolarTermsUtil.getSolarTermName(year, month + 1, day);
+                        long[] l = ChinaDate.calElement(year, month + 1, day);
+                        String pure = ChinaDate.getChinaDate((int) l[2]);
+                        if (pure.equals("初一")) pure = (l[1] == 12) ? "腊月" : ((0 != l[6]) ? ("闰" + (int) l[1] + "月") : ChinaDate.getChinaDate((int) l[2]));
+                        mark = (lunar.length() > 3) ? lunar.substring(0, 3) : lunar;
+                        if (term != null && term.trim().length() > 0) markColor = BLUE_W;
+                        else if (!lunar.equals(pure)) markColor = RED;
+                        else markColor = fgSub();
+                    }
+                } catch (Throwable ignored) {}
             }
             if (mark != null) {
                 TextView mk = new TextView(ctx);
