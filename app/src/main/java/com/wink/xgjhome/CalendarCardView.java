@@ -736,6 +736,71 @@ String[] labels = {"早上", "中午", "晚上"};
             }).show();
     }
 
+    // ---------- 签到管理(增删签到项) ----------
+    private void showSignManager() {
+        final LinearLayout box = new LinearLayout(ctx);
+        box.setOrientation(VERTICAL);
+        int p = dp(6);
+        box.setPadding(p, p, p, p);
+        final Runnable[] render = new Runnable[1];
+        render[0] = new Runnable() { public void run() {
+            box.removeAllViews();
+            JSONArray arr = signArr();
+            LinearLayout chips = new LinearLayout(ctx);
+            for (int k = 0; k < arr.length(); k++) {
+                final int idx = k;
+                JSONObject o = arr.optJSONObject(k);
+                if (o == null) continue;
+                TextView chip = new TextView(ctx);
+                chip.setText(o.optString("n", "签到") + " ✕");
+                chip.setTextSize(13);
+                chip.setTextColor(fgMain());
+                chip.setBackground(flatBg(cellBg(), 8));
+                chip.setPadding(dp(10), dp(6), dp(10), dp(6));
+                LayoutParams clp = new LayoutParams(-2, -2);
+                clp.setMargins(0, 0, dp(6), dp(6));
+                chip.setOnClickListener(new OnClickListener() { public void onClick(View v) {
+                    try {
+                        JSONArray a = signArr();
+                        JSONArray na = new JSONArray();
+                        for (int m = 0; m < a.length(); m++) if (m != idx) na.put(a.get(m));
+                        ctx.getSharedPreferences("cal", 0).edit().putString("signs", na.toString()).apply();
+                    } catch (Throwable ignored) {}
+                    render[0].run();
+                }});
+                chips.addView(chip, clp);
+            }
+            box.addView(chips);
+        }};
+        render[0].run();
+        android.widget.EditText et = new android.widget.EditText(ctx);
+        et.setHint("签到名称"); et.setSingleLine(true);
+        LinearLayout wrap = new LinearLayout(ctx);
+        wrap.setOrientation(VERTICAL);
+        wrap.addView(box);
+        wrap.addView(et);
+        new AlertDialog.Builder(ctx).setTitle("签到管理(点签到删除)")
+            .setView(wrap)
+            .setPositiveButton("添加", new android.content.DialogInterface.OnClickListener() {
+                public void onClick(android.content.DialogInterface d2, int w) {
+                    String n = et.getText().toString().trim();
+                    if (n.isEmpty()) return;
+                    try {
+                        JSONArray a = signArr();
+                        JSONObject o = new JSONObject();
+                        o.put("n", n); o.put("last", "");
+                        a.put(o);
+                        ctx.getSharedPreferences("cal", 0).edit().putString("signs", a.toString()).apply();
+                    } catch (Throwable ignored) {}
+                    render[0].run();
+                }
+            })
+            .setNegativeButton("完成", null)
+            .setOnDismissListener(new android.content.DialogInterface.OnDismissListener() {
+                public void onDismiss(android.content.DialogInterface d) { build(); }
+            }).show();
+    }
+
     // ---------- 自定义签到 ----------
     private JSONArray signArr() {
         try { return new JSONArray(ctx.getSharedPreferences("cal", 0).getString("signs", "[{\"n\":\"每日签到\"}]")); }
@@ -757,25 +822,7 @@ String[] labels = {"早上", "中午", "晚上"};
         addBtn.setTextSize(13); addBtn.setTextColor(Color.WHITE);
         addBtn.setBackground(flatBg(ACCENT, 12));
         addBtn.setPadding(dp(14), dp(7), dp(14), dp(7));
-        addBtn.setOnClickListener(new OnClickListener() { public void onClick(View v) {
-            android.widget.EditText et = new android.widget.EditText(ctx);
-            et.setHint("签到名称"); et.setSingleLine(true);
-            new AlertDialog.Builder(ctx).setTitle("新建签到").setView(et)
-                .setPositiveButton("添加", new android.content.DialogInterface.OnClickListener() {
-                    public void onClick(android.content.DialogInterface dlg, int w) {
-                        String n = et.getText().toString().trim();
-                        if (n.isEmpty()) return;
-                        try {
-                            JSONArray a = signArr();
-                            JSONObject o = new JSONObject();
-                            o.put("n", n); o.put("last", "");
-                            a.put(o);
-                            ctx.getSharedPreferences("cal", 0).edit().putString("signs", a.toString()).apply();
-                        } catch (Throwable ignored) {}
-                        build();
-                    }
-                }).setNegativeButton("取消", null).show();
-        }});
+        addBtn.setOnClickListener(new OnClickListener() { public void onClick(View v) { showSignManager(); }});
         head.addView(addBtn);
         sec.addView(head);
         String today = new SimpleDateFormat("yyyy-MM-dd", Locale.US).format(new Date());
