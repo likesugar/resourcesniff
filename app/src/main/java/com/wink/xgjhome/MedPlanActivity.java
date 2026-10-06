@@ -38,7 +38,7 @@ import java.util.Locale;
 public class MedPlanActivity extends Activity {
 
     private static final String CH = "medplan";
-    private LinearLayout listHost, formHost;
+    private LinearLayout listHost; private FrameLayout formHost;
     private ScrollView listScroll;
     private JSONArray plans;
 
@@ -55,6 +55,13 @@ public class MedPlanActivity extends Activity {
         root.setBackgroundColor(0xFFEAF2FF);
         root.setId(17901);
 
+        listScroll = new ScrollView(this);
+        listHost = new LinearLayout(this);
+        listHost.setOrientation(LinearLayout.VERTICAL);
+        listHost.setPadding(dp(16), dp(84), dp(16), dp(140));
+        listScroll.addView(listHost);
+        root.addView(listScroll, new FrameLayout.LayoutParams(-1, -1));
+
         TextView back = mkText("‹", 26, true, 0xFF1F2329); back.setPadding(dp(16), dp(30), dp(16), dp(10));
         back.setOnClickListener(v -> finish());
         root.addView(back, new FrameLayout.LayoutParams(-2, -2, Gravity.TOP | Gravity.START));
@@ -63,24 +70,16 @@ public class MedPlanActivity extends Activity {
         root.addView(title, new FrameLayout.LayoutParams(-2, -2, Gravity.TOP | Gravity.CENTER_HORIZONTAL));
         ((FrameLayout.LayoutParams) title.getLayoutParams()).topMargin = dp(32);
 
-        TextView add = mkText("＋ 新增用药计划", 15, true, Color.WHITE);
-        add.setTextAlignment(View.TEXT_ALIGNMENT_CENTER);
+        TextView add = mkText("＋  新增用药计划", 16, true, Color.WHITE);
+        add.setGravity(Gravity.CENTER);
         add.setBackgroundResource(R.drawable.bg_pill_blue);
-        add.setPadding(dp(26), dp(12), dp(26), dp(12));
+        add.setPadding(dp(20), dp(16), dp(20), dp(16));
         add.setOnClickListener(v -> showForm(-1));
-        FrameLayout.LayoutParams alp = new FrameLayout.LayoutParams(-2, -2, Gravity.TOP | Gravity.END);
-        alp.topMargin = dp(28); alp.rightMargin = dp(16);
+        FrameLayout.LayoutParams alp = new FrameLayout.LayoutParams(-1, -2, Gravity.BOTTOM);
+        alp.leftMargin = dp(16); alp.rightMargin = dp(16); alp.bottomMargin = dp(24);
         root.addView(add, alp);
 
-        listScroll = new ScrollView(this);
-        listHost = new LinearLayout(this);
-        listHost.setOrientation(LinearLayout.VERTICAL);
-        listHost.setPadding(dp(16), dp(84), dp(16), dp(30));
-        listScroll.addView(listHost);
-        root.addView(listScroll, new FrameLayout.LayoutParams(-1, -1));
-
-        formHost = new LinearLayout(this);
-        formHost.setOrientation(LinearLayout.VERTICAL);
+        formHost = new FrameLayout(this);
         formHost.setBackgroundColor(0xFFEAF2FF);
         formHost.setVisibility(View.GONE);
         root.addView(formHost, new FrameLayout.LayoutParams(-1, -1));
@@ -169,11 +168,16 @@ public class MedPlanActivity extends Activity {
         listScroll.setVisibility(View.GONE);
         formHost.removeAllViews();
         formHost.setVisibility(View.VISIBLE);
-        formHost.setPadding(dp(16), dp(84), dp(16), dp(30));
         ScrollView fs = new ScrollView(this);
         LinearLayout card = card();
+        card.setPadding(dp(16), dp(84), dp(16), dp(40));
         fs.addView(card);
         formHost.addView(fs, new FrameLayout.LayoutParams(-1, -1));
+        LinearLayout bottomBar = new LinearLayout(this);
+        bottomBar.setOrientation(LinearLayout.HORIZONTAL);
+        bottomBar.setBackgroundResource(R.drawable.bg_card_white);
+        bottomBar.setPadding(dp(16), dp(12), dp(16), dp(12));
+        formHost.addView(bottomBar, new FrameLayout.LayoutParams(-1, -2, Gravity.BOTTOM));
 
         final EditText name = rowInput(card, "💊", "药品名称", "请输入药品名称", idx >= 0 ? plans.optJSONObject(idx).optString("name", "") : "");
         final EditText spec = rowInput(card, "🧴", "规格剂量", "如：10mg*12片/盒", idx >= 0 ? plans.optJSONObject(idx).optString("spec", "") : "");
@@ -281,7 +285,7 @@ public class MedPlanActivity extends Activity {
         LinearLayout.LayoutParams c2 = new LinearLayout.LayoutParams(0, -2, 1f);
         c2.leftMargin = dp(14);
         btns.addView(cancel, c1); btns.addView(save, c2);
-        card.addView(btns, blp);
+        bottomBar.addView(btns, new LinearLayout.LayoutParams(-1, -2));
         cancel.setOnClickListener(v -> { formHost.setVisibility(View.GONE); listScroll.setVisibility(View.VISIBLE); });
         save.setOnClickListener(v -> {
             String n = name.getText().toString().trim();
