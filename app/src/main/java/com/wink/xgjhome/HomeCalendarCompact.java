@@ -68,28 +68,12 @@ public class HomeCalendarCompact extends LinearLayout {
         TextView spacer = new TextView(a);
         r1.addView(spacer, new LinearLayout.LayoutParams(0, 0, 1f));
         addView(r1);
+        addView(buildSignBtn());
 
-        // 行2: 签到按钮 + 连签 + 提醒摘要
+        // 行2: 提醒摘要
         LinearLayout r2 = new LinearLayout(a);
-        r2.setGravity(Gravity.CENTER_VERTICAL);
-        r2.setPadding(0, (int) (12 * getResources().getDisplayMetrics().density), 0, 0);
-        signBtn = new LinearLayout(a);
-        signBtn.setGravity(Gravity.CENTER);
-        signBtn.setOrientation(HORIZONTAL);
-        GradientDrawable g = new GradientDrawable();
-        g.setCornerRadius((int) (14 * getResources().getDisplayMetrics().density));
-        g.setColor(dark ? 0xFF232A38 : 0xFFE8EEFF);
-        signBtn.setBackground(g);
-        signText = new TextView(a);
-        signText.setTextSize(14); signText.setTypeface(Typeface.DEFAULT_BOLD);
-        signText.setTextColor(dark ? 0xFFB4C5FF : 0xFF315CDE);
-        signText.setPadding((int) (18 * getResources().getDisplayMetrics().density), (int) (9 * getResources().getDisplayMetrics().density), (int) (18 * getResources().getDisplayMetrics().density), (int) (9 * getResources().getDisplayMetrics().density));
-        signBtn.addView(signText);
-        signBtn.setOnClickListener(new View.OnClickListener() { public void onClick(View v) { doSign(); refresh(); }});
-        r2.addView(signBtn);
         remindText = new TextView(a);
         remindText.setTextSize(13); remindText.setTextColor(fgSub);
-        remindText.setPadding((int) (14 * getResources().getDisplayMetrics().density), 0, 0, 0);
         r2.addView(remindText, new LinearLayout.LayoutParams(0, -2, 1f));
         addView(r2);
         medHost = new LinearLayout(a);
@@ -260,6 +244,24 @@ public class HomeCalendarCompact extends LinearLayout {
             }
             return true;
         } catch (Throwable e) { return false; }
+    }
+
+    private LinearLayout buildSignBtn() {
+        signBtn = new LinearLayout(act);
+        signBtn.setGravity(Gravity.CENTER);
+        signBtn.setOrientation(HORIZONTAL);
+        GradientDrawable g = new GradientDrawable();
+        g.setCornerRadius((int) (14 * getResources().getDisplayMetrics().density));
+        g.setColor(dark ? 0xFF232A38 : 0xFFE8EEFF);
+        signBtn.setBackground(g);
+        signText = new TextView(act);
+        signText.setTextSize(14); signText.setTypeface(Typeface.DEFAULT_BOLD);
+        signText.setTextColor(dark ? 0xFFB4C5FF : 0xFF315CDE);
+        int p18 = (int) (18 * getResources().getDisplayMetrics().density);
+        signText.setPadding(p18, (int) (8 * getResources().getDisplayMetrics().density), p18, (int) (8 * getResources().getDisplayMetrics().density));
+        signBtn.addView(signText);
+        signBtn.setOnClickListener(new View.OnClickListener() { public void onClick(View v) { doSign(); refresh(); }});
+        return signBtn;
     }
 
     private android.graphics.drawable.GradientDrawable circleBg(boolean d) {

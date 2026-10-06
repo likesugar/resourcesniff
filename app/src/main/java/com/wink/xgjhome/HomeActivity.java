@@ -184,6 +184,9 @@ public class HomeActivity extends Activity {
                 }
             }
         });
+        findViewById(R.id.cardPomo).setOnClickListener(new View.OnClickListener() {
+            public void onClick(View v) { startActivity(new Intent(HomeActivity.this, PomodoroActivity.class)); }
+        });
         findViewById(R.id.cardDownload).setOnClickListener(new View.OnClickListener() {
             public void onClick(View v) { startActivity(new Intent(HomeActivity.this, RecordActivity.class)); }
         });
