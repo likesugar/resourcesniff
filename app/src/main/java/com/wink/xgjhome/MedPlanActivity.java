@@ -573,32 +573,14 @@ public class MedPlanActivity extends Activity {
                 int i = intent.getIntExtra("i", -1), t = intent.getIntExtra("t", -1);
                 JSONArray plans = load(context);
                 JSONObject o = plans.optJSONObject(i);
-                if (o != null && t >= 0) {
-                    String today = new SimpleDateFormat("yyyy-MM-dd", Locale.US).format(new Date());
-                    android.content.SharedPreferences pf = context.getSharedPreferences("medplan", 0);
-                    if (!pf.getBoolean("ntf_" + today + "_" + i + "_" + t, false)) {
-                        pf.edit().putBoolean("ntf_" + today + "_" + i + "_" + t, true).apply();
-                        String txt = "💊 " + o.optString("name", "") + "  " + o.optString("dose", "1") + o.optString("unit", "片")
-                            + (o.optString("relation", "").isEmpty() ? "" : "（" + o.optString("relation") + "）");
-                        notifyMed(context, "该吃药啦 ⏰ " + o.optString("times", ""), txt);
-                    }
+                if (o != null && t >= 0 && !medDone(context, i, t)) {
+                    String txt = "💊 " + o.optString("name", "") + "  " + o.optString("dose", "1") + o.optString("unit", "片")
+                        + (o.optString("relation", "").isEmpty() ? "" : "（" + o.optString("relation") + "）");
+                    notifyMedHold(context, i, t, "该吃药啦 ⏰（确认后才停止提醒）", txt);
                 }
                 scheduleAll(context); // 排下一个时间点
             } catch (Throwable ignored) {}
         }
-    }
-
-    /** 应用启动即创建渠道, 保证系统通知设置里能看到并配置 */
-    public static void ensureChannel(Context c) {
-        NotificationManager nm = (NotificationManager) c.getSystemService(Context.NOTIFICATION_SERVICE);
-        NotificationChannel ch = new NotificationChannel(CH, "用药提醒", NotificationManager.IMPORTANCE_HIGH);
-        ch.enableVibration(true);
-        ch.enableLights(true);
-        ch.setLockscreenVisibility(Notification.VISIBILITY_PUBLIC);
-        nm.createNotificationChannel(ch);
-        NotificationChannel r2 = new NotificationChannel("remind", "日程提醒", NotificationManager.IMPORTANCE_HIGH);
-        r2.enableVibration(true);
-        nm.createNotificationChannel(r2);
     }
 
     static int medNotifId(int planIdx, int timeIdx) { return 990200 + planIdx * 20 + timeIdx; }
@@ -648,9 +630,7 @@ public class MedPlanActivity extends Activity {
                 if (ts == null) continue;
                 for (int t = 0; t < ts.length(); t++) {
                     String tt = ts.optString(t);
-                    if (tt.compareTo(now) <= 0 && !medDone(c, i, t)
-                        && !pf.getBoolean("ntf_" + today + "_" + i + "_" + t, false)) {
-                        pf.edit().putBoolean("ntf_" + today + "_" + i + "_" + t, true).apply();
+                    if (tt.compareTo(now) <= 0 && !medDone(c, i, t)) {
                         String txt = "💊 " + o.optString("name", "") + "  " + o.optString("dose", "1") + o.optString("unit", "片")
                             + (o.optString("relation", "").isEmpty() ? "" : "（" + o.optString("relation") + "）");
                         notifyMedHold(c, i, t, "该吃药啦 ⏰（确认后才停止提醒）", txt);
