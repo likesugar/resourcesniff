@@ -215,11 +215,9 @@ public class HomeCalendarCompact extends LinearLayout {
             } catch (Throwable ignored) {}
             holidayText.setText(hol);
             holidayText.setTextColor(hol.endsWith("休") ? 0xFFFF6B6B : 0xFF5B8DEF);
-            // 签到
+            // 签到(自定义签到: 全签完=已签)
             android.content.SharedPreferences sp = act.getSharedPreferences("cal", 0);
-            boolean signed = sp.getString("sign_last", "").equals(today);
-            int days = sp.getInt("sign_days", 0);
-            signText.setText(signed ? "✓ 已连签" + days + "天" : "签到");
+            signText.setText(allSigned(today) ? "✓ 已签" : "签到");
             // 日程摘要: 最近一条
             String next = "";
             try {
@@ -246,18 +244,29 @@ public class HomeCalendarCompact extends LinearLayout {
         return bo.toString("UTF-8");
     }
 
+    private boolean allSigned(String today) {
+        try {
+            JSONArray a = new JSONArray(act.getSharedPreferences("cal", 0).getString("signs", "[{\"n\":\"每日签到\"}]"));
+            for (int i = 0; i < a.length(); i++) {
+                JSONObject o = a.optJSONObject(i);
+                if (o != null && !today.equals(o.optString("last", ""))) return false;
+            }
+            return true;
+        } catch (Throwable e) { return false; }
+    }
+
     private void doSign() {
         try {
             android.content.SharedPreferences sp = act.getSharedPreferences("cal", 0);
             String today = new SimpleDateFormat("yyyy-MM-dd", Locale.US).format(new Date());
-            if (sp.getString("sign_last", "").equals(today)) {
-                Toast.makeText(act, "今天已签过", Toast.LENGTH_SHORT).show(); return;
+            if (allSigned(today)) { Toast.makeText(act, "今天已签过", Toast.LENGTH_SHORT).show(); return; }
+            JSONArray a = new JSONArray(sp.getString("signs", "[]"));
+            for (int i = 0; i < a.length(); i++) {
+                JSONObject o = a.optJSONObject(i);
+                if (o != null && !today.equals(o.optString("last", ""))) o.put("last", today);
             }
-            Calendar y = Calendar.getInstance(); y.add(Calendar.DAY_OF_YEAR, -1);
-            boolean consecutive = sp.getString("sign_last", "").equals(new SimpleDateFormat("yyyy-MM-dd", Locale.US).format(y.getTime()));
-            int days = consecutive ? sp.getInt("sign_days", 0) + 1 : 1;
-            sp.edit().putString("sign_last", today).putInt("sign_days", days).apply();
-            Toast.makeText(act, "签到成功，已连签 " + days + " 天", Toast.LENGTH_SHORT).show();
+            sp.edit().putString("signs", a.toString()).apply();
+            Toast.makeText(act, "已签到", Toast.LENGTH_SHORT).show();
         } catch (Throwable ignored) {}
     }
 }

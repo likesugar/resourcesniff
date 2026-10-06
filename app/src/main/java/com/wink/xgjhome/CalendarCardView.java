@@ -44,7 +44,7 @@ public class CalendarCardView extends LinearLayout {
     private boolean dark;
     private int year, month; // month: 0-11
     private LinearLayout gridHost, remindList;
-    private TextView monthLabel, signBtn, signInfo;
+    private TextView monthLabel;
     private final Map<String, JSONObject> holidays = new HashMap<String, JSONObject>(); // date->obj
     private String holidayYearLoaded = "";
 
@@ -84,9 +84,6 @@ public class CalendarCardView extends LinearLayout {
 
     private void build() {
         removeAllViews();
-        int pad = dp(16);
-        setPadding(pad, pad, pad, pad);
-        setBackground(flatBg(bgCard(), 18));
 
         // 标题行: 📅 日历 + 月份切换
         LinearLayout head = new LinearLayout(ctx);
@@ -114,7 +111,9 @@ public class CalendarCardView extends LinearLayout {
             loadHolidaysAndBuildGrid();
         }});
         head.addView(next);
-        addView(head);
+        LinearLayout calBox = new LinearLayout(ctx);
+        calBox.setOrientation(VERTICAL);
+        calBox.addView(head);
 
         // 星期表头
         LinearLayout week = new LinearLayout(ctx);
@@ -127,34 +126,21 @@ public class CalendarCardView extends LinearLayout {
             t.setTextColor(i == 0 || i == 6 ? RED : fgSub());
             week.addView(t, new LayoutParams(0, -2, 1f));
         }
-        addView(week);
+        calBox.addView(week);
 
         gridHost = new LinearLayout(ctx);
         gridHost.setOrientation(VERTICAL);
         android.widget.ScrollView gsv = new android.widget.ScrollView(ctx);
         gsv.setVerticalScrollBarEnabled(true);
         gsv.addView(gridHost, new LayoutParams(-1, -2));
-        addView(frameWrap(gsv));
+        calBox.addView(frameWrap(gsv));
+        addView(calBox);
 
-        // 签到行
-        LinearLayout signRow = new LinearLayout(ctx);
-        signRow.setGravity(Gravity.CENTER_VERTICAL);
-        signRow.setPadding(0, dp(14), 0, 0);
-        signBtn = new TextView(ctx);
-        signBtn.setTextSize(14); signBtn.setTypeface(Typeface.DEFAULT_BOLD);
-        signBtn.setGravity(Gravity.CENTER);
-        signBtn.setPadding(dp(22), dp(9), dp(22), dp(9));
-        signBtn.setOnClickListener(new OnClickListener() { public void onClick(View v) { doSign(); }});
-        signRow.addView(signBtn);
-        signInfo = new TextView(ctx);
-        signInfo.setTextSize(13); signInfo.setTextColor(fgSub());
-        signInfo.setPadding(dp(14), 0, 0, 0);
-        signRow.addView(signInfo, new LayoutParams(0, -2, 1f));
-        addView(signRow);
-        refreshSignUi();
+        // 自定义签到区(可加多个, 不显示连签天数)
+        addView(buildSignSection());
 
-        // 药物提醒区
-        addView(frameWrap(buildMedSection()));
+        // 药物提醒区(不包白底)
+        addView(buildMedSection());
 
         // 提醒行
         LinearLayout rHead = new LinearLayout(ctx);
@@ -180,7 +166,7 @@ public class CalendarCardView extends LinearLayout {
         remindSec.setOrientation(VERTICAL);
         remindSec.addView(rHead);
         remindSec.addView(remindList);
-        addView(frameWrap(remindSec));
+        addView(remindSec);
 
         loadHolidaysAndBuildGrid();
         refreshReminders();
@@ -416,6 +402,16 @@ String[] labels = {"早上", "中午", "晚上"};
             }});
             times.addView(tt, tlp);
         }
+        TextView medMgr = new TextView(ctx);
+        medMgr.setText("＋"); medMgr.setTextSize(15);
+        medMgr.setTextColor(Color.WHITE);
+        medMgr.setGravity(Gravity.CENTER);
+        medMgr.setBackground(flatBg(ACCENT, 8));
+        medMgr.setPadding(dp(10), dp(2), dp(10), dp(2));
+        LayoutParams mlp = new LayoutParams(-2, -2);
+        mlp.setMargins(dp(8), 0, 0, 0);
+        medMgr.setOnClickListener(new OnClickListener() { public void onClick(View v) { showMedManager(); }});
+        times.addView(medMgr, mlp);
         sec.addView(times);
         ti.setTextSize(14); ti.setTypeface(Typeface.DEFAULT_BOLD);
         ti.setTextColor(fgMain());
@@ -476,29 +472,6 @@ String[] labels = {"早上", "中午", "晚上"};
                 drugBox.addView(none);
             }
             row.addView(drugBox, new LayoutParams(0, -2, 1f));
-            TextView add = new TextView(ctx);
-            add.setText("＋"); add.setTextSize(15);
-            add.setTextColor(Color.WHITE);
-            add.setGravity(Gravity.CENTER);
-            add.setBackground(flatBg(ACCENT, 8));
-            add.setPadding(dp(8), dp(2), dp(8), dp(2));
-            add.setOnClickListener(new OnClickListener() { public void onClick(View v) {
-                android.widget.EditText et = new android.widget.EditText(ctx);
-                et.setHint("药物名称");
-                et.setSingleLine(true);
-                new AlertDialog.Builder(ctx).setTitle("添加" + MED_SLOTS[si] + "药物").setView(et)
-                    .setPositiveButton("添加", new android.content.DialogInterface.OnClickListener() {
-                        public void onClick(android.content.DialogInterface dlg, int w) {
-                            String n = et.getText().toString().trim();
-                            if (n.isEmpty()) return;
-                            java.util.List<String>[] a = medArr();
-                            a[si].add(n);
-                            saveMeds(a);
-                            rebuildMedsOnly();
-                        }
-                    }).setNegativeButton("取消", null).show();
-            }});
-            row.addView(add);
             sec.addView(row);
         }
         return sec;
@@ -682,33 +655,159 @@ String[] labels = {"早上", "中午", "晚上"};
     }
 
     // ---------- 签到 ----------
-    private void refreshSignUi() {
-        android.content.SharedPreferences sp = ctx.getSharedPreferences("cal", 0);
-        String last = sp.getString("sign_last", "");
-        int days = sp.getInt("sign_days", 0);
-        boolean signed = last.equals(new SimpleDateFormat("yyyy-MM-dd", Locale.US).format(new Date()));
-        if (signed) {
-            signBtn.setText("已签到");
-            signBtn.setTextColor(dark ? 0xFF9AA3AE : 0xFF8A94A6);
-            signBtn.setBackground(flatBg(cellBg(), 12));
-        } else {
-            signBtn.setText("签到");
-            signBtn.setTextColor(Color.WHITE);
-            signBtn.setBackground(flatBg(ACCENT, 12));
-        }
-        signInfo.setText(days > 0 ? "已连签 " + days + " 天" : "今天还没签到");
+    // ---------- 药物管理(时间行＋进入: 增删早/中/晚药物) ----------
+    private void showMedManager() {
+        final LinearLayout box = new LinearLayout(ctx);
+        box.setOrientation(VERTICAL);
+        int p = dp(6);
+        box.setPadding(p, p, p, p);
+        final Runnable[] render = new Runnable[1];
+        render[0] = new Runnable() { public void run() {
+            box.removeAllViews();
+            java.util.List<String>[] meds = medArr();
+            for (int i = 0; i < 3; i++) {
+                final int si = i;
+                LinearLayout head = new LinearLayout(ctx);
+                head.setGravity(Gravity.CENTER_VERTICAL);
+                head.setPadding(0, dp(8), 0, dp(4));
+                TextView slotT = new TextView(ctx);
+                slotT.setText(MED_SLOTS[i]); slotT.setTextSize(14); slotT.setTypeface(Typeface.DEFAULT_BOLD);
+                slotT.setTextColor(fgMain());
+                head.addView(slotT, new LayoutParams(0, -2, 1f));
+                TextView add = new TextView(ctx);
+                add.setText("＋"); add.setTextSize(14);
+                add.setTextColor(fgMain());
+                add.setBackground(flatBg(cellBg(), 8));
+                add.setPadding(dp(10), dp(2), dp(10), dp(2));
+                add.setOnClickListener(new OnClickListener() { public void onClick(View v) {
+                    android.widget.EditText et = new android.widget.EditText(ctx);
+                    et.setHint("药物名称"); et.setSingleLine(true);
+                    new AlertDialog.Builder(ctx).setTitle("添加" + MED_SLOTS[si] + "药物").setView(et)
+                        .setPositiveButton("添加", new android.content.DialogInterface.OnClickListener() {
+                            public void onClick(android.content.DialogInterface d2, int w) {
+                                String n = et.getText().toString().trim();
+                                if (n.isEmpty()) return;
+                                java.util.List<String>[] a = medArr();
+                                a[si].add(n);
+                                saveMeds(a);
+                                render[0].run();
+                            }
+                        }).setNegativeButton("取消", null).show();
+                }});
+                head.addView(add);
+                box.addView(head);
+                if (meds[i].isEmpty()) {
+                    TextView none = new TextView(ctx);
+                    none.setText("未添加"); none.setTextSize(13); none.setTextColor(fgSub());
+                    box.addView(none);
+                } else {
+                    LinearLayout chips = new LinearLayout(ctx);
+                    for (int j = 0; j < meds[i].size(); j++) {
+                        final int dj = j;
+                        TextView chip = new TextView(ctx);
+                        chip.setText(meds[i].get(j) + " ✕");
+                        chip.setTextSize(13);
+                        chip.setTextColor(fgMain());
+                        chip.setBackground(flatBg(cellBg(), 8));
+                        chip.setPadding(dp(10), dp(6), dp(10), dp(6));
+                        LayoutParams clp = new LayoutParams(-2, -2);
+                        clp.setMargins(0, 0, dp(6), dp(6));
+                        chip.setOnClickListener(new OnClickListener() { public void onClick(View v) {
+                            java.util.List<String>[] a = medArr();
+                            a[si].remove(dj);
+                            saveMeds(a);
+                            render[0].run();
+                        }});
+                        chips.addView(chip, clp);
+                    }
+                    box.addView(chips);
+                }
+            }
+        }};
+        render[0].run();
+        new AlertDialog.Builder(ctx).setTitle("药物管理(点药删除)").setView(box)
+            .setPositiveButton("完成", null).show();
     }
 
-    private void doSign() {
-        android.content.SharedPreferences sp = ctx.getSharedPreferences("cal", 0);
+    // ---------- 自定义签到 ----------
+    private JSONArray signArr() {
+        try { return new JSONArray(ctx.getSharedPreferences("cal", 0).getString("signs", "[{\"n\":\"每日签到\"}]")); }
+        catch (Throwable e) { return new JSONArray(); }
+    }
+
+    private LinearLayout buildSignSection() {
+        LinearLayout sec = new LinearLayout(ctx);
+        sec.setOrientation(VERTICAL);
+        sec.setPadding(0, dp(14), 0, 0);
+        LinearLayout head = new LinearLayout(ctx);
+        head.setGravity(Gravity.CENTER_VERTICAL);
+        TextView ti = new TextView(ctx);
+        ti.setText("✅ 签到"); ti.setTextSize(15); ti.setTypeface(Typeface.DEFAULT_BOLD);
+        ti.setTextColor(fgMain());
+        head.addView(ti, new LayoutParams(0, -2, 1f));
+        TextView addBtn = new TextView(ctx);
+        addBtn.setText("＋ 新建");
+        addBtn.setTextSize(13); addBtn.setTextColor(Color.WHITE);
+        addBtn.setBackground(flatBg(ACCENT, 12));
+        addBtn.setPadding(dp(14), dp(7), dp(14), dp(7));
+        addBtn.setOnClickListener(new OnClickListener() { public void onClick(View v) {
+            android.widget.EditText et = new android.widget.EditText(ctx);
+            et.setHint("签到名称"); et.setSingleLine(true);
+            new AlertDialog.Builder(ctx).setTitle("新建签到").setView(et)
+                .setPositiveButton("添加", new android.content.DialogInterface.OnClickListener() {
+                    public void onClick(android.content.DialogInterface dlg, int w) {
+                        String n = et.getText().toString().trim();
+                        if (n.isEmpty()) return;
+                        try {
+                            JSONArray a = signArr();
+                            JSONObject o = new JSONObject();
+                            o.put("n", n); o.put("last", "");
+                            a.put(o);
+                            ctx.getSharedPreferences("cal", 0).edit().putString("signs", a.toString()).apply();
+                        } catch (Throwable ignored) {}
+                        build();
+                    }
+                }).setNegativeButton("取消", null).show();
+        }});
+        head.addView(addBtn);
+        sec.addView(head);
         String today = new SimpleDateFormat("yyyy-MM-dd", Locale.US).format(new Date());
-        if (sp.getString("sign_last", "").equals(today)) { Toast.makeText(ctx, "今天已签过", Toast.LENGTH_SHORT).show(); return; }
-        Calendar y = Calendar.getInstance(); y.add(Calendar.DATE, -1);
-        boolean consecutive = sp.getString("sign_last", "").equals(new SimpleDateFormat("yyyy-MM-dd", Locale.US).format(y.getTime()));
-        int days = consecutive ? sp.getInt("sign_days", 0) + 1 : 1;
-        sp.edit().putString("sign_last", today).putInt("sign_days", days).apply();
-        refreshSignUi();
-        Toast.makeText(ctx, "签到成功，已连签 " + days + " 天", Toast.LENGTH_SHORT).show();
+        JSONArray arr = signArr();
+        for (int k = 0; k < arr.length(); k++) {
+            final int idx = k;
+            JSONObject o = arr.optJSONObject(k);
+            if (o == null) continue;
+            final String name = o.optString("n", "签到");
+            boolean signed = today.equals(o.optString("last", ""));
+            LinearLayout row = new LinearLayout(ctx);
+            row.setGravity(Gravity.CENTER_VERTICAL);
+            LayoutParams rlp = new LayoutParams(-1, -2);
+            rlp.setMargins(0, dp(8), 0, 0);
+            TextView nm = new TextView(ctx);
+            nm.setText(name); nm.setTextSize(14);
+            nm.setTextColor(signed ? fgSub() : fgMain());
+            row.addView(nm, new LayoutParams(0, -2, 1f));
+            TextView btn = new TextView(ctx);
+            btn.setText(signed ? "已签" : "签到");
+            btn.setTextSize(13); btn.setTypeface(Typeface.DEFAULT_BOLD);
+            btn.setPadding(dp(16), dp(7), dp(16), dp(7));
+            if (signed) { btn.setTextColor(fgSub()); btn.setBackground(flatBg(cellBg(), 12)); }
+            else { btn.setTextColor(Color.WHITE); btn.setBackground(flatBg(ACCENT, 12)); }
+            btn.setOnClickListener(new OnClickListener() { public void onClick(View v) {
+                try {
+                    JSONArray a = signArr();
+                    JSONObject oo = a.optJSONObject(idx);
+                    if (oo == null) return;
+                    String t2 = new SimpleDateFormat("yyyy-MM-dd", Locale.US).format(new Date());
+                    oo.put("last", t2.equals(oo.optString("last", "")) ? "" : t2);
+                    ctx.getSharedPreferences("cal", 0).edit().putString("signs", a.toString()).apply();
+                } catch (Throwable ignored) {}
+                build();
+            }});
+            row.addView(btn);
+            sec.addView(row, rlp);
+        }
+        return sec;
     }
 
     // ---------- 提醒 ----------
