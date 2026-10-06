@@ -34,7 +34,7 @@ import java.util.Calendar;
 import java.util.Date;
 import java.util.Locale;
 
-/** 💊 用药提醒(小工具18.0同款): 用药计划 + 多时间点强提醒 */
+/** 用药提醒(小工具18.0同款): 用药计划 + 多时间点强提醒 */
 public class MedPlanActivity extends Activity {
 
     private static final String CH = "medplan";
@@ -78,14 +78,7 @@ public class MedPlanActivity extends Activity {
         FrameLayout.LayoutParams alp = new FrameLayout.LayoutParams(-1, -2, Gravity.BOTTOM);
         alp.leftMargin = dp(16); alp.rightMargin = dp(16); alp.bottomMargin = dp(24);
 
-        // 🧹 清当日去重标记
-        TextView cleanBtn = mkText("🧹", 18, false, 0xFF8A94A6);
-        FrameLayout.LayoutParams clp2 = new FrameLayout.LayoutParams(dp(44), dp(44), Gravity.TOP | Gravity.END);
-        clp2.topMargin = dp(80); clp2.rightMargin = dp(16);
-        cleanBtn.setGravity(Gravity.CENTER);
-        cleanBtn.setBackgroundResource(R.drawable.bg_input);
         root.addView(add, alp);
-        root.addView(cleanBtn, clp2);
 
         formHost = new FrameLayout(this);
         formHost.setBackgroundColor(0xFFEAF2FF);
@@ -95,7 +88,7 @@ public class MedPlanActivity extends Activity {
         setContentView(root);
         Immersive.hide(this);
         renderList();
-        cleanFutureMarks();
+        MedWatchService.ensure(this);
         // 精确闹钟权限(Android 12+): 不批的话提醒会延迟
         AlarmManager am = (AlarmManager) getSystemService(Context.ALARM_SERVICE);
         if (android.os.Build.VERSION.SDK_INT >= 31 && am != null && !am.canScheduleExactAlarms()) {
@@ -106,33 +99,10 @@ public class MedPlanActivity extends Activity {
         }
     }
 
-    private void cleanFutureMarks() {
-        try {
-            String today = new SimpleDateFormat("yyyy-MM-dd", Locale.US).format(new Date());
-            String now = new SimpleDateFormat("HH:mm", Locale.US).format(new Date());
-            android.content.SharedPreferences pf = getSharedPreferences("medplan", 0);
-            android.content.SharedPreferences.Editor e = pf.edit();
-            boolean changed = false;
-            for (int i = 0; i < plans.length(); i++) {
-                JSONObject o = plans.optJSONObject(i);
-                JSONArray ts = o == null ? null : o.optJSONArray("times");
-                if (ts == null) continue;
-                for (int t = 0; t < ts.length(); t++) {
-                    String tt = ts.optString(t);
-                    if (tt.compareTo(now) > 0 && pf.getBoolean("ntf_" + today + "_" + i + "_" + t, false)) {
-                        e.remove("ntf_" + today + "_" + i + "_" + t);
-                        changed = true;
-                    }
-                }
-            }
-            if (changed) e.apply();
-        } catch (Throwable ignored) {}
-    }
-
     private void renderList() {
         listHost.removeAllViews();
         if (plans.length() == 0) {
-            TextView e = mkText("还没有用药计划\n点下方「＋ 新增用药计划」创建 💊", 14, false, 0xFF8A94A6);
+            TextView e = mkText("还没有用药计划\n点下方「＋ 新增用药计划」创建", 14, false, 0xFF8A94A6);
             e.setGravity(Gravity.CENTER);
             e.setPadding(0, dp(120), 0, 0);
             listHost.addView(e);
@@ -157,8 +127,6 @@ public class MedPlanActivity extends Activity {
             LinearLayout.LayoutParams clp = new LinearLayout.LayoutParams(0, -2, 1f);
             if (i % 2 == 1) clp.leftMargin = dp(14);
             // 图标 + 药名
-            TextView ic = mkText("💊", 20, false, 0xFF1F2329);
-            cell.addView(ic);
             TextView name = mkText(o.optString("name", ""), 15, true, 0xFF1F2329);
             name.setPadding(0, dp(8), 0, 0);
             cell.addView(name);
@@ -167,13 +135,7 @@ public class MedPlanActivity extends Activity {
             cell.addView(dose);
             // 首个时间胶囊
             JSONArray ts = o.optJSONArray("times");
-            TextView chip = mkText((ts != null && ts.length() > 0 ? ts.optString(0) : "--:--") + (ts != null && ts.length() > 1 ? " +" + (ts.length() - 1) : ""), 13, true, 0xFF315CDE);
-            chip.setBackgroundResource(R.drawable.bg_chip_blue);
-            chip.setPadding(dp(12), dp(5), dp(12), dp(5));
-            LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(-2, -2);
-            lp.topMargin = dp(10);
-            cell.addView(chip, lp);
-            // 到点未确认 -> 红色确认按钮; 已确认 -> 绿色已服用
+            // 状态(确认/已服用)在时间左边, 同一行
             String now = new SimpleDateFormat("HH:mm", Locale.US).format(new Date());
             boolean hasDue = false, allDueDone = true;
             if (ts != null) for (int t = 0; t < ts.length(); t++) {
@@ -183,30 +145,40 @@ public class MedPlanActivity extends Activity {
                     if (!medDone(this, idx, t)) allDueDone = false;
                 }
             }
+            LinearLayout hrow = new LinearLayout(this);
+            hrow.setOrientation(LinearLayout.HORIZONTAL);
+            hrow.setGravity(Gravity.CENTER_VERTICAL);
+            LinearLayout.LayoutParams hlp = new LinearLayout.LayoutParams(-2, -2);
+            hlp.topMargin = dp(10);
             if (hasDue) {
                 if (allDueDone) {
-                    TextView done = mkText("✓ 已服用", 13, true, 0xFF34A853);
+                    TextView done = mkText("已服用", 13, true, 0xFF34A853);
                     done.setBackgroundResource(R.drawable.bg_chip_green);
                     done.setPadding(dp(12), dp(6), dp(12), dp(6));
-                    LinearLayout.LayoutParams dlp = new LinearLayout.LayoutParams(-2, -2);
-                    dlp.topMargin = dp(10);
-                    cell.addView(done, dlp);
+                    hrow.addView(done);
                 } else {
-                    TextView conf = mkText("确认", 14, true, Color.WHITE);
-                    conf.setGravity(Gravity.CENTER);
+                    final TextView conf = mkText("确认", 13, true, Color.WHITE);
                     conf.setBackgroundResource(R.drawable.bg_btn_red);
-                    LinearLayout.LayoutParams flp = new LinearLayout.LayoutParams(-1, dp(38));
-                    flp.topMargin = dp(10);
+                    conf.setPadding(dp(14), dp(6), dp(14), dp(6));
                     conf.setOnClickListener(v -> {
-                        if (ts != null) for (int t = 0; t < ts.length(); t++) {
-                            String tt = ts.optString(t);
-                            if (tt.compareTo(now) <= 0) confirmMed(this, idx, t);
-                        }
+                        try {
+                            if (ts != null) for (int t = 0; t < ts.length(); t++) {
+                                String tt = ts.optString(t);
+                                if (tt.compareTo(now) <= 0) confirmMed(this, idx, t);
+                            }
+                        } catch (Throwable ignored) {}
                         renderList();
                     });
-                    cell.addView(conf, flp);
+                    hrow.addView(conf);
                 }
+                TextView gap = new TextView(this);
+                hrow.addView(gap, new LinearLayout.LayoutParams(dp(10), 1));
             }
+            TextView chip = mkText((ts != null && ts.length() > 0 ? ts.optString(0) : "--:--") + (ts != null && ts.length() > 1 ? " +" + (ts.length() - 1) : ""), 13, true, 0xFF315CDE);
+            chip.setBackgroundResource(R.drawable.bg_chip_blue);
+            chip.setPadding(dp(12), dp(6), dp(12), dp(6));
+            hrow.addView(chip);
+            cell.addView(hrow, hlp);
             cell.setOnClickListener(v -> showForm(idx));
             row.addView(cell, clp);
         }
@@ -239,7 +211,7 @@ public class MedPlanActivity extends Activity {
         bottomBar.setPadding(dp(16), dp(12), dp(16), dp(12));
         formHost.addView(bottomBar, new FrameLayout.LayoutParams(-1, -2, Gravity.BOTTOM));
 
-        final EditText name = rowInput(card, "💊", "药品名称", "请输入药品名称", idx >= 0 ? plans.optJSONObject(idx).optString("name", "") : "");
+        final EditText name = rowInput(card, "", "药品名称", "请输入药品名称", idx >= 0 ? plans.optJSONObject(idx).optString("name", "") : "");
 
         // 单次用量: 数字 + 片/粒
         LinearLayout doseRow = rowHead(card, "🥛", "单次用量");
@@ -580,9 +552,9 @@ public class MedPlanActivity extends Activity {
                 JSONArray plans = load(context);
                 JSONObject o = plans.optJSONObject(i);
                 if (o != null && t >= 0 && !medDone(context, i, t)) {
-                    String txt = "💊 " + o.optString("name", "") + "  " + o.optString("dose", "1") + o.optString("unit", "片")
+                    String txt = o.optString("name", "") + "  " + o.optString("dose", "1") + o.optString("unit", "片")
                         + (o.optString("relation", "").isEmpty() ? "" : "（" + o.optString("relation") + "）");
-                    notifyMedHold(context, i, t, "该吃药啦 ⏰（确认后才停止提醒）", txt);
+                    notifyMedHold(context, i, t, "该吃药啦（确认后才停止提醒）", txt);
                 }
                 scheduleAll(context); // 排下一个时间点
             } catch (Throwable ignored) {}
@@ -616,7 +588,7 @@ public class MedPlanActivity extends Activity {
         PendingIntent cpi = PendingIntent.getBroadcast(c, 990400 + medNotifId(planIdx, timeIdx), conf,
             PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
         Notification n = new Notification.Builder(c, CH)
-            .setSmallIcon(android.R.drawable.ic_dialog_info)
+            .setSmallIcon(getApplicationInfo().icon)
             .setContentTitle(title).setContentText(text)
             .setContentIntent(pi)
             .setAutoCancel(false)
@@ -650,9 +622,9 @@ public class MedPlanActivity extends Activity {
                 for (int t = 0; t < ts.length(); t++) {
                     String tt = ts.optString(t);
                     if (tt.compareTo(now) <= 0 && !medDone(c, i, t)) {
-                        String txt = "💊 " + o.optString("name", "") + "  " + o.optString("dose", "1") + o.optString("unit", "片")
+                        String txt = o.optString("name", "") + "  " + o.optString("dose", "1") + o.optString("unit", "片")
                             + (o.optString("relation", "").isEmpty() ? "" : "（" + o.optString("relation") + "）");
-                        notifyMedHold(c, i, t, "该吃药啦 ⏰（确认后才停止提醒）", txt);
+                        notifyMedHold(c, i, t, "该吃药啦（确认后才停止提醒）", txt);
                     }
                 }
             }
@@ -678,7 +650,7 @@ public class MedPlanActivity extends Activity {
             .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP);
         PendingIntent pi = PendingIntent.getActivity(c, 990002, open, PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
         Notification n = new Notification.Builder(c, CH)
-            .setSmallIcon(android.R.drawable.ic_dialog_info)
+            .setSmallIcon(getApplicationInfo().icon)
             .setContentTitle(title).setContentText(text)
             .setContentIntent(pi)
             .setAutoCancel(true)

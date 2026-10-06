@@ -62,6 +62,7 @@
             </intent-filter>
         </activity>
         <service android:name=".LanShareService" android:stopWithTask="true"/>
+        <service android:name=".MedWatchService" android:exported="false" android:foregroundServiceType="dataSync"/>
         <service android:name=".DlKeepService" android:exported="false" android:stopWithTask="false"/>
         <provider android:name="androidx.core.content.FileProvider" android:authorities="com.wink.xgjhome.fp" android:exported="false" android:grantUriPermissions="true">
             <meta-data android:name="android.support.FILE_PROVIDER_PATHS" android:resource="@xml/provider_paths" />
