@@ -142,31 +142,7 @@ public class CalendarCardView extends LinearLayout {
         // 药物提醒区(不包白底)
         addView(buildMedSection());
 
-        // 提醒行
-        LinearLayout rHead = new LinearLayout(ctx);
-        rHead.setGravity(Gravity.CENTER_VERTICAL);
-        rHead.setPadding(0, dp(16), 0, dp(6));
-        TextView rTitle = new TextView(ctx);
-        rTitle.setText("⏰ 提醒");
-        rTitle.setTextSize(15); rTitle.setTypeface(Typeface.DEFAULT_BOLD);
-        rTitle.setTextColor(fgMain());
-        rHead.addView(rTitle, new LayoutParams(0, -2, 1f));
-        TextView addBtn = new TextView(ctx);
-        addBtn.setText("＋ 新建");
-        addBtn.setTextSize(13);
-        addBtn.setTextColor(Color.WHITE);
-        addBtn.setBackground(flatBg(ACCENT, 12));
-        addBtn.setPadding(dp(14), dp(7), dp(14), dp(7));
-        addBtn.setOnClickListener(new OnClickListener() { public void onClick(View v) { showAddReminder(); }});
-        rHead.addView(addBtn);
-
-        remindList = new LinearLayout(ctx);
-        remindList.setOrientation(VERTICAL);
-        LinearLayout remindSec = new LinearLayout(ctx);
-        remindSec.setOrientation(VERTICAL);
-        remindSec.addView(rHead);
-        remindSec.addView(remindList);
-        addView(remindSec);
+        // 提醒(日程)区已按要求移除
 
         loadHolidaysAndBuildGrid();
         refreshReminders();
