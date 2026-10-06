@@ -444,51 +444,67 @@ public class MedPlanActivity extends Activity {
         plans = na; save(this, plans); scheduleAll(this); renderList();
     }
 
-    // ---------- 调度 ----------
+    // ---------- 调度: 每个时间点一颗精确闹钟, 杀后台也能响 ----------
     static void scheduleAll(Context c) {
         AlarmManager am = (AlarmManager) c.getSystemService(Context.ALARM_SERVICE);
-        Intent box = new Intent(c, MedPlanActivity.class);
-        PendingIntent pi = PendingIntent.getBroadcast(c, 990001, new Intent(c, MedPlanReceiver.class).setAction("MED_FLUSH"), PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
-        try { am.cancel(pi); } catch (Throwable ignored) {}
-        Calendar first = Calendar.getInstance();
-        first.set(Calendar.SECOND, 5);
-        first.add(Calendar.MINUTE, 1);
-        if (android.os.Build.VERSION.SDK_INT >= 31 && !am.canScheduleExactAlarms()) am.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, first.getTimeInMillis(), pi);
-        else am.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, first.getTimeInMillis(), pi);
+        if (am == null) return;
+        JSONArray plans = load(c);
+        // 先清掉旧闹钟(固定槽位)
+        for (int slot = 0; slot < 400; slot++) {
+            try { am.cancel(firePI(c, slot, -1, -1)); } catch (Throwable ignored) {}
+        }
+        Calendar now = Calendar.getInstance();
+        for (int i = 0; i < plans.length(); i++) {
+            JSONObject o = plans.optJSONObject(i);
+            if (o == null) continue;
+            JSONArray ts = o.optJSONArray("times");
+            if (ts == null) continue;
+            for (int t = 0; t < ts.length(); t++) {
+                String tt = ts.optString(t);
+                int hh, mm;
+                try { hh = Integer.parseInt(tt.split(":")[0]); mm = Integer.parseInt(tt.split(":")[1]); }
+                catch (Throwable e) { continue; }
+                Calendar fire = Calendar.getInstance();
+                fire.set(Calendar.HOUR_OF_DAY, hh);
+                fire.set(Calendar.MINUTE, mm);
+                fire.set(Calendar.SECOND, 0);
+                fire.set(Calendar.MILLISECOND, 0);
+                if (!fire.after(now)) fire.add(Calendar.DATE, 1); // 已过点->明天的这个点
+                int slot = i * 20 + t;
+                PendingIntent pi = firePI(c, slot, i, t);
+                if (android.os.Build.VERSION.SDK_INT >= 31 && !am.canScheduleExactAlarms())
+                    am.setWindow(AlarmManager.RTC_WAKEUP, fire.getTimeInMillis(), 60_000, pi);
+                else
+                    am.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, fire.getTimeInMillis(), pi);
+            }
+        }
+    }
+
+    private static PendingIntent firePI(Context c, int slot, int planIdx, int timeIdx) {
+        Intent it = new Intent(c, MedPlanReceiver.class).setAction("MED_FIRE")
+            .putExtra("i", planIdx).putExtra("t", timeIdx);
+        return PendingIntent.getBroadcast(c, 990100 + slot, it, PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
     }
 
     public static class MedPlanReceiver extends BroadcastReceiver {
         @Override public void onReceive(Context context, Intent intent) {
             try {
+                ensureChannel(context);
+                if (!"MED_FIRE".equals(intent.getAction())) return;
+                int i = intent.getIntExtra("i", -1), t = intent.getIntExtra("t", -1);
                 JSONArray plans = load(context);
-                String today = new SimpleDateFormat("yyyy-MM-dd", Locale.US).format(new Date());
-                int dow = Calendar.getInstance().get(Calendar.DAY_OF_WEEK);
-                boolean workday = dow >= Calendar.MONDAY && dow <= Calendar.FRIDAY;
-                String hm = new SimpleDateFormat("HH:mm", Locale.US).format(new Date());
-                for (int i = 0; i < plans.length(); i++) {
-                    JSONObject o = plans.optJSONObject(i);
-                    if (o == null) continue;
-                    String rep = o.optString("repeat", "每天");
-                    if ("工作日".equals(rep) && !workday) continue;
-                    long start = o.optLong("start", 0);
-                    if (start > 0 && today.compareTo(new SimpleDateFormat("yyyy-MM-dd", Locale.US).format(new Date(start))) < 0) continue;
-                    long end = o.optLong("end", 0);
-                    if (end > 0 && today.compareTo(new SimpleDateFormat("yyyy-MM-dd", Locale.US).format(new Date(end))) > 0) continue;
-                    JSONArray ts = o.optJSONArray("times");
-                    if (ts == null) continue;
+                JSONObject o = plans.optJSONObject(i);
+                if (o != null && t >= 0) {
+                    String today = new SimpleDateFormat("yyyy-MM-dd", Locale.US).format(new Date());
                     android.content.SharedPreferences pf = context.getSharedPreferences("medplan", 0);
-                    for (int t = 0; t < ts.length(); t++) {
-                        String tt = ts.optString(t);
-                        // 到点(含闹钟延迟补发)且今天未发过
-                        if (hm.compareTo(tt) >= 0 && !pf.getBoolean("ntf_" + today + "_" + i + "_" + t, false)) {
-                            pf.edit().putBoolean("ntf_" + today + "_" + i + "_" + t, true).apply();
-                            String txt = "💊 " + o.optString("name", "") + "  " + o.optString("dose", "1") + o.optString("unit", "片")
-                                + (o.optString("relation", "").isEmpty() ? "" : "（" + o.optString("relation") + "）");
-                            notifyMed(context, "该吃药啦 ⏰", txt);
-                        }
+                    if (!pf.getBoolean("ntf_" + today + "_" + i + "_" + t, false)) {
+                        pf.edit().putBoolean("ntf_" + today + "_" + i + "_" + t, true).apply();
+                        String txt = "💊 " + o.optString("name", "") + "  " + o.optString("dose", "1") + o.optString("unit", "片")
+                            + (o.optString("relation", "").isEmpty() ? "" : "（" + o.optString("relation") + "）");
+                        notifyMed(context, "该吃药啦 ⏰ " + o.optString("times", ""), txt);
                     }
                 }
-                scheduleAll(context);
+                scheduleAll(context); // 排下一个时间点
             } catch (Throwable ignored) {}
         }
     }

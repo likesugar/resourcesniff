@@ -16,6 +16,44 @@ import android.widget.TextView;
 public class HomeActivity extends Activity {
 
     // ---------- 主题（纯黑 / 冰蓝） ----------
+    private void updateMedStatus() {
+        try {
+            TextView st = findViewById(R.id.medStatus);
+            if (st == null) return;
+            org.json.JSONArray plans = MedPlanActivity.load(this);
+            if (plans.length() == 0) {
+                st.setText("🌱 还没有计划，点进去添加");
+                return;
+            }
+            String next = null;
+            String now = new java.text.SimpleDateFormat("HH:mm", java.util.Locale.US).format(new java.util.Date());
+            for (int i = 0; i < plans.length(); i++) {
+                org.json.JSONObject o = plans.optJSONObject(i);
+                if (o == null) continue;
+                org.json.JSONArray ts = o.optJSONArray("times");
+                if (ts == null) continue;
+                for (int t = 0; t < ts.length(); t++) {
+                    String tt = ts.optString(t);
+                    if (tt.compareTo(now) >= 0 && (next == null || tt.compareTo(next) < 0)) next = tt;
+                }
+            }
+            if (next == null) {
+                // 今天都过了, 找全天最早
+                for (int i = 0; i < plans.length(); i++) {
+                    org.json.JSONObject o = plans.optJSONObject(i);
+                    org.json.JSONArray ts = o == null ? null : o.optJSONArray("times");
+                    if (ts == null) continue;
+                    for (int t = 0; t < ts.length(); t++) {
+                        String tt = ts.optString(t);
+                        if (next == null || tt.compareTo(next) < 0) next = tt;
+                    }
+                }
+                if (next != null) { st.setText("💊 " + plans.length() + " 个计划 · 明天 " + next); return; }
+            }
+            st.setText("💊 " + plans.length() + " 个计划 · 下次 " + (next == null ? "--:--" : next));
+        } catch (Throwable ignored) {}
+    }
+
     private void setupCalendar() {
         findViewById(R.id.calendarCard).setOnClickListener(new View.OnClickListener() {
             public void onClick(View v) { startActivity(new Intent(HomeActivity.this, CalendarActivity.class)); }

@@ -126,6 +126,12 @@
                             android:text="用药提醒" android:textSize="17sp"
                             android:textStyle="bold" android:tag="title" android:textColor="@color/textMain"/>
                     </LinearLayout>
+                    <TextView
+                        android:id="@+id/medStatus"
+                        android:layout_width="match_parent" android:layout_height="wrap_content"
+                        android:layout_marginTop="10dp" android:tag="sub"
+                        android:text="🌱 还没有计划，点进去添加" android:textSize="13sp"
+                        android:textColor="#8A94A6"/>
                 </LinearLayout>
 
                 <LinearLayout android:tag="card" android:id="@+id/cardShortcut"
