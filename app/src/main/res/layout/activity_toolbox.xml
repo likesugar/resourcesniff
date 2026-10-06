@@ -139,6 +139,10 @@
     
 
 
+                <TextView
+                    android:layout_width="match_parent" android:layout_height="wrap_content"
+                    android:gravity="center" android:paddingTop="26dp"
+                    android:text="v440.0 (767)" android:textSize="11sp" android:textColor="#B7BFCC"/>
             </LinearLayout>
         </ScrollView>
     </LinearLayout>
