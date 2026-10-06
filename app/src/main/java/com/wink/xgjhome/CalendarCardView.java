@@ -138,7 +138,7 @@ public class CalendarCardView extends LinearLayout {
 
         // 自定义签到区(可加多个, 不显示连签天数)
         addView(buildSignSection());
-        addView(buildMedSection());
+        // 药物提醒已移至首页「用药提醒」
 
         // 药物提醒区(不包白底)
 

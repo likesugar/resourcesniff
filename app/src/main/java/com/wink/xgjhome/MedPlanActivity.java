@@ -86,6 +86,14 @@ public class MedPlanActivity extends Activity {
 
         setContentView(root);
         renderList();
+        // 精确闹钟权限(Android 12+): 不批的话提醒会延迟
+        AlarmManager am = (AlarmManager) getSystemService(Context.ALARM_SERVICE);
+        if (android.os.Build.VERSION.SDK_INT >= 31 && am != null && !am.canScheduleExactAlarms()) {
+            try {
+                startActivity(new Intent(android.provider.Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM,
+                    android.net.Uri.parse("package:" + getPackageName())));
+            } catch (Throwable ignored) {}
+        }
     }
 
     private void renderList() {
@@ -466,8 +474,12 @@ public class MedPlanActivity extends Activity {
                     if (end > 0 && today.compareTo(new SimpleDateFormat("yyyy-MM-dd", Locale.US).format(new Date(end))) > 0) continue;
                     JSONArray ts = o.optJSONArray("times");
                     if (ts == null) continue;
+                    android.content.SharedPreferences pf = context.getSharedPreferences("medplan", 0);
                     for (int t = 0; t < ts.length(); t++) {
-                        if (hm.equals(ts.optString(t))) {
+                        String tt = ts.optString(t);
+                        // 到点(含闹钟延迟补发)且今天未发过
+                        if (hm.compareTo(tt) >= 0 && !pf.getBoolean("ntf_" + today + "_" + i + "_" + t, false)) {
+                            pf.edit().putBoolean("ntf_" + today + "_" + i + "_" + t, true).apply();
                             String txt = "💊 " + o.optString("name", "") + "  " + o.optString("dose", "1") + o.optString("unit", "片")
                                 + (o.optString("relation", "").isEmpty() ? "" : "（" + o.optString("relation") + "）");
                             notifyMed(context, "该吃药啦 ⏰", txt);
