@@ -60,7 +60,6 @@ public class HomeCalendarCompact extends LinearLayout {
         holidayText.setTextSize(13);
         holidayText.setPadding((int) (10 * getResources().getDisplayMetrics().density), 0, 0, 0);
         r1.addView(holidayText);
-        // arrow weight trick: set weight via LayoutParams above then re-add
         r1.removeAllViews();
         r1.addView(calIcon, ilp);
         r1.addView(dateText);
@@ -71,8 +70,11 @@ public class HomeCalendarCompact extends LinearLayout {
 
         // 行2: 提醒摘要
         LinearLayout r2 = new LinearLayout(a);
+        r2.setGravity(Gravity.CENTER_VERTICAL);
+        r2.setPadding(0, (int) (12 * getResources().getDisplayMetrics().density), 0, 0);
         remindText = new TextView(a);
         remindText.setTextSize(13); remindText.setTextColor(fgSub);
+        remindText.setPadding((int) (14 * getResources().getDisplayMetrics().density), 0, 0, 0);
         r2.addView(remindText, new LinearLayout.LayoutParams(0, -2, 1f));
         addView(r2);
         medHost = new LinearLayout(a);
@@ -243,24 +245,6 @@ public class HomeCalendarCompact extends LinearLayout {
             }
             return true;
         } catch (Throwable e) { return false; }
-    }
-
-    private LinearLayout buildSignBtn() {
-        signBtn = new LinearLayout(act);
-        signBtn.setGravity(Gravity.CENTER);
-        signBtn.setOrientation(HORIZONTAL);
-        GradientDrawable g = new GradientDrawable();
-        g.setCornerRadius((int) (14 * getResources().getDisplayMetrics().density));
-        g.setColor(dark ? 0xFF232A38 : 0xFFE8EEFF);
-        signBtn.setBackground(g);
-        signText = new TextView(act);
-        signText.setTextSize(14); signText.setTypeface(Typeface.DEFAULT_BOLD);
-        signText.setTextColor(dark ? 0xFFB4C5FF : 0xFF315CDE);
-        int p18 = (int) (18 * getResources().getDisplayMetrics().density);
-        signText.setPadding(p18, (int) (8 * getResources().getDisplayMetrics().density), p18, (int) (8 * getResources().getDisplayMetrics().density));
-        signBtn.addView(signText);
-        signBtn.setOnClickListener(new View.OnClickListener() { public void onClick(View v) { doSign(); refresh(); }});
-        return signBtn;
     }
 
     private android.graphics.drawable.GradientDrawable circleBg(boolean d) {

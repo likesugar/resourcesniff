@@ -142,7 +142,7 @@ public class CalendarCardView extends LinearLayout {
         // 药物提醒区(不包白底)
         addView(buildMedSection());
 
-        // 提醒(日程)区已按要求移除
+        // 日程提醒区已按要求移除
 
         loadHolidaysAndBuildGrid();
         refreshReminders();
