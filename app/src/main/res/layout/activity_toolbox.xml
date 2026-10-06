@@ -33,15 +33,15 @@
                 <LinearLayout android:tag="card" android:id="@+id/cardPlayer"
                     android:layout_width="match_parent" android:layout_height="wrap_content"
                     android:layout_marginTop="0dp"
-                    android:background="@drawable/bg_card" android:orientation="vertical"
+                    android:background="@drawable/bg_card_md3" android:orientation="vertical"
                     android:padding="20dp">
 
                     <LinearLayout
                         android:layout_width="match_parent" android:layout_height="wrap_content"
                         android:orientation="horizontal" android:gravity="center_vertical">
                         <TextView
-                            android:layout_width="46dp" android:layout_height="46dp"
-                            android:background="@drawable/bg_btn"
+                            android:layout_width="48dp" android:layout_height="48dp"
+                            android:background="@drawable/bg_btn_md3"
                             android:text="🪩" android:textSize="22sp" android:gravity="center"/>
                         <TextView
                             android:layout_width="0dp" android:layout_height="wrap_content"
@@ -57,14 +57,14 @@
                 <LinearLayout android:tag="card" android:id="@+id/cardDownload"
                     android:layout_width="match_parent" android:layout_height="wrap_content"
                     android:layout_marginTop="14dp"
-                    android:background="@drawable/bg_card" android:orientation="vertical"
+                    android:background="@drawable/bg_card_md3" android:orientation="vertical"
                     android:padding="20dp">
                     <LinearLayout
                         android:layout_width="match_parent" android:layout_height="wrap_content"
                         android:orientation="horizontal" android:gravity="center_vertical">
                         <TextView
-                            android:layout_width="46dp" android:layout_height="46dp"
-                            android:background="@drawable/bg_btn"
+                            android:layout_width="48dp" android:layout_height="48dp"
+                            android:background="@drawable/bg_btn_md3"
                             android:text="➼" android:textSize="22sp" android:gravity="center"/>
                         <TextView
                             android:layout_width="0dp" android:layout_height="wrap_content"
@@ -79,12 +79,12 @@
                  <LinearLayout android:tag="card" android:id="@+id/cardVideoDl"
                     android:layout_width="match_parent" android:layout_height="wrap_content"
                     android:layout_marginTop="14dp"
-                    android:background="@drawable/bg_card" android:orientation="vertical"
+                    android:background="@drawable/bg_card_md3" android:orientation="vertical"
                     android:padding="18dp">
                     <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
                         android:orientation="horizontal" android:gravity="center_vertical">
-                        <TextView android:layout_width="46dp" android:layout_height="46dp"
-                            android:background="@drawable/bg_btn"
+                        <TextView android:layout_width="48dp" android:layout_height="48dp"
+                            android:background="@drawable/bg_btn_md3"
                             android:text="🎬" android:textSize="22sp" android:gravity="center"/>
                         <TextView
                             android:layout_width="0dp" android:layout_height="wrap_content"
@@ -100,7 +100,7 @@
                <LinearLayout android:tag="card" android:id="@+id/calendarCard"
                     android:layout_width="match_parent" android:layout_height="wrap_content"
                     android:layout_marginTop="14dp"
-                    android:background="@drawable/bg_card" android:orientation="vertical">
+                    android:background="@drawable/bg_card_md3" android:orientation="vertical">
                     <LinearLayout android:id="@+id/calHost"
                         android:layout_width="match_parent" android:layout_height="wrap_content"
                         android:orientation="vertical"/>
@@ -109,14 +109,14 @@
                <LinearLayout android:tag="card" android:id="@+id/cardShortcut"
                     android:layout_width="match_parent" android:layout_height="wrap_content"
                     android:layout_marginTop="14dp"
-                    android:background="@drawable/bg_card" android:orientation="vertical"
+                    android:background="@drawable/bg_card_md3" android:orientation="vertical"
                     android:padding="20dp">
                     <LinearLayout
                         android:layout_width="match_parent" android:layout_height="wrap_content"
                         android:orientation="horizontal" android:gravity="center_vertical">
                         <TextView
-                            android:layout_width="46dp" android:layout_height="46dp"
-                            android:background="@drawable/bg_btn" android:padding="8dp"
+                            android:layout_width="48dp" android:layout_height="48dp"
+                            android:background="@drawable/bg_btn_md3" android:padding="8dp"
                             android:text="⚡" android:textSize="22sp" android:gravity="center"/>
                         <TextView
                             android:layout_width="0dp" android:layout_height="wrap_content"
@@ -134,14 +134,14 @@
                 <LinearLayout android:tag="card" android:id="@+id/cardAppSettings"
                     android:layout_width="match_parent" android:layout_height="wrap_content"
                     android:layout_marginTop="14dp"
-                    android:background="@drawable/bg_card" android:orientation="vertical"
+                    android:background="@drawable/bg_card_md3" android:orientation="vertical"
                     android:padding="20dp">
                     <LinearLayout
                         android:layout_width="match_parent" android:layout_height="wrap_content"
                         android:orientation="horizontal" android:gravity="center_vertical">
                         <TextView
-                            android:layout_width="46dp" android:layout_height="46dp"
-                            android:background="@drawable/bg_btn" android:padding="8dp"
+                            android:layout_width="48dp" android:layout_height="48dp"
+                            android:background="@drawable/bg_btn_md3" android:padding="8dp"
                             android:text="⚙️" android:textSize="22sp" android:gravity="center"/>
                         <TextView
                             android:layout_width="0dp" android:layout_height="wrap_content"

@@ -72,12 +72,13 @@ public class HomeActivity extends Activity {
             if (c instanceof TextView) {
                 if (t.equals("title")) ((TextView) c).setTextColor(dark ? 0xFFFFFFFF : 0xFF1F2329);
                 else if (t.equals("sub")) ((TextView) c).setTextColor(dark ? 0xFF9AA3AE : 0xFF8A94A6);
+                else if (t.equals("icon")) c.setBackgroundResource(dark ? R.drawable.bg_btn_md3_dark : R.drawable.bg_btn_md3);
                 else if (t.equals("chip")) {
                     ((TextView) c).setBackgroundResource(dark ? R.drawable.bg_chip_dark : R.drawable.bg_chip_off);
                     ((TextView) c).setTextColor(dark ? 0xFF9AA3AE : 0xFF8A94A6);
                 }
             }
-            if (t.equals("card")) c.setBackgroundResource(dark ? R.drawable.bg_card_dark : R.drawable.bg_card);
+            if (t.equals("card")) c.setBackgroundResource(dark ? R.drawable.bg_card_md3_dark : R.drawable.bg_card_md3);
             if (c instanceof android.view.ViewGroup) applyTraversal((android.view.ViewGroup) c, dark);
         }
     }
