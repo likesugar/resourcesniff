@@ -90,6 +90,7 @@ public class MedPlanActivity extends Activity {
             Toast.makeText(this, "已清今日标记，到点会重新提醒", Toast.LENGTH_SHORT).show();
         });
         root.addView(add, alp);
+        root.addView(cleanBtn, clp2);
 
         formHost = new FrameLayout(this);
         formHost.setBackgroundColor(0xFFEAF2FF);
@@ -99,6 +100,7 @@ public class MedPlanActivity extends Activity {
         setContentView(root);
         Immersive.hide(this);
         renderList();
+        cleanFutureMarks();
         // 精确闹钟权限(Android 12+): 不批的话提醒会延迟
         AlarmManager am = (AlarmManager) getSystemService(Context.ALARM_SERVICE);
         if (android.os.Build.VERSION.SDK_INT >= 31 && am != null && !am.canScheduleExactAlarms()) {
@@ -107,6 +109,29 @@ public class MedPlanActivity extends Activity {
                     android.net.Uri.parse("package:" + getPackageName())));
             } catch (Throwable ignored) {}
         }
+    }
+
+    private void cleanFutureMarks() {
+        try {
+            String today = new SimpleDateFormat("yyyy-MM-dd", Locale.US).format(new Date());
+            String now = new SimpleDateFormat("HH:mm", Locale.US).format(new Date());
+            android.content.SharedPreferences pf = getSharedPreferences("medplan", 0);
+            android.content.SharedPreferences.Editor e = pf.edit();
+            boolean changed = false;
+            for (int i = 0; i < plans.length(); i++) {
+                JSONObject o = plans.optJSONObject(i);
+                JSONArray ts = o == null ? null : o.optJSONArray("times");
+                if (ts == null) continue;
+                for (int t = 0; t < ts.length(); t++) {
+                    String tt = ts.optString(t);
+                    if (tt.compareTo(now) > 0 && pf.getBoolean("ntf_" + today + "_" + i + "_" + t, false)) {
+                        e.remove("ntf_" + today + "_" + i + "_" + t);
+                        changed = true;
+                    }
+                }
+            }
+            if (changed) e.apply();
+        } catch (Throwable ignored) {}
     }
 
     private void renderList() {

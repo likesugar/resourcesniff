@@ -235,6 +235,7 @@ public class HomeActivity extends Activity {
         super.onResume();
         calTick.post(calTickRun);
         updateMedStatus();
+        try { MedPlanActivity.checkAndNotifyDue(this); } catch (Throwable ignored) {}
     }
 
     @Override
