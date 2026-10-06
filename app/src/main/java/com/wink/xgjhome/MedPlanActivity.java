@@ -77,6 +77,18 @@ public class MedPlanActivity extends Activity {
         add.setOnClickListener(v -> showForm(-1));
         FrameLayout.LayoutParams alp = new FrameLayout.LayoutParams(-1, -2, Gravity.BOTTOM);
         alp.leftMargin = dp(16); alp.rightMargin = dp(16); alp.bottomMargin = dp(24);
+
+        // 🧹 清当日去重标记
+        TextView clean = mkText("🧹", 18, false, 0xFF8A94A6);
+        clean.setGravity(Gravity.CENTER);
+        clean.setBackgroundResource(R.drawable.bg_input);
+        FrameLayout.LayoutParams clp = new FrameLayout.LayoutParams(dp(44), dp(44), Gravity.TOP | Gravity.END);
+        clp.topMargin = dp(28); clp.rightMargin = dp(16);
+        clean.setOnClickListener(v -> {
+            getSharedPreferences("medplan", 0).edit()
+                .remove("ntf_" + new SimpleDateFormat("yyyy-MM-dd", Locale.US).format(new Date())).apply();
+            Toast.makeText(this, "已清今日标记，到点会重新提醒", Toast.LENGTH_SHORT).show();
+        });
         root.addView(add, alp);
 
         formHost = new FrameLayout(this);
