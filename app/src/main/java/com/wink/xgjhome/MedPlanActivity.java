@@ -101,6 +101,13 @@ public class MedPlanActivity extends Activity {
 
     private void renderList() {
         listHost.removeAllViews();
+        try {
+            android.content.SharedPreferences pf = getSharedPreferences("medplan", 0);
+            TextView st = mkText("守护 " + pf.getString("watch_last", "-") + " · 闹钟 " + pf.getString("alarm_last", "-")
+                + " · 待提醒 " + dueCount(), 11, false, 0xFF8A94A6);
+            st.setPadding(dp(4), dp(6), 0, dp(8));
+            listHost.addView(st);
+        } catch (Throwable ignored) {}
         if (plans.length() == 0) {
             TextView e = mkText("还没有用药计划\n点下方「＋ 新增用药计划」创建", 14, false, 0xFF8A94A6);
             e.setGravity(Gravity.CENTER);
@@ -537,6 +544,26 @@ public class MedPlanActivity extends Activity {
         }
     }
 
+    /** 每分钟兜底闹钟: 进程被冻结也能被唤醒补挂提醒 */
+    static void armTick(Context c) {
+        try {
+            AlarmManager am = (AlarmManager) c.getSystemService(Context.ALARM_SERVICE);
+            if (am == null) return;
+            Intent it = new Intent(c, MedPlanReceiver.class).setAction("MED_TICK");
+            PendingIntent pi = PendingIntent.getBroadcast(c, 990501, it,
+                PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
+            am.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, System.currentTimeMillis() + 60000, pi);
+        } catch (Throwable e) {
+            try {
+                AlarmManager am2 = (AlarmManager) c.getSystemService(Context.ALARM_SERVICE);
+                Intent it2 = new Intent(c, MedPlanReceiver.class).setAction("MED_TICK");
+                PendingIntent pi2 = PendingIntent.getBroadcast(c, 990501, it2,
+                    PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
+                am2.setWindow(AlarmManager.RTC_WAKEUP, System.currentTimeMillis() + 60000, 30000, pi2);
+            } catch (Throwable ignored) {}
+        }
+    }
+
     private static PendingIntent firePI(Context c, int slot, int planIdx, int timeIdx) {
         Intent it = new Intent(c, MedPlanReceiver.class).setAction("MED_FIRE")
             .putExtra("i", planIdx).putExtra("t", timeIdx);
@@ -546,6 +573,13 @@ public class MedPlanActivity extends Activity {
     public static class MedPlanReceiver extends BroadcastReceiver {
         @Override public void onReceive(Context context, Intent intent) {
             try {
+                context.getSharedPreferences("medplan", 0).edit().putString("alarm_last",
+                    new SimpleDateFormat("HH:mm:ss", Locale.US).format(new Date())).apply();
+                if ("MED_TICK".equals(intent.getAction())) {
+                    checkAndNotifyDue(context);
+                    armTick(context);
+                    return;
+                }
                 ensureChannel(context);
                 if (!"MED_FIRE".equals(intent.getAction())) return;
                 int i = intent.getIntExtra("i", -1), t = intent.getIntExtra("t", -1);
@@ -637,6 +671,22 @@ public class MedPlanActivity extends Activity {
         String id = o == null ? String.valueOf(planIdx) : o.optString("id", String.valueOf(planIdx));
         String tt = o == null ? String.valueOf(timeIdx) : o.optJSONArray("times").optString(timeIdx);
         return "done_" + today + "_" + id + "_" + tt;
+    }
+
+    private String dueCount() {
+        try {
+            String now = new SimpleDateFormat("HH:mm", Locale.US).format(new Date());
+            int n = 0;
+            for (int i = 0; i < plans.length(); i++) {
+                JSONObject o = plans.optJSONObject(i);
+                if (o == null) continue;
+                JSONArray ts = o.optJSONArray("times");
+                if (ts == null) continue;
+                for (int t = 0; t < ts.length(); t++)
+                    if (ts.optString(t).compareTo(now) <= 0 && !medDone(this, i, t)) n++;
+            }
+            return String.valueOf(n);
+        } catch (Throwable e) { return "?"; }
     }
 
     static boolean medDone(Context c, int planIdx, int timeIdx) {

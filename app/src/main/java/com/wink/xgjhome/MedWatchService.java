@@ -32,7 +32,12 @@ public class MedWatchService extends Service {
         boolean hasPlans = false;
         try {
             hasPlans = MedPlanActivity.load(MedWatchService.this).length() > 0;
-            if (hasPlans) MedPlanActivity.checkAndNotifyDue(MedWatchService.this);
+            if (hasPlans) {
+                MedPlanActivity.checkAndNotifyDue(MedWatchService.this);
+                MedPlanActivity.armTick(MedWatchService.this);
+                getSharedPreferences("medplan", 0).edit().putString("watch_last",
+                    android.text.format.DateFormat.format("HH:mm:ss", System.currentTimeMillis()).toString()).apply();
+            }
         } catch (Throwable ignored) {}
         if (!hasPlans && ++idle > 30) { // 无计划约10分钟后自动收摊
             stopForeground(true);
