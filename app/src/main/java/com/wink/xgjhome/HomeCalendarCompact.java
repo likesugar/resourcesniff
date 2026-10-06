@@ -60,10 +60,6 @@ public class HomeCalendarCompact extends LinearLayout {
         holidayText.setTextSize(13);
         holidayText.setPadding((int) (10 * getResources().getDisplayMetrics().density), 0, 0, 0);
         r1.addView(holidayText);
-        TextView arrow = new TextView(a);
-        arrow.setText("›"); arrow.setTextSize(20);
-        arrow.setTextColor(dark ? 0xFF8A94A6 : 0xFFC3CAD6);
-        r1.addView(arrow, new LinearLayout.LayoutParams(0, -2, 1f) );
         // arrow weight trick: set weight via LayoutParams above then re-add
         r1.removeAllViews();
         r1.addView(calIcon, ilp);
@@ -71,7 +67,6 @@ public class HomeCalendarCompact extends LinearLayout {
         r1.addView(holidayText);
         TextView spacer = new TextView(a);
         r1.addView(spacer, new LinearLayout.LayoutParams(0, 0, 1f));
-        r1.addView(arrow);
         addView(r1);
 
         // 行2: 签到按钮 + 连签 + 提醒摘要
