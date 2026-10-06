@@ -877,80 +877,8 @@ String[] labels = {"早上", "中午", "晚上"};
     }
 
     private void refreshReminders() {
-        remindList.removeAllViews();
-        JSONArray arr = reminders();
-        if (arr.length() == 0) {
-            TextView e = new TextView(ctx);
-            e.setText("暂无日程，点右上角＋新建");
-            e.setTextSize(13); e.setTextColor(fgSub());
-            e.setPadding(dp(12), dp(10), dp(12), dp(10));
-            remindList.addView(e);
-            return;
-        }
-        android.widget.ScrollView sv = new android.widget.ScrollView(ctx);
-        sv.setVerticalScrollBarEnabled(false);
-        LinearLayout inner = new LinearLayout(ctx);
-        inner.setOrientation(VERTICAL);
-        int rowH = dp(56);
-        sv.addView(inner, new LayoutParams(-1, android.view.ViewGroup.LayoutParams.WRAP_CONTENT));
-        for (int i = 0; i < arr.length(); i++) {
-            try {
-                final JSONObject o = arr.getJSONObject(i);
-                final int idx = i;
-                // 卡片框
-                LinearLayout card = new LinearLayout(ctx);
-                card.setOrientation(VERTICAL);
-                card.setBackground(flatBg(cellBg(), 12));
-                card.setPadding(dp(14), dp(10), dp(14), dp(10));
-                LayoutParams clp = new LayoutParams(-1, -2);
-                clp.setMargins(0, dp(6), 0, 0);
-                // 行1: 内容
-                LinearLayout row = new LinearLayout(ctx);
-                row.setGravity(Gravity.CENTER_VERTICAL);
-                TextView t = new TextView(ctx);
-                String when = new SimpleDateFormat("MM-dd HH:mm", Locale.US).format(new Date(o.optLong("ts")));
-                t.setText(o.optString("t") + "\n" + when);
-                t.setTextSize(13); t.setTextColor(fgMain());
-                row.addView(t, new LayoutParams(0, -2, 1f));
-                // 确认按钮
-                TextView ok = new TextView(ctx);
-                ok.setText("✓ 确认"); ok.setTextSize(13);
-                ok.setTextColor(Color.WHITE);
-                ok.setGravity(Gravity.CENTER);
-                ok.setBackground(flatBg(ACCENT, 10));
-                ok.setPadding(dp(14), dp(7), dp(14), dp(7));
-                ok.setOnClickListener(new OnClickListener() { public void onClick(View v) {
-                    JSONArray arr2 = reminders();
-                    JSONArray out = new JSONArray();
-                    try { for (int j = 0; j < arr2.length(); j++) if (j != idx) out.put(arr2.getJSONObject(j)); } catch (Throwable ignored) {}
-                    saveReminders(out);
-                    Toast.makeText(ctx, "已完成", Toast.LENGTH_SHORT).show();
-                    refreshReminders();
-                }});
-                row.addView(ok);
-                if (o.optBoolean("daily")) {
-                    TextView off = new TextView(ctx);
-                    off.setText("关闭重复"); off.setTextSize(12);
-                    off.setTextColor(0xFFFFB74D);
-                    off.setPadding(dp(10), dp(6), dp(10), dp(6));
-                    off.setOnClickListener(new OnClickListener() { public void onClick(View v) {
-                        JSONArray arr2 = reminders();
-                        try { arr2.getJSONObject(idx).put("daily", false); } catch (Throwable ignored) { return; }
-                        saveReminders(arr2);
-                        Toast.makeText(ctx, "已改为仅一次", Toast.LENGTH_SHORT).show();
-                        refreshReminders();
-                    }});
-                    row.addView(off);
-                }
-                card.addView(row);
-                inner.addView(card, new LayoutParams(-1, android.view.ViewGroup.LayoutParams.WRAP_CONTENT));
-            } catch (Throwable ignored) {}
-        }
-        // 超过4条限高可滑动
-        int maxH = rowH * 4 + dp(24);
-        LayoutParams svlp = new LayoutParams(-1, Math.min(maxH, android.view.ViewGroup.LayoutParams.WRAP_CONTENT));
-        remindList.addView(sv, svlp);
-    }
+        if (remindList == null) return; // 日程区已移除
+ /* 日程区已移除 */ }
 
     private void showAddReminder() {
         final LinearLayout box = new LinearLayout(ctx);
