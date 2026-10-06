@@ -153,6 +153,40 @@ public class MedPlanActivity extends Activity {
             LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(-2, -2);
             lp.topMargin = dp(10);
             cell.addView(chip, lp);
+            // 到点未确认 -> 红色确认按钮; 已确认 -> 绿色已服用
+            String now = new SimpleDateFormat("HH:mm", Locale.US).format(new Date());
+            boolean hasDue = false, allDueDone = true;
+            if (ts != null) for (int t = 0; t < ts.length(); t++) {
+                String tt = ts.optString(t);
+                if (tt.compareTo(now) <= 0) {
+                    hasDue = true;
+                    if (!medDone(this, idx, t)) allDueDone = false;
+                }
+            }
+            if (hasDue) {
+                if (allDueDone) {
+                    TextView done = mkText("✓ 已服用", 13, true, 0xFF34A853);
+                    done.setBackgroundResource(R.drawable.bg_chip_green);
+                    done.setPadding(dp(12), dp(6), dp(12), dp(6));
+                    LinearLayout.LayoutParams dlp = new LinearLayout.LayoutParams(-2, -2);
+                    dlp.topMargin = dp(10);
+                    cell.addView(done, dlp);
+                } else {
+                    TextView conf = mkText("确认", 14, true, Color.WHITE);
+                    conf.setGravity(Gravity.CENTER);
+                    conf.setBackgroundResource(R.drawable.bg_btn_red);
+                    LinearLayout.LayoutParams flp = new LinearLayout.LayoutParams(-1, dp(38));
+                    flp.topMargin = dp(10);
+                    conf.setOnClickListener(v -> {
+                        if (ts != null) for (int t = 0; t < ts.length(); t++) {
+                            String tt = ts.optString(t);
+                            if (tt.compareTo(now) <= 0) confirmMed(this, idx, t);
+                        }
+                        renderList();
+                    });
+                    cell.addView(conf, flp);
+                }
+            }
             cell.setOnClickListener(v -> showForm(idx));
             row.addView(cell, clp);
         }
