@@ -473,7 +473,11 @@ public class MedPlanActivity extends Activity {
                 if (!fire.after(now)) fire.add(Calendar.DATE, 1); // 已过点->明天的这个点
                 int slot = i * 20 + t;
                 PendingIntent pi = firePI(c, slot, i, t);
-                am.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, fire.getTimeInMillis(), pi);
+                // setAlarmClock: 系统闹钟语义, 后台/省电/勿扰都保证触发(状态栏显示闹钟图标)
+                Intent show = new Intent(c, MedPlanActivity.class);
+                PendingIntent showPI = PendingIntent.getActivity(c, 990300 + slot, show,
+                    PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
+                am.setAlarmClock(new AlarmManager.AlarmClockInfo(fire.getTimeInMillis(), showPI), pi);
             }
         }
     }
@@ -523,7 +527,8 @@ public class MedPlanActivity extends Activity {
     static void notifyMed(Context c, String title, String text) {
         ensureChannel(c);
         NotificationManager nm = (NotificationManager) c.getSystemService(Context.NOTIFICATION_SERVICE);
-        Intent open = new Intent(c, MedPlanActivity.class);
+        Intent open = new Intent(c, MedPlanActivity.class)
+            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP);
         PendingIntent pi = PendingIntent.getActivity(c, 990002, open, PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
         Notification n = new Notification.Builder(c, CH)
             .setSmallIcon(android.R.drawable.ic_dialog_info)
