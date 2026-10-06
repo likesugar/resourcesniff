@@ -512,8 +512,14 @@ public class MedPlanActivity extends Activity {
     }
 
     static JSONArray load(Context c) {
-        try { return new JSONArray(c.getSharedPreferences("medplan", 0).getString("plans", "[]")); }
-        catch (Throwable e) { return new JSONArray(); }
+        try {
+            JSONArray arr = new JSONArray(c.getSharedPreferences("medplan", 0).getString("plans", "[]"));
+            for (int k = 0; k < arr.length(); k++) {
+                JSONObject o = arr.optJSONObject(k);
+                if (o != null && !o.has("id")) o.put("id", String.valueOf(System.currentTimeMillis()) + "_" + k);
+            }
+            return arr;
+        } catch (Throwable e) { return new JSONArray(); }
     }
     static void save(Context c, JSONArray a) { c.getSharedPreferences("medplan", 0).edit().putString("plans", a.toString()).apply(); }
     private void removePlan(int idx) {
@@ -624,7 +630,7 @@ public class MedPlanActivity extends Activity {
     static void confirmMed(Context c, int planIdx, int timeIdx) {
         String today = new SimpleDateFormat("yyyy-MM-dd", Locale.US).format(new Date());
         c.getSharedPreferences("medplan", 0).edit()
-            .putBoolean("done_" + today + "_" + planIdx + "_" + timeIdx, true).apply();
+            .putBoolean(medKey(c, planIdx, timeIdx), true).apply();
         NotificationManager nm = (NotificationManager) c.getSystemService(Context.NOTIFICATION_SERVICE);
         nm.cancel(medNotifId(planIdx, timeIdx));
     }
@@ -653,9 +659,16 @@ public class MedPlanActivity extends Activity {
         } catch (Throwable ignored) {}
     }
 
-    static boolean medDone(Context c, int planIdx, int timeIdx) {
+    static String medKey(Context c, int planIdx, int timeIdx) {
         String today = new SimpleDateFormat("yyyy-MM-dd", Locale.US).format(new Date());
-        return c.getSharedPreferences("medplan", 0).getBoolean("done_" + today + "_" + planIdx + "_" + timeIdx, false);
+        JSONObject o = load(c).optJSONObject(planIdx);
+        String id = o == null ? String.valueOf(planIdx) : o.optString("id", String.valueOf(planIdx));
+        String tt = o == null ? String.valueOf(timeIdx) : o.optJSONArray("times").optString(timeIdx);
+        return "done_" + today + "_" + id + "_" + tt;
+    }
+
+    static boolean medDone(Context c, int planIdx, int timeIdx) {
+        return c.getSharedPreferences("medplan", 0).getBoolean(medKey(c, planIdx, timeIdx), false);
     }
 
     static void notifyMed(Context c, String title, String text) {
