@@ -165,7 +165,6 @@ public class MedPlanActivity extends Activity {
         formHost.addView(bottomBar, new FrameLayout.LayoutParams(-1, -2, Gravity.BOTTOM));
 
         final EditText name = rowInput(card, "💊", "药品名称", "请输入药品名称", idx >= 0 ? plans.optJSONObject(idx).optString("name", "") : "");
-        final EditText spec = rowInput(card, "🧴", "规格剂量", "如：10mg*12片/盒", idx >= 0 ? plans.optJSONObject(idx).optString("spec", "") : "");
 
         // 单次用量: 数字 + 片/粒
         LinearLayout doseRow = rowHead(card, "🥛", "单次用量");
@@ -250,15 +249,33 @@ public class MedPlanActivity extends Activity {
         Runnable renderRep = () -> { renderPick(repBox, new String[]{"每天", "工作日", "自定义"}, new String[]{formRepeat}, v -> formRepeat = v); };
         renderRep.run();
 
-        // 开始/结束日期
-        LinearLayout startRow = rowHead(card, "📅", "开始日期");
-        final TextView startV = mkText(fmt(formStart), 15, true, 0xFF1F2329);
-        startRow.addView(startV, endLp());
-        startRow.setOnClickListener(v -> pickDate(formStart, t -> { formStart = t; startV.setText(fmt(t)); }));
-        LinearLayout endRow = rowHead(card, "📅", "结束日期");
-        final TextView endV = mkText(formEnd > 0 ? fmt(formEnd) : "未设置", 15, true, formEnd > 0 ? 0xFF1F2329 : 0xFFB7BFCC);
-        endRow.addView(endV, endLp());
-        endRow.setOnClickListener(v -> pickDate(formEnd > 0 ? formEnd : System.currentTimeMillis(), t -> { formEnd = t; endV.setText(fmt(t)); endV.setTextColor(0xFF1F2329); }));
+        // 开始/结束日期(同一行紧凑排布)
+        LinearLayout dateRow = rowHead(card, "📅", "开始 / 结束日期");
+        LinearLayout dateBox = new LinearLayout(this);
+        dateBox.setOrientation(LinearLayout.HORIZONTAL);
+        LinearLayout startCell = new LinearLayout(this);
+        startCell.setOrientation(LinearLayout.VERTICAL);
+        startCell.setBackgroundResource(R.drawable.bg_input);
+        startCell.setPadding(dp(14), dp(10), dp(14), dp(10));
+        TextView sLabel = mkText("开始", 11, false, 0xFF8A94A6);
+        final TextView startV = mkText(fmt(formStart), 14, true, 0xFF1F2329);
+        startCell.addView(sLabel); startCell.addView(startV);
+        startCell.setOnClickListener(v -> pickDate(formStart, t -> { formStart = t; startV.setText(fmt(t)); }));
+        LinearLayout endCell = new LinearLayout(this);
+        endCell.setOrientation(LinearLayout.VERTICAL);
+        endCell.setBackgroundResource(R.drawable.bg_input);
+        endCell.setPadding(dp(14), dp(10), dp(14), dp(10));
+        TextView eLabel = mkText("结束", 11, false, 0xFF8A94A6);
+        final TextView endV = mkText(formEnd > 0 ? fmt(formEnd) : "未设置", 14, true, formEnd > 0 ? 0xFF1F2329 : 0xFFB7BFCC);
+        endCell.addView(eLabel); endCell.addView(endV);
+        endCell.setOnClickListener(v -> pickDate(formEnd > 0 ? formEnd : System.currentTimeMillis(), t -> { formEnd = t; endV.setText(fmt(t)); endV.setTextColor(0xFF1F2329); }));
+        LinearLayout.LayoutParams scp = new LinearLayout.LayoutParams(0, -2, 1f);
+        LinearLayout.LayoutParams ecp = new LinearLayout.LayoutParams(0, -2, 1f);
+        ecp.leftMargin = dp(10);
+        dateBox.addView(startCell, scp); dateBox.addView(endCell, ecp);
+        LinearLayout.LayoutParams dlp3 = new LinearLayout.LayoutParams(-1, -2);
+        dlp3.leftMargin = dp(10); dlp3.topMargin = dp(12);
+        dateRow.addView(dateBox, dlp3);
 
         // 保存/取消
         LinearLayout btns = new LinearLayout(this);
@@ -296,7 +313,6 @@ public class MedPlanActivity extends Activity {
             try {
                 JSONObject o = new JSONObject();
                 o.put("name", n);
-                o.put("spec", spec.getText().toString().trim());
                 o.put("dose", dose.getText().toString().trim());
                 o.put("unit", unit[0]);
                 o.put("times", formTimes);
