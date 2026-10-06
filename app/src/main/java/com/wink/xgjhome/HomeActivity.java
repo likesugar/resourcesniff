@@ -16,36 +16,14 @@ import android.widget.TextView;
 public class HomeActivity extends Activity {
 
     // ---------- 主题（纯黑 / 冰蓝） ----------
-    private HomeCalendarCompact compact;
-
     private void setupCalendar() {
-        try {
-            android.view.ViewGroup host = (android.view.ViewGroup) findViewById(R.id.calHost);
-            if (host == null) throw new IllegalStateException("calHost not found");
-            if (host.getChildCount() == 0) {
-                compact = new HomeCalendarCompact(this);
-                host.addView(compact, new android.view.ViewGroup.LayoutParams(-1, -2));
-            }
-        } catch (Throwable t) {
-            try {
-                android.view.ViewGroup host = (android.view.ViewGroup) findViewById(R.id.calHost);
-                if (host != null && host.getChildCount() == 0) {
-                    TextView err = new TextView(this);
-                    err.setText("日历加载失败: " + t);
-                    err.setTextColor(0xFFFF7B8A); err.setTextSize(13);
-                    err.setPadding(20, 20, 20, 20);
-                    host.addView(err);
-                }
-                java.io.FileWriter fw = new java.io.FileWriter(new java.io.File(getExternalFilesDir(null), "网页诊断.txt"), true);
-                fw.write("\n==== CAL ERR " + new java.util.Date() + " ====\n" + android.util.Log.getStackTraceString(t) + "\n");
-                fw.close();
-            } catch (Throwable ignored) {}
-        }
+        findViewById(R.id.calendarCard).setOnClickListener(new View.OnClickListener() {
+            public void onClick(View v) { startActivity(new Intent(HomeActivity.this, CalendarActivity.class)); }
+        });
     }
 
     private final android.os.Handler calTick = new android.os.Handler();
     private final Runnable calTickRun = new Runnable() { public void run() {
-        try { if (compact != null) compact.refresh(); } catch (Throwable ignored) {}
         calTick.postDelayed(this, 30_000);
     }};
 
@@ -85,7 +63,6 @@ public class HomeActivity extends Activity {
                 }
             }));
         findViewById(R.id.toolColumn).setBackgroundColor(dark ? 0xFF000000 : 0xFFEEF4FF);
-        try { if (compact != null) compact.setDark(dark); } catch (Throwable ignored) {}
         ((TextView) findViewById(R.id.themeToggle)).setText(dark ? "☀️" : "🌙");
         applyTraversal((android.view.ViewGroup) findViewById(R.id.toolColumn), dark);
     }
@@ -159,7 +136,6 @@ public class HomeActivity extends Activity {
         if (getIntent() != null && getIntent().getBooleanExtra("goto_play", false)) showPlayChoice();
         setupCalendar();
         applyTheme();
-        if (compact != null) compact.setDark(getSharedPreferences("settings", MODE_PRIVATE).getBoolean("dark", false));
         applyImmersive();
 
         findViewById(R.id.themeToggle).setOnClickListener(new View.OnClickListener() {

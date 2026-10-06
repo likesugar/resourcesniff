@@ -17,8 +17,7 @@
 
     <LinearLayout android:id="@+id/toolColumn"
         android:layout_width="match_parent" android:layout_height="match_parent"
-        android:orientation="vertical"
-        android:background="@color/bg">
+        android:orientation="vertical">
 
         <ScrollView
             android:layout_width="match_parent" android:layout_height="match_parent"
@@ -28,14 +27,12 @@
                 android:layout_width="match_parent" android:layout_height="wrap_content"
                 android:orientation="vertical"
                 android:paddingLeft="18dp" android:paddingRight="18dp"
-                android:paddingTop="14dp" android:paddingBottom="18dp">
+                android:paddingTop="70dp" android:paddingBottom="150dp">
 
                 <LinearLayout android:tag="card" android:id="@+id/cardPlayer"
                     android:layout_width="match_parent" android:layout_height="wrap_content"
-                    android:layout_marginTop="0dp"
                     android:background="@drawable/bg_card_md3" android:orientation="vertical"
                     android:padding="20dp">
-
                     <LinearLayout
                         android:layout_width="match_parent" android:layout_height="wrap_content"
                         android:orientation="horizontal" android:gravity="center_vertical">
@@ -70,14 +67,17 @@
                             android:textStyle="bold" android:tag="title" android:textColor="@color/textMain"/>
                     </LinearLayout>
                 </LinearLayout>
-                 <LinearLayout android:tag="card" android:id="@+id/cardVideoDl"
+
+                <LinearLayout android:tag="card" android:id="@+id/cardVideoDl"
                     android:layout_width="match_parent" android:layout_height="wrap_content"
                     android:layout_marginTop="14dp"
                     android:background="@drawable/bg_card_md3" android:orientation="vertical"
-                    android:padding="18dp">
-                    <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
+                    android:padding="20dp">
+                    <LinearLayout
+                        android:layout_width="match_parent" android:layout_height="wrap_content"
                         android:orientation="horizontal" android:gravity="center_vertical">
-                        <TextView android:layout_width="48dp" android:layout_height="48dp"
+                        <TextView
+                            android:layout_width="48dp" android:layout_height="48dp"
                             android:background="@drawable/bg_btn_md3"
                             android:text="🎬" android:textSize="22sp" android:gravity="center"/>
                         <TextView
@@ -88,16 +88,7 @@
                     </LinearLayout>
                 </LinearLayout>
 
-               <LinearLayout android:tag="card" android:id="@+id/calendarCard"
-                    android:layout_width="match_parent" android:layout_height="wrap_content"
-                    android:layout_marginTop="14dp"
-                    android:background="@drawable/bg_card_md3" android:orientation="vertical">
-                    <LinearLayout android:id="@+id/calHost"
-                        android:layout_width="match_parent" android:layout_height="wrap_content"
-                        android:orientation="vertical"/>
-               </LinearLayout>
-
-               <LinearLayout android:tag="card" android:id="@+id/cardShortcut"
+                <LinearLayout android:tag="card" android:id="@+id/calendarCard"
                     android:layout_width="match_parent" android:layout_height="wrap_content"
                     android:layout_marginTop="14dp"
                     android:background="@drawable/bg_card_md3" android:orientation="vertical"
@@ -107,7 +98,47 @@
                         android:orientation="horizontal" android:gravity="center_vertical">
                         <TextView
                             android:layout_width="48dp" android:layout_height="48dp"
-                            android:background="@drawable/bg_btn_md3" android:padding="8dp"
+                            android:background="@drawable/bg_btn_md3"
+                            android:text="📅" android:textSize="22sp" android:gravity="center"/>
+                        <TextView
+                            android:layout_width="0dp" android:layout_height="wrap_content"
+                            android:layout_weight="1" android:layout_marginLeft="12dp"
+                            android:text="日历" android:textSize="17sp"
+                            android:textStyle="bold" android:tag="title" android:textColor="@color/textMain"/>
+                    </LinearLayout>
+                </LinearLayout>
+
+                <LinearLayout android:tag="card" android:id="@+id/cardMed"
+                    android:layout_width="match_parent" android:layout_height="wrap_content"
+                    android:layout_marginTop="14dp"
+                    android:background="@drawable/bg_card_md3" android:orientation="vertical"
+                    android:padding="20dp">
+                    <LinearLayout
+                        android:layout_width="match_parent" android:layout_height="wrap_content"
+                        android:orientation="horizontal" android:gravity="center_vertical">
+                        <TextView
+                            android:layout_width="48dp" android:layout_height="48dp"
+                            android:background="@drawable/bg_btn_md3"
+                            android:text="💊" android:textSize="22sp" android:gravity="center"/>
+                        <TextView
+                            android:layout_width="0dp" android:layout_height="wrap_content"
+                            android:layout_weight="1" android:layout_marginLeft="12dp"
+                            android:text="用药提醒" android:textSize="17sp"
+                            android:textStyle="bold" android:tag="title" android:textColor="@color/textMain"/>
+                    </LinearLayout>
+                </LinearLayout>
+
+                <LinearLayout android:tag="card" android:id="@+id/cardShortcut"
+                    android:layout_width="match_parent" android:layout_height="wrap_content"
+                    android:layout_marginTop="14dp"
+                    android:background="@drawable/bg_card_md3" android:orientation="vertical"
+                    android:padding="20dp">
+                    <LinearLayout
+                        android:layout_width="match_parent" android:layout_height="wrap_content"
+                        android:orientation="horizontal" android:gravity="center_vertical">
+                        <TextView
+                            android:layout_width="48dp" android:layout_height="48dp"
+                            android:background="@drawable/bg_btn_md3"
                             android:text="⚡" android:textSize="22sp" android:gravity="center"/>
                         <TextView
                             android:layout_width="0dp" android:layout_height="wrap_content"
@@ -117,8 +148,10 @@
                     </LinearLayout>
                 </LinearLayout>
 
-
-
+                <TextView
+                    android:layout_width="match_parent" android:layout_height="wrap_content"
+                    android:gravity="center" android:paddingTop="26dp"
+                    android:text="v446.0 (779)" android:textSize="11sp" android:textColor="#B7BFCC"/>
             </LinearLayout>
         </ScrollView>
     </LinearLayout>
