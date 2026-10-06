@@ -20,6 +20,9 @@ public class HomeActivity extends Activity {
         findViewById(R.id.calendarCard).setOnClickListener(new View.OnClickListener() {
             public void onClick(View v) { startActivity(new Intent(HomeActivity.this, CalendarActivity.class)); }
         });
+        findViewById(R.id.cardMed).setOnClickListener(new View.OnClickListener() {
+            public void onClick(View v) { startActivity(new Intent(HomeActivity.this, CalendarActivity.class)); }
+        });
     }
 
     private final android.os.Handler calTick = new android.os.Handler();

@@ -138,6 +138,7 @@ public class CalendarCardView extends LinearLayout {
 
         // 自定义签到区(可加多个, 不显示连签天数)
         addView(buildSignSection());
+        addView(buildMedSection());
 
         // 药物提醒区(不包白底)
 
@@ -146,6 +147,7 @@ public class CalendarCardView extends LinearLayout {
         loadHolidaysAndBuildGrid();
         refreshReminders();
         try { CalendarCardView.scheduleSchedules(ctx); } catch (Throwable ignored) {}
+        try { CalendarCardView.scheduleMedsAll(ctx); } catch (Throwable ignored) {}
     }
 
     private TextView navBtn(String s) {
@@ -251,8 +253,380 @@ public class CalendarCardView extends LinearLayout {
 
 
     /** 药物提醒功能已移除, 保留空实现兼容旧调用 */
-    public static void scheduleMedsAll(Context c) { }
-    public static void scheduleMeds(Context c, java.util.List<String>[] arr) { }
+    private static final String[] MED_SLOTS = {"早", "中", "晚"};
+    private static final int[] MED_DEFAULT_MIN = {8 * 60, 12 * 60, 18 * 60 + 30};
+
+    private int medMin(int slot) {
+        try {
+            JSONObject o = new JSONObject(ctx.getSharedPreferences("cal", 0).getString("meds_times", "{}"));
+            return o.optInt(MED_SLOTS[slot], MED_DEFAULT_MIN[slot]);
+        } catch (Throwable e) { return MED_DEFAULT_MIN[slot]; }
+    }
+
+    private void setMedMin(int slot, int minutes) {
+        try {
+            JSONObject o = new JSONObject(ctx.getSharedPreferences("cal", 0).getString("meds_times", "{}"));
+            o.put(MED_SLOTS[slot], minutes);
+            ctx.getSharedPreferences("cal", 0).edit().putString("meds_times", o.toString()).apply();
+        } catch (Throwable ignored) {}
+    }
+
+    private java.util.List<String>[] medArr() {
+        java.util.List<String>[] out = new java.util.List[3];
+        for (int i = 0; i < 3; i++) out[i] = new java.util.ArrayList<String>();
+        try {
+            JSONObject o = new JSONObject(ctx.getSharedPreferences("cal", 0).getString("meds", "{}"));
+            for (int i = 0; i < 3; i++) {
+                JSONArray a = o.optJSONArray(MED_SLOTS[i]);
+                if (a != null) for (int j = 0; j < a.length(); j++) {
+                    String n = a.optString(j); if (n.length() > 0) out[i].add(n);
+                }
+            }
+        } catch (Throwable ignored) {}
+        return out;
+    }
+
+    private void saveMeds(java.util.List<String>[] arr) {
+        try {
+            JSONObject o = new JSONObject();
+            for (int i = 0; i < 3; i++) {
+                JSONArray a = new JSONArray();
+                for (String n : arr[i]) a.put(n);
+                o.put(MED_SLOTS[i], a);
+            }
+            ctx.getSharedPreferences("cal", 0).edit().putString("meds", o.toString()).apply();
+            scheduleMeds(ctx, arr);
+        } catch (Throwable ignored) {}
+    }
+
+    public static void scheduleMeds(Context c, java.util.List<String>[] arr) {
+        try {
+            android.app.AlarmManager am = (android.app.AlarmManager) c.getSystemService(Context.ALARM_SERVICE);
+            for (int i = 0; i < 3; i++) {
+                android.app.PendingIntent pi = android.app.PendingIntent.getBroadcast(c, 46010 + i,
+                    new Intent(c, ScheduleReceiver.class).putExtra("t", medText(arr, i)),
+                    android.app.PendingIntent.FLAG_UPDATE_CURRENT | android.app.PendingIntent.FLAG_IMMUTABLE);
+                am.cancel(pi);
+                if (arr[i].isEmpty()) continue;
+                Calendar t = Calendar.getInstance();
+                int mm = medMinStatic(c, i);
+                t.set(Calendar.HOUR_OF_DAY, mm / 60);
+                t.set(Calendar.MINUTE, mm % 60);
+                t.set(Calendar.SECOND, 0);
+                if (t.getTimeInMillis() <= System.currentTimeMillis()) t.add(Calendar.DATE, 1);
+                if (android.os.Build.VERSION.SDK_INT >= 31 && !am.canScheduleExactAlarms())
+                    am.setAndAllowWhileIdle(android.app.AlarmManager.RTC_WAKEUP, t.getTimeInMillis(), pi);
+                else
+                    am.setExactAndAllowWhileIdle(android.app.AlarmManager.RTC_WAKEUP, t.getTimeInMillis(), pi);
+            }
+        } catch (Throwable ignored) {}
+    }
+
+    private static int medMinStatic(Context c, int slot) {
+        try {
+            JSONObject o = new JSONObject(c.getSharedPreferences("cal", 0).getString("meds_times", "{}"));
+            return o.optInt(MED_SLOTS[slot], MED_DEFAULT_MIN[slot]);
+        } catch (Throwable e) { return MED_DEFAULT_MIN[slot]; }
+    }
+
+    /** 重启后/进页时: 从存储重排全部药物闹钟 */
+    public static void scheduleMedsAll(Context c) {
+        try {
+            JSONObject o = new JSONObject(c.getSharedPreferences("cal", 0).getString("meds", "{}"));
+            java.util.List<String>[] arr = new java.util.List[3];
+            for (int i = 0; i < 3; i++) {
+                arr[i] = new java.util.ArrayList<String>();
+                JSONArray a = o.optJSONArray(MED_SLOTS[i]);
+                if (a != null) for (int j = 0; j < a.length(); j++) arr[i].add(a.optString(j));
+            }
+            scheduleMeds(c, arr);
+        } catch (Throwable ignored) {}
+    }
+
+    private static String medText(java.util.List<String>[] arr, int i) {
+        StringBuilder sb = new StringBuilder(MED_SLOTS[i] + "吃药: ");
+        for (String n : arr[i]) sb.append(n).append("、");
+        return sb.substring(0, sb.length() - 1);
+    }
+
+    private java.util.Set<String> medTaken(String day, int slot) {
+        java.util.Set<String> out = new java.util.HashSet<String>();
+        try {
+            JSONObject o = new JSONObject(ctx.getSharedPreferences("cal", 0).getString("meds_taken", "{}"));
+            JSONObject d = o.optJSONObject(day);
+            if (d != null) {
+                JSONArray a = d.optJSONArray(MED_SLOTS[slot]);
+                if (a != null) for (int i = 0; i < a.length(); i++) out.add(a.optString(i));
+            }
+        } catch (Throwable ignored) {}
+        return out;
+    }
+
+    private void toggleTaken(int slot, String name) {
+        try {
+            String day = new SimpleDateFormat("yyyy-MM-dd", Locale.US).format(new Date());
+            android.content.SharedPreferences sp = ctx.getSharedPreferences("cal", 0);
+            JSONObject o = new JSONObject(sp.getString("meds_taken", "{}"));
+            JSONObject d = o.optJSONObject(day); if (d == null) d = new JSONObject();
+            JSONArray a = d.optJSONArray(MED_SLOTS[slot]); if (a == null) a = new JSONArray();
+            java.util.List<String> l = new java.util.ArrayList<String>();
+            for (int i = 0; i < a.length(); i++) l.add(a.optString(i));
+            if (l.contains(name)) l.remove(name); else l.add(name);
+            JSONArray na = new JSONArray(); for (String x : l) na.put(x);
+            d.put(MED_SLOTS[slot], na); o.put(day, d);
+            sp.edit().putString("meds_taken", o.toString()).apply();
+        } catch (Throwable ignored) {}
+    }
+
+    private LinearLayout buildMedSection() {
+        LinearLayout sec = new LinearLayout(ctx);
+        sec.setOrientation(VERTICAL);
+        LinearLayout head = new LinearLayout(ctx);
+        head.setGravity(Gravity.CENTER_VERTICAL);
+        head.setPadding(0, dp(16), 0, dp(4));
+String[] labels = {"早上", "中午", "晚上"};
+        TextView ti = new TextView(ctx);
+        ti.setText("💊 药物提醒(点时间可改, 点药名确认已吃)");
+        // 时间行: 早上/中午/晚上 三个可点时间(时间在本区顶部统一改)
+        LinearLayout times = new LinearLayout(ctx);
+        times.setGravity(Gravity.CENTER_VERTICAL);
+        times.setPadding(0, dp(8), 0, 0);
+        for (int i = 0; i < 3; i++) {
+            final int si = i;
+            int m0 = medMin(i);
+            TextView tt = new TextView(ctx);
+            tt.setText(labels[i] + " " + String.format(Locale.US, "%02d:%02d", m0 / 60, m0 % 60));
+            tt.setTextSize(13); tt.setTypeface(Typeface.DEFAULT_BOLD);
+            tt.setTextColor(ACCENT);
+            tt.setGravity(Gravity.CENTER);
+            tt.setBackground(flatBg(dark ? 0xFF232A38 : 0xFFE8EEFF, 8));
+            tt.setPadding(dp(10), dp(6), dp(10), dp(6));
+            LayoutParams tlp = new LayoutParams(0, -2, 1f);
+            if (i > 0) tlp.setMargins(dp(8), 0, 0, 0);
+            tt.setOnClickListener(new View.OnClickListener() { public void onClick(View v) {
+                int cur = medMin(si);
+                new TimePickerDialog(ctx, new TimePickerDialog.OnTimeSetListener() {
+                    public void onTimeSet(TimePicker tp, int hh, int mm) {
+                        setMedMin(si, hh * 60 + mm);
+                        saveMeds(medArr());
+                        rebuildMedsOnly();
+                    }
+                }, cur / 60, cur % 60, true).show();
+            }});
+            times.addView(tt, tlp);
+        }
+        TextView medMgr = new TextView(ctx);
+        medMgr.setText("＋"); medMgr.setTextSize(15);
+        medMgr.setTextColor(Color.WHITE);
+        medMgr.setGravity(Gravity.CENTER);
+        medMgr.setBackground(flatBg(ACCENT, 8));
+        medMgr.setPadding(dp(10), dp(2), dp(10), dp(2));
+        LayoutParams mlp = new LayoutParams(-2, -2);
+        mlp.setMargins(dp(8), 0, 0, 0);
+        medMgr.setOnClickListener(new OnClickListener() { public void onClick(View v) { showMedManager(); }});
+        times.addView(medMgr, mlp);
+        sec.addView(times);
+        ti.setTextSize(14); ti.setTypeface(Typeface.DEFAULT_BOLD);
+        ti.setTextColor(fgMain());
+        head.addView(ti, new LayoutParams(0, -2, 1f));
+        sec.addView(head);
+        java.util.List<String>[] meds = medArr();
+        for (int i = 0; i < 3; i++) {
+            final int si = i;
+            LinearLayout row = new LinearLayout(ctx);
+            row.setGravity(Gravity.CENTER_VERTICAL);
+            row.setBackground(flatBg(dark ? 0xFF232A38 : 0xFFE8EEFF, 10));
+            row.setPadding(dp(12), dp(8), dp(12), dp(8));
+            LayoutParams rlp = new LayoutParams(-1, -2);
+            rlp.setMargins(0, dp(6), 0, 0);
+            TextView slot = new TextView(ctx);
+            slot.setText(MED_SLOTS[i]); slot.setTextSize(14); slot.setTypeface(Typeface.DEFAULT_BOLD);
+            slot.setTextColor(fgMain());
+            row.addView(slot);
+            // 药名: 每种一行, 黑色加大加粗, 点击确认吃没吃, 后跟✕删除
+            LinearLayout drugBox = new LinearLayout(ctx);
+            drugBox.setOrientation(VERTICAL);
+            drugBox.setPadding(dp(12), 0, 0, 0);
+            String tday = new SimpleDateFormat("yyyy-MM-dd", Locale.US).format(new Date());
+            java.util.Set<String> taken = medTaken(tday, si);
+            for (int j = 0; j < meds[i].size(); j++) {
+                final int dj = j;
+                String dn = meds[i].get(j);
+                boolean ate = taken.contains(dn);
+                LinearLayout drow = new LinearLayout(ctx);
+                drow.setGravity(Gravity.CENTER_VERTICAL);
+                TextView drug = new TextView(ctx);
+                drug.setText((ate ? "✓ " : "") + dn);
+                drug.setTextSize(16);
+                drug.setTypeface(Typeface.DEFAULT_BOLD);
+                drug.setTextColor(ate ? 0xFF9CCC65 : fgMain());
+                drug.setPadding(dp(6), dp(4), dp(6), dp(4));
+                drug.setOnClickListener(new OnClickListener() { public void onClick(View v) {
+                    toggleTaken(si, dn);
+                    rebuildMedsOnly();
+                }});
+                drow.addView(drug, new LayoutParams(0, -2, 1f));
+                drugBox.addView(drow, new LayoutParams(-1, -2));
+            }
+            if (meds[i].isEmpty()) {
+                TextView none = new TextView(ctx);
+                none.setText("未添加"); none.setTextSize(13); none.setTextColor(fgSub());
+                drugBox.addView(none);
+            }
+            row.addView(drugBox, new LayoutParams(0, -2, 1f));
+            sec.addView(row);
+        }
+        return sec;
+    }
+
+    private void rebuildMedsOnly() {
+        // 仅重建药物区: build()整体重建最简单
+        build();
+    }
+
+
+
+    // ---------- 药物管理(时间行＋进入: 增删早/中/晚药物) ----------
+    private void showMedManager() {
+        final LinearLayout box = new LinearLayout(ctx);
+        box.setOrientation(VERTICAL);
+        int p = dp(6);
+        box.setPadding(p, p, p, p);
+        final Runnable[] render = new Runnable[1];
+        render[0] = new Runnable() { public void run() {
+            box.removeAllViews();
+            java.util.List<String>[] meds = medArr();
+            for (int i = 0; i < 3; i++) {
+                final int si = i;
+                LinearLayout head = new LinearLayout(ctx);
+                head.setGravity(Gravity.CENTER_VERTICAL);
+                head.setPadding(0, dp(8), 0, dp(4));
+                TextView slotT = new TextView(ctx);
+                slotT.setText(MED_SLOTS[i]); slotT.setTextSize(14); slotT.setTypeface(Typeface.DEFAULT_BOLD);
+                slotT.setTextColor(fgMain());
+                head.addView(slotT, new LayoutParams(0, -2, 1f));
+                TextView add = new TextView(ctx);
+                add.setText("＋"); add.setTextSize(14);
+                add.setTextColor(fgMain());
+                add.setBackground(flatBg(cellBg(), 8));
+                add.setPadding(dp(10), dp(2), dp(10), dp(2));
+                add.setOnClickListener(new OnClickListener() { public void onClick(View v) {
+                    android.widget.EditText et = new android.widget.EditText(ctx);
+                    et.setHint("药物名称"); et.setSingleLine(true);
+                    new AlertDialog.Builder(ctx).setTitle("添加" + MED_SLOTS[si] + "药物").setView(et)
+                        .setPositiveButton("添加", new android.content.DialogInterface.OnClickListener() {
+                            public void onClick(android.content.DialogInterface d2, int w) {
+                                String n = et.getText().toString().trim();
+                                if (n.isEmpty()) return;
+                                java.util.List<String>[] a = medArr();
+                                a[si].add(n);
+                                saveMeds(a);
+                                render[0].run();
+                            }
+                        }).setNegativeButton("取消", null).show();
+                }});
+                head.addView(add);
+                box.addView(head);
+                if (meds[i].isEmpty()) {
+                    TextView none = new TextView(ctx);
+                    none.setText("未添加"); none.setTextSize(13); none.setTextColor(fgSub());
+                    box.addView(none);
+                } else {
+                    LinearLayout chips = new LinearLayout(ctx);
+                    for (int j = 0; j < meds[i].size(); j++) {
+                        final int dj = j;
+                        TextView chip = new TextView(ctx);
+                        chip.setText(meds[i].get(j) + " ✕");
+                        chip.setTextSize(13);
+                        chip.setTextColor(fgMain());
+                        chip.setBackground(flatBg(cellBg(), 8));
+                        chip.setPadding(dp(10), dp(6), dp(10), dp(6));
+                        LayoutParams clp = new LayoutParams(-2, -2);
+                        clp.setMargins(0, 0, dp(6), dp(6));
+                        chip.setOnClickListener(new OnClickListener() { public void onClick(View v) {
+                            java.util.List<String>[] a = medArr();
+                            a[si].remove(dj);
+                            saveMeds(a);
+                            render[0].run();
+                        }});
+                        chips.addView(chip, clp);
+                    }
+                    box.addView(chips);
+                }
+            }
+        }};
+        render[0].run();
+        new AlertDialog.Builder(ctx).setTitle("药物管理(点药删除)").setView(box)
+            .setPositiveButton("完成", null)
+            .setOnDismissListener(new android.content.DialogInterface.OnDismissListener() {
+                public void onDismiss(android.content.DialogInterface d) { build(); }
+            }).show();
+    }
+
+    // ---------- 签到管理(增删签到项) ----------
+    private void showSignManager() {
+        final LinearLayout box = new LinearLayout(ctx);
+        box.setOrientation(VERTICAL);
+        int p = dp(6);
+        box.setPadding(p, p, p, p);
+        final Runnable[] render = new Runnable[1];
+        render[0] = new Runnable() { public void run() {
+            box.removeAllViews();
+            JSONArray arr = signArr();
+            LinearLayout chips = new LinearLayout(ctx);
+            for (int k = 0; k < arr.length(); k++) {
+                final int idx = k;
+                JSONObject o = arr.optJSONObject(k);
+                if (o == null) continue;
+                TextView chip = new TextView(ctx);
+                chip.setText(o.optString("n", "签到") + " ✕");
+                chip.setTextSize(13);
+                chip.setTextColor(fgMain());
+                chip.setBackground(flatBg(cellBg(), 8));
+                chip.setPadding(dp(10), dp(6), dp(10), dp(6));
+                LayoutParams clp = new LayoutParams(-2, -2);
+                clp.setMargins(0, 0, dp(6), dp(6));
+                chip.setOnClickListener(new OnClickListener() { public void onClick(View v) {
+                    try {
+                        JSONArray a = signArr();
+                        JSONArray na = new JSONArray();
+                        for (int m = 0; m < a.length(); m++) if (m != idx) na.put(a.get(m));
+                        ctx.getSharedPreferences("cal", 0).edit().putString("signs", na.toString()).apply();
+                    } catch (Throwable ignored) {}
+                    render[0].run();
+                }});
+                chips.addView(chip, clp);
+            }
+            box.addView(chips);
+        }};
+        render[0].run();
+        android.widget.EditText et = new android.widget.EditText(ctx);
+        et.setHint("签到名称"); et.setSingleLine(true);
+        LinearLayout wrap = new LinearLayout(ctx);
+        wrap.setOrientation(VERTICAL);
+        wrap.addView(box);
+        wrap.addView(et);
+        new AlertDialog.Builder(ctx).setTitle("签到管理(点签到删除)")
+            .setView(wrap)
+            .setPositiveButton("添加", new android.content.DialogInterface.OnClickListener() {
+                public void onClick(android.content.DialogInterface d2, int w) {
+                    String n = et.getText().toString().trim();
+                    if (n.isEmpty()) return;
+                    try {
+                        JSONArray a = signArr();
+                        JSONObject o = new JSONObject();
+                        o.put("n", n); o.put("last", "");
+                        a.put(o);
+                        ctx.getSharedPreferences("cal", 0).edit().putString("signs", a.toString()).apply();
+                    } catch (Throwable ignored) {}
+                    render[0].run();
+                }
+            })
+            .setNegativeButton("完成", null)
+            .setOnDismissListener(new android.content.DialogInterface.OnDismissListener() {
+                public void onDismiss(android.content.DialogInterface d) { build(); }
+            }).show();
+    }
 
     // ---------- holiday-cn ----------
     private void loadHolidaysAndBuildGrid() {
@@ -423,70 +797,6 @@ public class CalendarCardView extends LinearLayout {
     // ---------- 药物管理(时间行＋进入: 增删早/中/晚药物) ----------
 
     // ---------- 签到管理(增删签到项) ----------
-    private void showSignManager() {
-        final LinearLayout box = new LinearLayout(ctx);
-        box.setOrientation(VERTICAL);
-        int p = dp(6);
-        box.setPadding(p, p, p, p);
-        final Runnable[] render = new Runnable[1];
-        render[0] = new Runnable() { public void run() {
-            box.removeAllViews();
-            JSONArray arr = signArr();
-            LinearLayout chips = new LinearLayout(ctx);
-            for (int k = 0; k < arr.length(); k++) {
-                final int idx = k;
-                JSONObject o = arr.optJSONObject(k);
-                if (o == null) continue;
-                TextView chip = new TextView(ctx);
-                chip.setText(o.optString("n", "签到") + " ✕");
-                chip.setTextSize(13);
-                chip.setTextColor(fgMain());
-                chip.setBackground(flatBg(cellBg(), 8));
-                chip.setPadding(dp(10), dp(6), dp(10), dp(6));
-                LayoutParams clp = new LayoutParams(-2, -2);
-                clp.setMargins(0, 0, dp(6), dp(6));
-                chip.setOnClickListener(new OnClickListener() { public void onClick(View v) {
-                    try {
-                        JSONArray a = signArr();
-                        JSONArray na = new JSONArray();
-                        for (int m = 0; m < a.length(); m++) if (m != idx) na.put(a.get(m));
-                        ctx.getSharedPreferences("cal", 0).edit().putString("signs", na.toString()).apply();
-                    } catch (Throwable ignored) {}
-                    render[0].run();
-                }});
-                chips.addView(chip, clp);
-            }
-            box.addView(chips);
-        }};
-        render[0].run();
-        android.widget.EditText et = new android.widget.EditText(ctx);
-        et.setHint("签到名称"); et.setSingleLine(true);
-        LinearLayout wrap = new LinearLayout(ctx);
-        wrap.setOrientation(VERTICAL);
-        wrap.addView(box);
-        wrap.addView(et);
-        new AlertDialog.Builder(ctx).setTitle("签到管理(点签到删除)")
-            .setView(wrap)
-            .setPositiveButton("添加", new android.content.DialogInterface.OnClickListener() {
-                public void onClick(android.content.DialogInterface d2, int w) {
-                    String n = et.getText().toString().trim();
-                    if (n.isEmpty()) return;
-                    try {
-                        JSONArray a = signArr();
-                        JSONObject o = new JSONObject();
-                        o.put("n", n); o.put("last", "");
-                        a.put(o);
-                        ctx.getSharedPreferences("cal", 0).edit().putString("signs", a.toString()).apply();
-                    } catch (Throwable ignored) {}
-                    render[0].run();
-                }
-            })
-            .setNegativeButton("完成", null)
-            .setOnDismissListener(new android.content.DialogInterface.OnDismissListener() {
-                public void onDismiss(android.content.DialogInterface d) { build(); }
-            }).show();
-    }
-
     // ---------- 自定义签到 ----------
     private JSONArray signArr() {
         try { return new JSONArray(ctx.getSharedPreferences("cal", 0).getString("signs", "[{\"n\":\"每日签到\"}]")); }
