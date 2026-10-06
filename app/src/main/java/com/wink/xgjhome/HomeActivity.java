@@ -49,6 +49,30 @@ public class HomeActivity extends Activity {
         calTick.postDelayed(this, 30_000);
     }};
 
+    private float swX, swY; private boolean swDone;
+
+    @Override
+    public boolean dispatchTouchEvent(android.view.MotionEvent ev) {
+        switch (ev.getActionMasked()) {
+            case android.view.MotionEvent.ACTION_DOWN:
+                swX = ev.getX(); swY = ev.getY(); swDone = false; break;
+            case android.view.MotionEvent.ACTION_MOVE: {
+                if (!swDone) {
+                    float dx = ev.getX() - swX, dy = ev.getY() - swY;
+                    if (Math.abs(dx) > Math.abs(dy) * 1.4f && Math.abs(dx) > dp2(80)) {
+                        swDone = true;
+                        startActivity(new Intent(this, SettingsActivity.class));
+                        overridePendingTransition(R.anim.slide_in_right, R.anim.slide_out_left);
+                    }
+                }
+                break;
+            }
+        }
+        return super.dispatchTouchEvent(ev);
+    }
+
+    private float dp2(float v) { return v * getResources().getDisplayMetrics().density; }
+
     private void applyTheme() {
         boolean dark = getSharedPreferences("settings", MODE_PRIVATE).getBoolean("dark", false);
         findViewById(R.id.toolRoot).setBackgroundColor(dark ? 0xFF000000 : 0xFFEEF4FF);

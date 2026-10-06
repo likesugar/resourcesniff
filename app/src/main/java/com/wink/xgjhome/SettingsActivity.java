@@ -24,6 +24,28 @@ public class SettingsActivity extends Activity {
     private TextView[] actions = new TextView[3];
 
     @Override
+    private float swX, swY; private boolean swDone;
+
+    @Override
+    public boolean dispatchTouchEvent(android.view.MotionEvent ev) {
+        switch (ev.getActionMasked()) {
+            case android.view.MotionEvent.ACTION_DOWN:
+                swX = ev.getX(); swY = ev.getY(); swDone = false; break;
+            case android.view.MotionEvent.ACTION_MOVE: {
+                if (!swDone) {
+                    float dx = ev.getX() - swX, dy = ev.getY() - swY;
+                    if (dx > Math.abs(dy) * 1.4f && dx > 80 * getResources().getDisplayMetrics().density) {
+                        swDone = true;
+                        finish();
+                        overridePendingTransition(R.anim.slide_in_left, R.anim.slide_out_right);
+                    }
+                }
+                break;
+            }
+        }
+        return super.dispatchTouchEvent(ev);
+    }
+
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_settings);
