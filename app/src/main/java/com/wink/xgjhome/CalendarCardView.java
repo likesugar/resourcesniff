@@ -171,6 +171,7 @@ public class CalendarCardView extends LinearLayout {
         loadHolidaysAndBuildGrid();
         refreshReminders();
         try { CalendarCardView.scheduleSchedules(ctx); } catch (Throwable ignored) {}
+        try { CalendarCardView.scheduleMedsAll(ctx); } catch (Throwable ignored) {}
     }
 
     private TextView navBtn(String s) {
@@ -312,6 +313,20 @@ public class CalendarCardView extends LinearLayout {
             JSONObject o = new JSONObject(c.getSharedPreferences("cal", 0).getString("meds_times", "{}"));
             return o.optInt(MED_SLOTS[slot], MED_DEFAULT_MIN[slot]);
         } catch (Throwable e) { return MED_DEFAULT_MIN[slot]; }
+    }
+
+    /** 重启后/进页时: 从存储重排全部药物闹钟 */
+    public static void scheduleMedsAll(Context c) {
+        try {
+            JSONObject o = new JSONObject(c.getSharedPreferences("cal", 0).getString("meds", "{}"));
+            java.util.List<String>[] arr = new java.util.List[3];
+            for (int i = 0; i < 3; i++) {
+                arr[i] = new java.util.ArrayList<String>();
+                JSONArray a = o.optJSONArray(MED_SLOTS[i]);
+                if (a != null) for (int j = 0; j < a.length(); j++) arr[i].add(a.optString(j));
+            }
+            scheduleMeds(c, arr);
+        } catch (Throwable ignored) {}
     }
 
     private static String medText(java.util.List<String>[] arr, int i) {

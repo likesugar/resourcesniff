@@ -11,6 +11,11 @@ import android.content.Intent;
 public class ScheduleReceiver extends BroadcastReceiver {
     @Override
     public void onReceive(Context context, Intent intent) {
+        if (Intent.ACTION_BOOT_COMPLETED.equals(intent.getAction())) {
+            try { CalendarCardView.scheduleSchedules(context); } catch (Throwable ignored) {}
+            try { CalendarCardView.scheduleMedsAll(context); } catch (Throwable ignored) {}
+            return;
+        }
         try {
             String t = intent.getStringExtra("t");
             NotificationManager nm = (NotificationManager) context.getSystemService(Context.NOTIFICATION_SERVICE);

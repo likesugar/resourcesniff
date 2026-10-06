@@ -55,6 +55,12 @@ public class CalendarActivity extends Activity {
         col.addView(host, lp);
 
         setContentView(root);
+        // 药物/日程到点通知: Android 13+ 需运行时授权
+        if (android.os.Build.VERSION.SDK_INT >= 33
+            && checkSelfPermission("android.permission.POST_NOTIFICATIONS")
+                != android.content.pm.PackageManager.PERMISSION_GRANTED) {
+            requestPermissions(new String[]{"android.permission.POST_NOTIFICATIONS"}, 901);
+        }
     }
 
     @Override
