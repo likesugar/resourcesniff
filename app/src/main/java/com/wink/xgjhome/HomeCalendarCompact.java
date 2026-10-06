@@ -51,7 +51,6 @@ public class HomeCalendarCompact extends LinearLayout {
         int ic = (int) (48 * getResources().getDisplayMetrics().density);
         calIcon.setBackground(circleBg(dark));
         LayoutParams ilp = new LayoutParams(ic, ic);
-        r1.addView(calIcon, ilp);
         dateText = new TextView(a);
         dateText.setTextSize(20); dateText.setTypeface(Typeface.DEFAULT_BOLD);
         dateText.setTextColor(fgMain);
@@ -67,6 +66,7 @@ public class HomeCalendarCompact extends LinearLayout {
         r1.addView(arrow, new LinearLayout.LayoutParams(0, -2, 1f) );
         // arrow weight trick: set weight via LayoutParams above then re-add
         r1.removeAllViews();
+        r1.addView(calIcon, ilp);
         r1.addView(dateText);
         r1.addView(holidayText);
         TextView spacer = new TextView(a);

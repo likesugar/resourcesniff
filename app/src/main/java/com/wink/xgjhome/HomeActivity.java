@@ -155,6 +155,8 @@ public class HomeActivity extends Activity {
             }
         });
         setContentView(R.layout.activity_toolbox);
+
+        if (getIntent() != null && getIntent().getBooleanExtra("goto_play", false)) showPlayChoice();
         setupCalendar();
         applyTheme();
         if (compact != null) compact.setDark(getSharedPreferences("settings", MODE_PRIVATE).getBoolean("dark", false));

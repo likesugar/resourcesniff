@@ -23,7 +23,6 @@ public class SettingsActivity extends Activity {
     private TextView[] states = new TextView[3];
     private TextView[] actions = new TextView[3];
 
-    @Override
     private float swX, swY; private boolean swDone;
 
     @Override
@@ -46,9 +45,32 @@ public class SettingsActivity extends Activity {
         return super.dispatchTouchEvent(ev);
     }
 
+    @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_settings);
+
+        // 底部胶囊条(与首页同款): 首页=返回, 设置=当前, 播放器=回首页弹播放
+        android.view.View sroot = findViewById(R.id.settingsRoot);
+        if (sroot instanceof android.widget.FrameLayout) {
+            boolean d = getSharedPreferences("settings", MODE_PRIVATE).getBoolean("dark", false);
+            CapsuleBottomBar bar = new CapsuleBottomBar(this, d, new CapsuleBottomBar.OnItem() {
+                public void onItem(int idx) {
+                    if (idx == 0) {
+                        finish();
+                        overridePendingTransition(R.anim.slide_in_left, R.anim.slide_out_right);
+                    } else if (idx == 2) {
+                        finish();
+                        overridePendingTransition(R.anim.slide_in_left, R.anim.slide_out_right);
+                        startActivity(new Intent(SettingsActivity.this, HomeActivity.class).putExtra("goto_play", true));
+                    }
+                }
+            });
+            bar.select(1, false);
+            ((android.widget.FrameLayout) sroot).addView(bar, new android.widget.FrameLayout.LayoutParams(
+                android.view.ViewGroup.LayoutParams.WRAP_CONTENT, android.view.ViewGroup.LayoutParams.WRAP_CONTENT,
+                android.view.Gravity.BOTTOM | android.view.Gravity.CENTER_HORIZONTAL));
+        }
         dark = getSharedPreferences("settings", MODE_PRIVATE).getBoolean("dark", false);
         applyTheme();
 
@@ -323,7 +345,7 @@ public class SettingsActivity extends Activity {
         int[] accents = {R.id.biliAction, R.id.dyAction, R.id.ytAction, R.id.btnClearAll, R.id.arrow, R.id.btnBack, R.id.custAction};
         for (int id : accents) ((TextView) findViewById(id)).setTextColor(accent);
         int[] cards = {R.id.card1, R.id.card2, R.id.card3, R.id.cardNotify, R.id.cardAbout2};
-        for (int id : cards) findViewById(id).setBackgroundColor(card);
+        for (int id : cards) findViewById(id).setBackgroundResource(dark ? R.drawable.bg_card_md3_dark : R.drawable.bg_card_md3);
         int[] divs = {R.id.div1, R.id.div2, R.id.div3};
         for (int id : divs) findViewById(id).setBackgroundColor(div);
         if (Build.VERSION.SDK_INT >= 23) {
