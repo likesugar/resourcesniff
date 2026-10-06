@@ -91,64 +91,49 @@ public class MedPlanActivity extends Activity {
     private void renderList() {
         listHost.removeAllViews();
         if (plans.length() == 0) {
-            TextView e = mkText("还没有用药计划\n点右上角「＋ 新增用药计划」创建 💊", 14, false, 0xFF8A94A6);
+            TextView e = mkText("还没有用药计划\n点下方「＋ 新增用药计划」创建 💊", 14, false, 0xFF8A94A6);
             e.setGravity(Gravity.CENTER);
             e.setPadding(0, dp(120), 0, 0);
             listHost.addView(e);
             return;
         }
-        String today = new SimpleDateFormat("yyyy-MM-dd", Locale.US).format(new Date());
+        LinearLayout row = null;
         for (int i = 0; i < plans.length(); i++) {
             final int idx = i;
             JSONObject o = plans.optJSONObject(i);
             if (o == null) continue;
-            LinearLayout card = card();
-            TextView name = mkText("💊 " + o.optString("name", ""), 17, true, 0xFF1F2329);
-            card.addView(name);
-            TextView spec = mkText(o.optString("spec", "") + " · 每次 " + o.optString("dose", "1")
-                + o.optString("unit", "片") + " · " + o.optString("relation", ""), 13, false, 0xFF8A94A6);
-            spec.setPadding(0, dp(6), 0, 0);
-            card.addView(spec);
-            LinearLayout times = new LinearLayout(this);
-            times.setOrientation(LinearLayout.HORIZONTAL);
-            JSONArray ts = o.optJSONArray("times");
-            if (ts != null) for (int t = 0; t < ts.length(); t++) {
-                TextView chip = mkText(ts.optString(t), 13, true, 0xFF315CDE);
-                chip.setBackgroundResource(R.drawable.bg_chip_blue);
-                chip.setPadding(dp(12), dp(5), dp(12), dp(5));
-                LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(-2, -2);
-                if (t > 0) lp.leftMargin = dp(8);
-                lp.topMargin = dp(10);
-                times.addView(chip, lp);
+            if (i % 2 == 0) {
+                row = new LinearLayout(this);
+                row.setOrientation(LinearLayout.HORIZONTAL);
+                LinearLayout.LayoutParams rlp = new LinearLayout.LayoutParams(-1, -2);
+                if (i > 0) rlp.topMargin = dp(14);
+                listHost.addView(row, rlp);
             }
-            card.addView(times);
-            String repeat = o.optString("repeat", "每天");
-            String range = repeat + " · " + o.optString("start", "") + " 起"
-                + (o.optLong("end", 0) > 0 ? " 至 " + new SimpleDateFormat("yyyy-MM-dd", Locale.US).format(new Date(o.optLong("end"))) : "");
-            TextView meta = mkText(range, 12, false, 0xFFB08497);
-            meta.setPadding(0, dp(8), 0, 0);
-            card.addView(meta);
-            LinearLayout btns = new LinearLayout(this);
-            TextView del = mkText("删除", 13, false, 0xFFFF7B8A);
-            del.setBackgroundResource(R.drawable.bg_chip_gray);
-            del.setPadding(dp(16), dp(8), dp(16), dp(8));
-            del.setOnClickListener(v -> new AlertDialog.Builder(this).setTitle("删除计划")
-                .setMessage("删除「" + o.optString("name", "") + "」的用药计划?")
-                .setPositiveButton("删除", (d, w) -> { removePlan(idx); })
-                .setNegativeButton("取消", null).show());
-            TextView edit = mkText("编辑", 13, false, 0xFF315CDE);
-            edit.setBackgroundResource(R.drawable.bg_chip_blue);
-            edit.setPadding(dp(16), dp(8), dp(16), dp(8));
-            LinearLayout.LayoutParams elp = new LinearLayout.LayoutParams(-2, -2);
-            elp.leftMargin = dp(10);
-            edit.setOnClickListener(v -> showForm(idx));
-            btns.addView(del); btns.addView(edit, elp);
-            LinearLayout.LayoutParams blp = new LinearLayout.LayoutParams(-2, -2);
-            blp.topMargin = dp(14);
-            card.addView(btns, blp);
-            LinearLayout.LayoutParams clp = new LinearLayout.LayoutParams(-1, -2);
-            clp.topMargin = dp(14);
-            listHost.addView(card, clp);
+            LinearLayout cell = new LinearLayout(this);
+            cell.setOrientation(LinearLayout.VERTICAL);
+            cell.setBackgroundResource(R.drawable.bg_card_white);
+            cell.setPadding(dp(16), dp(16), dp(16), dp(16));
+            LinearLayout.LayoutParams clp = new LinearLayout.LayoutParams(0, -2, 1f);
+            if (i % 2 == 1) clp.leftMargin = dp(14);
+            // 图标 + 药名
+            TextView ic = mkText("💊", 20, false, 0xFF1F2329);
+            cell.addView(ic);
+            TextView name = mkText(o.optString("name", ""), 15, true, 0xFF1F2329);
+            name.setPadding(0, dp(8), 0, 0);
+            cell.addView(name);
+            TextView dose = mkText(o.optString("dose", "1") + o.optString("unit", "片") + " · " + o.optString("relation", ""), 12, false, 0xFF8A94A6);
+            dose.setPadding(0, dp(4), 0, 0);
+            cell.addView(dose);
+            // 首个时间胶囊
+            JSONArray ts = o.optJSONArray("times");
+            TextView chip = mkText((ts != null && ts.length() > 0 ? ts.optString(0) : "--:--") + (ts != null && ts.length() > 1 ? " +" + (ts.length() - 1) : ""), 13, true, 0xFF315CDE);
+            chip.setBackgroundResource(R.drawable.bg_chip_blue);
+            chip.setPadding(dp(12), dp(5), dp(12), dp(5));
+            LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(-2, -2);
+            lp.topMargin = dp(10);
+            cell.addView(chip, lp);
+            cell.setOnClickListener(v -> showForm(idx));
+            row.addView(cell, clp);
         }
     }
 
@@ -184,6 +169,9 @@ public class MedPlanActivity extends Activity {
 
         // 单次用量: 数字 + 片/粒
         LinearLayout doseRow = rowHead(card, "🥛", "单次用量");
+        LinearLayout doseLine = new LinearLayout(this);
+        doseLine.setOrientation(LinearLayout.HORIZONTAL);
+        doseLine.setGravity(Gravity.CENTER_VERTICAL);
         final EditText dose = new EditText(this);
         dose.setText(idx >= 0 ? plans.optJSONObject(idx).optString("dose", "1") : "1");
         dose.setInputType(android.text.InputType.TYPE_CLASS_NUMBER);
@@ -191,9 +179,11 @@ public class MedPlanActivity extends Activity {
         dose.setTextSize(15); dose.setTextColor(0xFF1F2329);
         dose.setBackgroundResource(R.drawable.bg_input);
         dose.setPadding(dp(14), dp(8), dp(14), dp(8));
-        doseRow.addView(dose, new LinearLayout.LayoutParams(dp(56), -2));
+        LinearLayout.LayoutParams dlp = new LinearLayout.LayoutParams(0, -2, 1f);
+        dlp.leftMargin = dp(10);
+        doseLine.addView(dose, dlp);
         final String[] unit = {idx >= 0 ? plans.optJSONObject(idx).optString("unit", "片") : "片"};
-        LinearLayout unitBox = new LinearLayout(this);
+        final LinearLayout unitBox = new LinearLayout(this);
         for (final String u : new String[]{"片", "粒"}) {
             TextView c = mkText(u, 14, u.equals(unit[0]), u.equals(unit[0]) ? 0xFF315CDE : 0xFF8A94A6);
             c.setBackgroundResource(u.equals(unit[0]) ? R.drawable.bg_chip_blue : R.drawable.bg_chip_gray);
@@ -206,8 +196,10 @@ public class MedPlanActivity extends Activity {
             });
             unitBox.addView(c, lp);
         }
-        doseRow.addView(unitBox);
-        final LinearLayout unitRef = unitBox;
+        doseLine.addView(unitBox);
+        LinearLayout.LayoutParams dlp2 = new LinearLayout.LayoutParams(-1, -2);
+        dlp2.leftMargin = dp(10);
+        doseRow.addView(doseLine, dlp2);
 
         // 服用时间
         LinearLayout timeHead = rowHead(card, "⏰", "服用时间");
@@ -286,6 +278,16 @@ public class MedPlanActivity extends Activity {
         c2.leftMargin = dp(14);
         btns.addView(cancel, c1); btns.addView(save, c2);
         bottomBar.addView(btns, new LinearLayout.LayoutParams(-1, -2));
+        if (editIdx >= 0) {
+            TextView del = mkText("🗑 删除此计划", 14, false, 0xFFFF7B8A);
+            del.setGravity(Gravity.CENTER);
+            del.setPadding(0, dp(14), 0, 0);
+            card.addView(del, new LinearLayout.LayoutParams(-1, -2));
+            del.setOnClickListener(v -> new AlertDialog.Builder(this).setTitle("删除计划")
+                .setMessage("删除「" + name.getText().toString() + "」?")
+                .setPositiveButton("删除", (d, w) -> { removePlan(editIdx); formHost.setVisibility(View.GONE); listScroll.setVisibility(View.VISIBLE); })
+                .setNegativeButton("取消", null).show());
+        }
         cancel.setOnClickListener(v -> { formHost.setVisibility(View.GONE); listScroll.setVisibility(View.VISIBLE); });
         save.setOnClickListener(v -> {
             String n = name.getText().toString().trim();
@@ -356,7 +358,7 @@ public class MedPlanActivity extends Activity {
         et.setHintTextColor(0xFFB7BFCC);
         et.setBackgroundResource(R.drawable.bg_input);
         et.setPadding(dp(14), dp(10), dp(14), dp(10));
-        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(0, -2, 1f);
+        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(-1, -2);
         lp.leftMargin = dp(10);
         row.addView(et, lp);
         return et;
