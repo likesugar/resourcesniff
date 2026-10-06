@@ -79,16 +79,11 @@ public class MedPlanActivity extends Activity {
         alp.leftMargin = dp(16); alp.rightMargin = dp(16); alp.bottomMargin = dp(24);
 
         // 🧹 清当日去重标记
-        TextView clean = mkText("🧹", 18, false, 0xFF8A94A6);
-        clean.setGravity(Gravity.CENTER);
-        clean.setBackgroundResource(R.drawable.bg_input);
-        FrameLayout.LayoutParams clp = new FrameLayout.LayoutParams(dp(44), dp(44), Gravity.TOP | Gravity.END);
-        clp.topMargin = dp(28); clp.rightMargin = dp(16);
-        clean.setOnClickListener(v -> {
-            getSharedPreferences("medplan", 0).edit()
-                .remove("ntf_" + new SimpleDateFormat("yyyy-MM-dd", Locale.US).format(new Date())).apply();
-            Toast.makeText(this, "已清今日标记，到点会重新提醒", Toast.LENGTH_SHORT).show();
-        });
+        TextView cleanBtn = mkText("🧹", 18, false, 0xFF8A94A6);
+        FrameLayout.LayoutParams clp2 = new FrameLayout.LayoutParams(dp(44), dp(44), Gravity.TOP | Gravity.END);
+        clp2.topMargin = dp(80); clp2.rightMargin = dp(16);
+        cleanBtn.setGravity(Gravity.CENTER);
+        cleanBtn.setBackgroundResource(R.drawable.bg_input);
         root.addView(add, alp);
         root.addView(cleanBtn, clp2);
 
@@ -637,6 +632,32 @@ public class MedPlanActivity extends Activity {
             .putBoolean("done_" + today + "_" + planIdx + "_" + timeIdx, true).apply();
         NotificationManager nm = (NotificationManager) c.getSystemService(Context.NOTIFICATION_SERVICE);
         nm.cancel(medNotifId(planIdx, timeIdx));
+    }
+
+    /** app活着即兜底: 补挂所有到点未确认通知 */
+    static void checkAndNotifyDue(Context c) {
+        try {
+            JSONArray plans = load(c);
+            String today = new SimpleDateFormat("yyyy-MM-dd", Locale.US).format(new Date());
+            String now = new SimpleDateFormat("HH:mm", Locale.US).format(new Date());
+            android.content.SharedPreferences pf = c.getSharedPreferences("medplan", 0);
+            for (int i = 0; i < plans.length(); i++) {
+                JSONObject o = plans.optJSONObject(i);
+                if (o == null) continue;
+                JSONArray ts = o.optJSONArray("times");
+                if (ts == null) continue;
+                for (int t = 0; t < ts.length(); t++) {
+                    String tt = ts.optString(t);
+                    if (tt.compareTo(now) <= 0 && !medDone(c, i, t)
+                        && !pf.getBoolean("ntf_" + today + "_" + i + "_" + t, false)) {
+                        pf.edit().putBoolean("ntf_" + today + "_" + i + "_" + t, true).apply();
+                        String txt = "💊 " + o.optString("name", "") + "  " + o.optString("dose", "1") + o.optString("unit", "片")
+                            + (o.optString("relation", "").isEmpty() ? "" : "（" + o.optString("relation") + "）");
+                        notifyMedHold(c, i, t, "该吃药啦 ⏰（确认后才停止提醒）", txt);
+                    }
+                }
+            }
+        } catch (Throwable ignored) {}
     }
 
     static boolean medDone(Context c, int planIdx, int timeIdx) {
