@@ -70,41 +70,14 @@ public class MedPlanActivity extends Activity {
         root.addView(title, new FrameLayout.LayoutParams(-2, -2, Gravity.TOP | Gravity.CENTER_HORIZONTAL));
         ((FrameLayout.LayoutParams) title.getLayoutParams()).topMargin = dp(32);
 
-        LinearLayout bottomBar2 = new LinearLayout(this);
-        bottomBar2.setOrientation(LinearLayout.HORIZONTAL);
         TextView add = mkText("＋  新增用药计划", 16, true, Color.WHITE);
         add.setGravity(Gravity.CENTER);
         add.setBackgroundResource(R.drawable.bg_pill_blue);
-        add.setPadding(dp(12), dp(16), dp(12), dp(16));
+        add.setPadding(dp(20), dp(16), dp(20), dp(16));
         add.setOnClickListener(v -> showForm(-1));
-        LinearLayout.LayoutParams a1 = new LinearLayout.LayoutParams(0, -2, 2f);
-        TextView test = mkText("🔔 测试通知", 16, true, 0xFF315CDE);
-        test.setGravity(Gravity.CENTER);
-        test.setBackgroundResource(R.drawable.bg_btn_outline);
-        test.setPadding(dp(12), dp(16), dp(12), dp(16));
-        test.setOnClickListener(v -> {
-            ensureChannel(this);
-            ensureService(this);
-            notifyMed(this, "测试通知 ✅", "能看到这条说明通知链路正常，到点也会这样提醒");
-            toast("已发送测试通知，看通知栏");
-        });
-        LinearLayout.LayoutParams a2 = new LinearLayout.LayoutParams(0, -2, 1f);
-        a2.leftMargin = dp(12);
-        TextView clean = mkText("🧹 清标记", 16, false, 0xFF8A94A6);
-        clean.setGravity(Gravity.CENTER);
-        clean.setBackgroundResource(R.drawable.bg_btn_outline);
-        clean.setPadding(dp(8), dp(16), dp(8), dp(16));
-        clean.setOnClickListener(v -> {
-            getSharedPreferences("medplan", 0).edit()
-                .remove("ntf_" + new SimpleDateFormat("yyyy-MM-dd", Locale.US).format(new Date())).apply();
-            toast("已清今日标记，到点会重新提醒");
-        });
-        LinearLayout.LayoutParams a3 = new LinearLayout.LayoutParams(0, -2, 1f);
-        a3.leftMargin = dp(10);
-        bottomBar2.addView(add, a1); bottomBar2.addView(test, a2); bottomBar2.addView(clean, a3);
         FrameLayout.LayoutParams alp = new FrameLayout.LayoutParams(-1, -2, Gravity.BOTTOM);
         alp.leftMargin = dp(16); alp.rightMargin = dp(16); alp.bottomMargin = dp(24);
-        root.addView(bottomBar2, alp);
+        root.addView(add, alp);
 
         formHost = new FrameLayout(this);
         formHost.setBackgroundColor(0xFFEAF2FF);
@@ -114,7 +87,6 @@ public class MedPlanActivity extends Activity {
         setContentView(root);
         Immersive.hide(this);
         renderList();
-        cleanFutureMarks();
         // 精确闹钟权限(Android 12+): 不批的话提醒会延迟
         AlarmManager am = (AlarmManager) getSystemService(Context.ALARM_SERVICE);
         if (android.os.Build.VERSION.SDK_INT >= 31 && am != null && !am.canScheduleExactAlarms()) {
@@ -123,29 +95,6 @@ public class MedPlanActivity extends Activity {
                     android.net.Uri.parse("package:" + getPackageName())));
             } catch (Throwable ignored) {}
         }
-    }
-
-    private void cleanFutureMarks() {
-        try {
-            String today = new SimpleDateFormat("yyyy-MM-dd", Locale.US).format(new Date());
-            String now = new SimpleDateFormat("HH:mm", Locale.US).format(new Date());
-            android.content.SharedPreferences pf = getSharedPreferences("medplan", 0);
-            android.content.SharedPreferences.Editor e = pf.edit();
-            boolean changed = false;
-            for (int i = 0; i < plans.length(); i++) {
-                JSONObject o = plans.optJSONObject(i);
-                JSONArray ts = o == null ? null : o.optJSONArray("times");
-                if (ts == null) continue;
-                for (int t = 0; t < ts.length(); t++) {
-                    String tt = ts.optString(t);
-                    if (tt.compareTo(now) > 0 && pf.getBoolean("ntf_" + today + "_" + i + "_" + t, false)) {
-                        e.remove("ntf_" + today + "_" + i + "_" + t);
-                        changed = true;
-                    }
-                }
-            }
-            if (changed) e.apply();
-        } catch (Throwable ignored) {}
     }
 
     private void renderList() {
@@ -384,10 +333,7 @@ public class MedPlanActivity extends Activity {
                 o.put("end", formEnd);
                 if (editIdx >= 0) plans.put(editIdx, o); else plans.put(o);
                 save(this, plans);
-                // 清当天去重标记, 新保存的计划当天也能提醒
-                getSharedPreferences("medplan", 0).edit()
-                    .remove("ntf_" + new SimpleDateFormat("yyyy-MM-dd", Locale.US).format(new Date())).apply();
-                scheduleAll(this); ensureService(this);
+                scheduleAll(this);
                 formHost.setVisibility(View.GONE); listScroll.setVisibility(View.VISIBLE);
                 renderList();
                 toast("已保存，到点提醒 📳");
@@ -540,70 +486,6 @@ public class MedPlanActivity extends Activity {
         Intent it = new Intent(c, MedPlanReceiver.class).setAction("MED_FIRE")
             .putExtra("i", planIdx).putExtra("t", timeIdx);
         return PendingIntent.getBroadcast(c, 990100 + slot, it, PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
-    }
-
-    /** 前台服务: 常驻进程, 免疫锁屏/冻结, 每20秒检查到点计划 */
-    public static class MedPlanService extends android.app.Service {
-        private final android.os.Handler h = new android.os.Handler(android.os.Looper.getMainLooper());
-        private boolean running = false;
-        private final Runnable tickRunnable = new Runnable() { public void run() { checkDue(); h.postDelayed(tickRunnable, 20_000); } };
-
-        private void checkDue() {
-            try {
-                JSONArray plans = load(this);
-                String today = new SimpleDateFormat("yyyy-MM-dd", Locale.US).format(new Date());
-                String hm = new SimpleDateFormat("HH:mm", Locale.US).format(new Date());
-                android.content.SharedPreferences pf = getSharedPreferences("medplan", 0);
-                for (int i = 0; i < plans.length(); i++) {
-                    JSONObject o = plans.optJSONObject(i);
-                    if (o == null) continue;
-                    JSONArray ts = o.optJSONArray("times");
-                    if (ts == null) continue;
-                    for (int t = 0; t < ts.length(); t++) {
-                        String tt = ts.optString(t);
-                        if (hm.compareTo(tt) >= 0 && !pf.getBoolean("ntf_" + today + "_" + i + "_" + t, false)) {
-                            pf.edit().putBoolean("ntf_" + today + "_" + i + "_" + t, true).apply();
-                            String txt = "💊 " + o.optString("name", "") + "  " + o.optString("dose", "1") + o.optString("unit", "片")
-                                + (o.optString("relation", "").isEmpty() ? "" : "（" + o.optString("relation") + "）");
-                            notifyMed(this, "该吃药啦 ⏰", txt);
-                        }
-                    }
-                }
-            } catch (Throwable ignored) {}
-        }
-
-        @Override public void onCreate() {
-            super.onCreate();
-            Notification n = new Notification.Builder(this, CH)
-                .setSmallIcon(android.R.drawable.ic_dialog_info)
-                .setContentTitle("用药提醒运行中 🛡️")
-                .setContentText("到点会准时提醒你吃药")
-                .setOngoing(true)
-                .build();
-            try {
-                if (android.os.Build.VERSION.SDK_INT >= 29)
-                    startForeground(990010, n, android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE);
-                else
-                    startForeground(990010, n);
-            } catch (Throwable e) { startForeground(990010, n); }
-        }
-
-        @Override public int onStartCommand(Intent intent, int flags, int startId) {
-            if (!running) { running = true; h.post(tickRunnable); }
-            return android.app.Service.START_STICKY;
-        }
-
-        @Override public void onDestroy() { h.removeCallbacksAndMessages(null); super.onDestroy(); }
-        @Override public android.os.IBinder onBind(Intent i) { return null; }
-    }
-
-    /** 确保前台服务在跑 */
-    public static void ensureService(Context c) {
-        try {
-            Intent it = new Intent(c, MedPlanService.class);
-            if (android.os.Build.VERSION.SDK_INT >= 26) c.startForegroundService(it);
-            else c.startService(it);
-        } catch (Throwable ignored) {}
     }
 
     public static class MedPlanReceiver extends BroadcastReceiver {
