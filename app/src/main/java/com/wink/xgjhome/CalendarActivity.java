@@ -50,6 +50,7 @@ public class CalendarActivity extends Activity {
         LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(-1, -2);
         lp.topMargin = (int) (12 * getResources().getDisplayMetrics().density);
         card = new CalendarCardView(this);
+        card.setDark(dark);
         host.addView(card);
         col.addView(host, lp);
 

@@ -453,17 +453,6 @@ String[] labels = {"早上", "中午", "晚上"};
                     rebuildMedsOnly();
                 }});
                 drow.addView(drug, new LayoutParams(0, -2, 1f));
-                TextView del = new TextView(ctx);
-                del.setText("✕"); del.setTextSize(14);
-                del.setTextColor(0xFFFF7B8A);
-                del.setPadding(dp(10), dp(4), dp(6), dp(4));
-                del.setOnClickListener(new OnClickListener() { public void onClick(View v) {
-                    java.util.List<String>[] a = medArr();
-                    a[si].remove(dj);
-                    saveMeds(a);
-                    rebuildMedsOnly();
-                }});
-                drow.addView(del);
                 drugBox.addView(drow, new LayoutParams(-1, -2));
             }
             if (meds[i].isEmpty()) {
@@ -726,7 +715,10 @@ String[] labels = {"早上", "中午", "晚上"};
         }};
         render[0].run();
         new AlertDialog.Builder(ctx).setTitle("药物管理(点药删除)").setView(box)
-            .setPositiveButton("完成", null).show();
+            .setPositiveButton("完成", null)
+            .setOnDismissListener(new android.content.DialogInterface.OnDismissListener() {
+                public void onDismiss(android.content.DialogInterface d) { build(); }
+            }).show();
     }
 
     // ---------- 自定义签到 ----------
