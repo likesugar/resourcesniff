@@ -491,11 +491,22 @@ public class MedPlanActivity extends Activity {
         }
     }
 
-    static void notifyMed(Context c, String title, String text) {
+    /** 应用启动即创建渠道, 保证系统通知设置里能看到并配置 */
+    public static void ensureChannel(Context c) {
         NotificationManager nm = (NotificationManager) c.getSystemService(Context.NOTIFICATION_SERVICE);
         NotificationChannel ch = new NotificationChannel(CH, "用药提醒", NotificationManager.IMPORTANCE_HIGH);
         ch.enableVibration(true);
+        ch.enableLights(true);
+        ch.setLockscreenVisibility(Notification.VISIBILITY_PUBLIC);
         nm.createNotificationChannel(ch);
+        NotificationChannel r2 = new NotificationChannel("remind", "日程提醒", NotificationManager.IMPORTANCE_HIGH);
+        r2.enableVibration(true);
+        nm.createNotificationChannel(r2);
+    }
+
+    static void notifyMed(Context c, String title, String text) {
+        ensureChannel(c);
+        NotificationManager nm = (NotificationManager) c.getSystemService(Context.NOTIFICATION_SERVICE);
         Intent open = new Intent(c, MedPlanActivity.class);
         PendingIntent pi = PendingIntent.getActivity(c, 990002, open, PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
         Notification n = new Notification.Builder(c, CH)
