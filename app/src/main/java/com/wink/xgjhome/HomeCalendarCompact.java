@@ -68,7 +68,6 @@ public class HomeCalendarCompact extends LinearLayout {
         TextView spacer = new TextView(a);
         r1.addView(spacer, new LinearLayout.LayoutParams(0, 0, 1f));
         addView(r1);
-        addView(buildSignBtn());
 
         // 行2: 提醒摘要
         LinearLayout r2 = new LinearLayout(a);
