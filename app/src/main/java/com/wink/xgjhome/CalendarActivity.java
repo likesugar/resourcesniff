@@ -55,6 +55,7 @@ public class CalendarActivity extends Activity {
         col.addView(host, lp);
 
         setContentView(root);
+        Immersive.hide(this);
         // 药物/日程到点通知: Android 13+ 需运行时授权
         if (android.os.Build.VERSION.SDK_INT >= 33
             && checkSelfPermission("android.permission.POST_NOTIFICATIONS")

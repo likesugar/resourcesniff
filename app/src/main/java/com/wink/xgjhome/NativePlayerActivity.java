@@ -81,6 +81,7 @@ public class NativePlayerActivity extends Activity {
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
 
         setContentView(root);
+        Immersive.hide(this);
         if (url == null || url.length() == 0) {
             Toast.makeText(this, "无播放地址", Toast.LENGTH_SHORT).show();
             finish();

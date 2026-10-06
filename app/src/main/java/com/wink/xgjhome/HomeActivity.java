@@ -173,6 +173,7 @@ public class HomeActivity extends Activity {
             }
         });
         setContentView(R.layout.activity_toolbox);
+        Immersive.hide(this);
 
         // 启动即创建通知渠道 + 申请通知权限(Android 13+)
         try { MedPlanActivity.ensureChannel(this); } catch (Throwable ignored) {}

@@ -148,6 +148,7 @@ public class RecordActivity extends Activity {
         sv.addView(col);
         root.addView(sv);
         setContentView(root);
+        Immersive.hide(this);
 
         handler = new Handler();
         tick = new Runnable() {

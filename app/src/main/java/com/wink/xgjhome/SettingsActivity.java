@@ -51,13 +51,7 @@ public class SettingsActivity extends Activity {
         if (hasFocus) hideNav();
     }
 
-    private void hideNav() {
-        android.view.View dec = getWindow().getDecorView();
-        dec.setSystemUiVisibility(View.SYSTEM_UI_FLAG_HIDE_NAVIGATION
-            | View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY
-            | View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION
-            | View.SYSTEM_UI_FLAG_LAYOUT_STABLE);
-    }
+    private void hideNav() { Immersive.hide(this); }
 
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -82,7 +76,7 @@ public class SettingsActivity extends Activity {
         android.widget.FrameLayout.LayoutParams blp = new android.widget.FrameLayout.LayoutParams(
             android.view.ViewGroup.LayoutParams.WRAP_CONTENT, android.view.ViewGroup.LayoutParams.WRAP_CONTENT,
             android.view.Gravity.BOTTOM | android.view.Gravity.CENTER_HORIZONTAL);
-        blp.bottomMargin = (int) (12 * getResources().getDisplayMetrics().density);
+
         content.addView(bar, blp);
         dark = getSharedPreferences("settings", MODE_PRIVATE).getBoolean("dark", false);
         applyTheme();

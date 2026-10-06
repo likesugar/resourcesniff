@@ -85,6 +85,7 @@ public class MedPlanActivity extends Activity {
         root.addView(formHost, new FrameLayout.LayoutParams(-1, -1));
 
         setContentView(root);
+        Immersive.hide(this);
         renderList();
         // 精确闹钟权限(Android 12+): 不批的话提醒会延迟
         AlarmManager am = (AlarmManager) getSystemService(Context.ALARM_SERVICE);
@@ -472,10 +473,7 @@ public class MedPlanActivity extends Activity {
                 if (!fire.after(now)) fire.add(Calendar.DATE, 1); // 已过点->明天的这个点
                 int slot = i * 20 + t;
                 PendingIntent pi = firePI(c, slot, i, t);
-                if (android.os.Build.VERSION.SDK_INT >= 31 && !am.canScheduleExactAlarms())
-                    am.setWindow(AlarmManager.RTC_WAKEUP, fire.getTimeInMillis(), 60_000, pi);
-                else
-                    am.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, fire.getTimeInMillis(), pi);
+                am.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, fire.getTimeInMillis(), pi);
             }
         }
     }

@@ -204,6 +204,7 @@ public class VideoDlActivity extends Activity {
         ScrollView sv = new ScrollView(this);
         sv.setFillViewport(true);
         setContentView(root);
+        Immersive.hide(this);
         // 入口交互与资源嗅探一致: 进入即弹输入窗
         String autoUrl = getIntent() != null ? getIntent().getStringExtra("url") : null;
         if (autoUrl != null && autoUrl.length() > 0) { submit(autoUrl); }
