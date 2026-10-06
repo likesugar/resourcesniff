@@ -48,9 +48,6 @@
                             android:layout_weight="1" android:layout_marginLeft="12dp"
                             android:text="资源嗅探" android:textSize="17sp"
                             android:textStyle="bold" android:tag="title" android:textColor="@color/textMain"/>
-                        <TextView android:text="›" android:textSize="20sp"
-                            android:textColor="#C3CAD6"
-                            android:layout_width="wrap_content" android:layout_height="wrap_content"/>
                     </LinearLayout>
                 </LinearLayout>
 
@@ -71,9 +68,6 @@
                             android:layout_weight="1" android:layout_marginLeft="12dp"
                             android:text="资源下载" android:textSize="17sp"
                             android:textStyle="bold" android:tag="title" android:textColor="@color/textMain"/>
-                        <TextView android:text="›" android:textSize="20sp"
-                            android:textColor="#C3CAD6"
-                            android:layout_width="wrap_content" android:layout_height="wrap_content"/>
                     </LinearLayout>
                 </LinearLayout>
                  <LinearLayout android:tag="card" android:id="@+id/cardVideoDl"
@@ -91,9 +85,6 @@
                             android:layout_weight="1" android:layout_marginLeft="12dp"
                             android:text="视频下载" android:textSize="17sp"
                             android:textStyle="bold" android:tag="title" android:textColor="@color/textMain"/>
-                        <TextView android:text="›" android:textSize="20sp"
-                            android:textColor="#C3CAD6"
-                            android:layout_width="wrap_content" android:layout_height="wrap_content"/>
                     </LinearLayout>
                 </LinearLayout>
 
@@ -123,9 +114,6 @@
                             android:layout_weight="1" android:layout_marginLeft="12dp"
                             android:text="创建快捷键" android:textSize="17sp"
                             android:textStyle="bold" android:tag="title" android:textColor="@color/textMain"/>
-                        <TextView android:text="›" android:textSize="20sp"
-                            android:textColor="#C3CAD6"
-                            android:layout_width="wrap_content" android:layout_height="wrap_content"/>
                     </LinearLayout>
                 </LinearLayout>
 

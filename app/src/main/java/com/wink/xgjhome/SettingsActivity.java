@@ -51,26 +51,26 @@ public class SettingsActivity extends Activity {
         setContentView(R.layout.activity_settings);
 
         // 底部胶囊条(与首页同款): 首页=返回, 设置=当前, 播放器=回首页弹播放
-        android.view.View sroot = findViewById(R.id.settingsRoot);
-        if (sroot instanceof android.widget.FrameLayout) {
-            boolean d = getSharedPreferences("settings", MODE_PRIVATE).getBoolean("dark", false);
-            CapsuleBottomBar bar = new CapsuleBottomBar(this, d, new CapsuleBottomBar.OnItem() {
-                public void onItem(int idx) {
-                    if (idx == 0) {
-                        finish();
-                        overridePendingTransition(R.anim.slide_in_left, R.anim.slide_out_right);
-                    } else if (idx == 2) {
-                        finish();
-                        overridePendingTransition(R.anim.slide_in_left, R.anim.slide_out_right);
-                        startActivity(new Intent(SettingsActivity.this, HomeActivity.class).putExtra("goto_play", true));
-                    }
+        boolean d = getSharedPreferences("settings", MODE_PRIVATE).getBoolean("dark", false);
+        CapsuleBottomBar bar = new CapsuleBottomBar(this, d, new CapsuleBottomBar.OnItem() {
+            public void onItem(int idx) {
+                if (idx == 0) {
+                    finish();
+                    overridePendingTransition(R.anim.slide_in_left, R.anim.slide_out_right);
+                } else if (idx == 2) {
+                    finish();
+                    overridePendingTransition(R.anim.slide_in_left, R.anim.slide_out_right);
+                    startActivity(new Intent(SettingsActivity.this, HomeActivity.class).putExtra("goto_play", true));
                 }
-            });
-            bar.select(1, false);
-            ((android.widget.FrameLayout) sroot).addView(bar, new android.widget.FrameLayout.LayoutParams(
-                android.view.ViewGroup.LayoutParams.WRAP_CONTENT, android.view.ViewGroup.LayoutParams.WRAP_CONTENT,
-                android.view.Gravity.BOTTOM | android.view.Gravity.CENTER_HORIZONTAL));
-        }
+            }
+        });
+        bar.select(1, false);
+        android.widget.FrameLayout content = (android.widget.FrameLayout) findViewById(android.R.id.content);
+        android.widget.FrameLayout.LayoutParams blp = new android.widget.FrameLayout.LayoutParams(
+            android.view.ViewGroup.LayoutParams.WRAP_CONTENT, android.view.ViewGroup.LayoutParams.WRAP_CONTENT,
+            android.view.Gravity.BOTTOM | android.view.Gravity.CENTER_HORIZONTAL);
+        blp.bottomMargin = (int) (12 * getResources().getDisplayMetrics().density);
+        content.addView(bar, blp);
         dark = getSharedPreferences("settings", MODE_PRIVATE).getBoolean("dark", false);
         applyTheme();
 
