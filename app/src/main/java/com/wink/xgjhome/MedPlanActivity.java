@@ -226,13 +226,15 @@ public class MedPlanActivity extends Activity {
             timeChips.removeAllViews();
             for (int t = 0; t < formTimes.length(); t++) {
                 final int ti = t;
-                TextView chip = mkText(formTimes.optString(ti), 14, true, 0xFF315CDE);
+                TextView chip = mkText(formTimes.optString(ti) + " ✕", 14, true, 0xFF315CDE);
                 chip.setBackgroundResource(R.drawable.bg_chip_blue);
                 chip.setPadding(dp(14), dp(8), dp(14), dp(8));
-                chip.setOnClickListener(v -> new TimePickerDialog(MedPlanActivity.this, (tp, hh, mm) -> {
-                    formTimes.put(String.format(Locale.US, "%02d:%02d", hh, mm));
+                chip.setOnClickListener(v -> {
+                    JSONArray na = new JSONArray();
+                    for (int m = 0; m < formTimes.length(); m++) if (m != ti) { try { na.put(formTimes.get(m)); } catch (Throwable ignored) {} }
+                    formTimes = na;
                     renderTimes[0].run();
-                }, hour(formTimes.optString(ti)), min(formTimes.optString(ti)), true).show());
+                });
                 timeChips.addView(chip, chipLp(t > 0));
             }
         };
