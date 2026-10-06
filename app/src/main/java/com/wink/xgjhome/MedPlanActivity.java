@@ -446,6 +446,17 @@ public class MedPlanActivity extends Activity {
     private int dp(float v) { return Math.round(v * getResources().getDisplayMetrics().density); }
 
     // ---------- 存储 ----------
+    /** 确认按钮广播 */
+    public static class MedConfirmReceiver extends BroadcastReceiver {
+        @Override public void onReceive(Context context, Intent intent) {
+            try {
+                if (!"MED_CONFIRM".equals(intent.getAction())) return;
+                confirmMed(context, intent.getIntExtra("i", -1), intent.getIntExtra("t", -1));
+                Toast.makeText(context, "已确认服药 ✓", Toast.LENGTH_SHORT).show();
+            } catch (Throwable ignored) {}
+        }
+    }
+
     static JSONArray load(Context c) {
         try { return new JSONArray(c.getSharedPreferences("medplan", 0).getString("plans", "[]")); }
         catch (Throwable e) { return new JSONArray(); }
@@ -534,6 +545,44 @@ public class MedPlanActivity extends Activity {
         NotificationChannel r2 = new NotificationChannel("remind", "日程提醒", NotificationManager.IMPORTANCE_HIGH);
         r2.enableVibration(true);
         nm.createNotificationChannel(r2);
+    }
+
+    static int medNotifId(int planIdx, int timeIdx) { return 990200 + planIdx * 20 + timeIdx; }
+
+    /** 到点提醒: 常驻通知, 只有确认才消失 */
+    static void notifyMedHold(Context c, int planIdx, int timeIdx, String title, String text) {
+        ensureChannel(c);
+        NotificationManager nm = (NotificationManager) c.getSystemService(Context.NOTIFICATION_SERVICE);
+        Intent open = new Intent(c, MedPlanActivity.class)
+            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP);
+        PendingIntent pi = PendingIntent.getActivity(c, 990002, open, PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
+        Intent conf = new Intent(c, MedConfirmReceiver.class)
+            .setAction("MED_CONFIRM").putExtra("i", planIdx).putExtra("t", timeIdx);
+        PendingIntent cpi = PendingIntent.getBroadcast(c, 990400 + medNotifId(planIdx, timeIdx), conf,
+            PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
+        Notification n = new Notification.Builder(c, CH)
+            .setSmallIcon(android.R.drawable.ic_dialog_info)
+            .setContentTitle(title).setContentText(text)
+            .setContentIntent(pi)
+            .setAutoCancel(false)
+            .setOngoing(true)
+            .addAction(0, "✓ 已服用", cpi)
+            .build();
+        nm.notify(medNotifId(planIdx, timeIdx), n);
+    }
+
+    /** 确认服药: 标记+撤通知 */
+    static void confirmMed(Context c, int planIdx, int timeIdx) {
+        String today = new SimpleDateFormat("yyyy-MM-dd", Locale.US).format(new Date());
+        c.getSharedPreferences("medplan", 0).edit()
+            .putBoolean("done_" + today + "_" + planIdx + "_" + timeIdx, true).apply();
+        NotificationManager nm = (NotificationManager) c.getSystemService(Context.NOTIFICATION_SERVICE);
+        nm.cancel(medNotifId(planIdx, timeIdx));
+    }
+
+    static boolean medDone(Context c, int planIdx, int timeIdx) {
+        String today = new SimpleDateFormat("yyyy-MM-dd", Locale.US).format(new Date());
+        return c.getSharedPreferences("medplan", 0).getBoolean("done_" + today + "_" + planIdx + "_" + timeIdx, false);
     }
 
     static void notifyMed(Context c, String title, String text) {
