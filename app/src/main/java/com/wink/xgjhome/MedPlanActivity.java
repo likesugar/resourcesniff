@@ -588,7 +588,7 @@ public class MedPlanActivity extends Activity {
         PendingIntent cpi = PendingIntent.getBroadcast(c, 990400 + medNotifId(planIdx, timeIdx), conf,
             PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
         Notification n = new Notification.Builder(c, CH)
-            .setSmallIcon(getApplicationInfo().icon)
+            .setSmallIcon(c.getApplicationInfo().icon)
             .setContentTitle(title).setContentText(text)
             .setContentIntent(pi)
             .setAutoCancel(false)
@@ -650,7 +650,7 @@ public class MedPlanActivity extends Activity {
             .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP);
         PendingIntent pi = PendingIntent.getActivity(c, 990002, open, PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
         Notification n = new Notification.Builder(c, CH)
-            .setSmallIcon(getApplicationInfo().icon)
+            .setSmallIcon(c.getApplicationInfo().icon)
             .setContentTitle(title).setContentText(text)
             .setContentIntent(pi)
             .setAutoCancel(true)
