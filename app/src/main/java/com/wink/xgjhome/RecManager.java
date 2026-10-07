@@ -364,6 +364,7 @@ public class RecManager {
 
     public static void recStop(int jid) {
         RecJob bg = recJobs.get(jid);
+        if (bg != null && bg.state != null && bg.state.contains("合并视频")) return; // 合并中不可暂停
         if (bg != null && bg.file != null && bg.file.isDirectory()) { pauseBg(bg, "暂停录制"); return; }
         if (ffkSession != null) {
             com.arthenica.ffmpegkit.FFmpegKit.cancel(ffkSession.getSessionId());
@@ -418,9 +419,8 @@ public class RecManager {
                 live.secs += (System.currentTimeMillis() - live.startTs) / 1000;
                 live.startTs = 0;
             }
-            recJobs.remove(live.id);
-            removeLiveRec(live);
-            releaseWakeIfIdle();
+            // 留在列表显示"合并视频", 合并完成才移出(对齐参考App)
+            live.state = "合并视频";
             mergeSegs(live);
             return;
         }
@@ -753,6 +753,7 @@ public class RecManager {
                     HistoryStore.add(sCtx, "录制", mp4Name, "file://" + new java.io.File(job.file, mp4Name).getAbsolutePath());
                     job.savedToHistory = true;
                 } else job.state = "合并失败";
+                recJobs.remove(job.id); removeLiveRec(job); releaseWakeIfIdle(); // 合并完成, 卡片此时才移出
                 stoppedJobs.put(job.id, job);
             } catch (Throwable e) {
                 job.state = "转换失败: " + e.getClass().getSimpleName();
