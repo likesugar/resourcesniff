@@ -217,7 +217,7 @@ public class HomeActivity extends Activity {
             public void onClick(View v) { startActivity(new Intent(HomeActivity.this, RecordActivity.class)); }
         });
         findViewById(R.id.cardVideoDl).setOnClickListener(new View.OnClickListener() {
-            public void onClick(View v) { showSniffDialog(VideoDlActivity.class, "下载", "视频下载", "进入"); }
+            public void onClick(View v) { showVdlDialog(); }
         });
 
         findViewById(R.id.lanToggle).setOnClickListener(new View.OnClickListener() {
@@ -395,9 +395,7 @@ public class HomeActivity extends Activity {
         } catch (Throwable e) { return null; }
     }
 
-    private void showSniffDialog() { showSniffDialog(null, "开始嗅探", "资源嗅探", "取消"); }
-
-    private void showSniffDialog(final Class<?> target, final String goLabel, final String dlgTitle, final String leftLabel) {
+    private void showSniffDialog() {
         android.app.Dialog d = new android.app.Dialog(this);
         d.setContentView(R.layout.dialog_sniff);
         android.view.Window w = d.getWindow();
@@ -406,8 +404,6 @@ public class HomeActivity extends Activity {
             w.setLayout(android.view.ViewGroup.LayoutParams.MATCH_PARENT,
                     android.view.ViewGroup.LayoutParams.WRAP_CONTENT);
         }
-        android.widget.TextView dlgT = (android.widget.TextView) d.findViewById(R.id.tv_dialog_title);
-        if (dlgT != null) dlgT.setText(dlgTitle);
         final EditText et = d.findViewById(R.id.et_dialog_url);
         d.findViewById(R.id.btn_paste).setOnClickListener(new View.OnClickListener() {
             public void onClick(View v) {
@@ -421,21 +417,53 @@ public class HomeActivity extends Activity {
                 } catch (Exception e) { }
             }
         });
-        android.widget.TextView cancelBtn = (android.widget.TextView) d.findViewById(R.id.btn_cancel);
-        if (!"取消".equals(leftLabel)) cancelBtn.setText(leftLabel);
-        cancelBtn.setOnClickListener(new View.OnClickListener() {
+        d.findViewById(R.id.btn_cancel).setOnClickListener(new View.OnClickListener() {
+            public void onClick(View v) { d.dismiss(); }
+        });
+        d.findViewById(R.id.btn_go).setOnClickListener(new View.OnClickListener() {
             public void onClick(View v) {
-                if (target != null) { startActivity(new Intent(HomeActivity.this, target)); }
+                Intent i = new Intent(HomeActivity.this, SniffActivity.class);
+                i.putExtra("input", et.getText().toString().trim());
+                startActivity(i);
                 d.dismiss();
             }
         });
-        android.widget.TextView goBtn = (android.widget.TextView) d.findViewById(R.id.btn_go);
-        goBtn.setText(goLabel);
-        goBtn.setOnClickListener(new View.OnClickListener() {
+        d.show();
+    }
+
+    /** 视频下载专用弹窗: [进入]仅进页, [下载]带链接直开 */
+    private void showVdlDialog() {
+        android.app.Dialog d = new android.app.Dialog(this);
+        d.setContentView(R.layout.dialog_vdl);
+        android.view.Window w = d.getWindow();
+        if (w != null) {
+            w.setBackgroundDrawableResource(android.R.color.transparent);
+            w.setLayout(android.view.ViewGroup.LayoutParams.MATCH_PARENT,
+                    android.view.ViewGroup.LayoutParams.WRAP_CONTENT);
+        }
+        final EditText et = d.findViewById(R.id.et_vdl_url);
+        d.findViewById(R.id.btn_vdl_paste).setOnClickListener(new View.OnClickListener() {
             public void onClick(View v) {
-                String u = et.getText().toString().trim();
-                Intent i = new Intent(HomeActivity.this, target != null ? target : SniffActivity.class);
-                if (target != null) i.putExtra("url", u); else i.putExtra("input", u);
+                try {
+                    ClipboardManager cm = (ClipboardManager) getSystemService(CLIPBOARD_SERVICE);
+                    if (cm != null && cm.getPrimaryClip() != null
+                            && cm.getPrimaryClip().getItemAt(0) != null
+                            && cm.getPrimaryClip().getItemAt(0).getText() != null) {
+                        et.setText(cm.getPrimaryClip().getItemAt(0).getText().toString().trim());
+                    }
+                } catch (Exception e) { }
+            }
+        });
+        d.findViewById(R.id.btn_vdl_cancel).setOnClickListener(new View.OnClickListener() {
+            public void onClick(View v) {
+                startActivity(new Intent(HomeActivity.this, VideoDlActivity.class));
+                d.dismiss();
+            }
+        });
+        d.findViewById(R.id.btn_vdl_go).setOnClickListener(new View.OnClickListener() {
+            public void onClick(View v) {
+                Intent i = new Intent(HomeActivity.this, VideoDlActivity.class);
+                i.putExtra("url", et.getText().toString().trim());
                 startActivity(i);
                 d.dismiss();
             }
