@@ -190,9 +190,10 @@ public class MedPlanActivity extends Activity {
                 TextView gap = new TextView(this);
                 hrow.addView(gap, new LinearLayout.LayoutParams(dp(10), 1));
             }
-            TextView chip = mkText((ts != null && ts.length() > 0 ? ts.optString(0) : "--:--") + (ts != null && ts.length() > 1 ? " +" + (ts.length() - 1) : ""), 13, true, 0xFF315CDE);
+            TextView chip = mkText((ts != null && ts.length() > 0 ? ts.optString(0) : "--:--") + (ts != null && ts.length() > 1 ? " +1" : ""), 13, true, 0xFF315CDE);
             chip.setBackgroundResource(R.drawable.bg_chip_blue);
             chip.setPadding(dp(12), dp(6), dp(12), dp(6));
+            chip.setSingleLine(true);
             hrow.addView(chip);
             cell.addView(hrow, hlp);
             cell.setOnClickListener(v -> showForm(idx));
@@ -237,7 +238,7 @@ public class MedPlanActivity extends Activity {
         formHost.setVisibility(View.VISIBLE);
         ScrollView fs = new ScrollView(this);
         LinearLayout card = card();
-        card.setPadding(dp(16), dp(84), dp(16), dp(40));
+        card.setPadding(dp(16), dp(28), dp(16), dp(120));
         fs.addView(card);
         formHost.addView(fs, new FrameLayout.LayoutParams(-1, -1));
         LinearLayout bottomBar = new LinearLayout(this);
