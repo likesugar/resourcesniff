@@ -30,13 +30,13 @@ public class ShortcutActivity extends Activity {
         App0 = getApplicationContext();
         LinearLayout root = new LinearLayout(this);
         root.setOrientation(LinearLayout.VERTICAL);
-        root.setBackgroundColor(Color0.bg());
+        root.setBackgroundColor(Color0.bg(this));
 
         TextView title = new TextView(this);
         title.setText("创建快捷键");
         title.setTextSize(22);
         title.setTypeface(Typeface.DEFAULT_BOLD);
-        title.setTextColor(Color0.text());
+        title.setTextColor(Color0.text(this));
         title.setPadding(dp(18), dp(20), dp(18), dp(10));
         root.addView(title);
 
@@ -159,8 +159,8 @@ public class ShortcutActivity extends Activity {
         ic.setText(icon);
         ic.setTextSize(20);
         ic.setGravity(Gravity.CENTER);
-        ic.setTextColor(Color0.text());
-        ic.setBackgroundColor(Color0.btnBg());
+        ic.setTextColor(Color0.text(this));
+        ic.setBackgroundColor(Color0.btnBg(this));
         return smallCardEx(ic, name, click, longClick);
     }
 
@@ -168,14 +168,14 @@ public class ShortcutActivity extends Activity {
         LinearLayout card = new LinearLayout(this);
         card.setOrientation(LinearLayout.VERTICAL);
         card.setGravity(Gravity.CENTER);
-        card.setBackgroundColor(Color0.card());
+        card.setBackgroundColor(Color0.card(this));
         int pad = dp(14);
         card.setPadding(pad, pad, pad, pad);
         card.addView(iconCell, new LinearLayout.LayoutParams(dp(40), dp(40)));
         TextView tv = new TextView(this);
         tv.setText(name);
         tv.setTextSize(13);
-        tv.setTextColor(Color0.text());
+        tv.setTextColor(Color0.text(this));
         tv.setGravity(Gravity.CENTER);
         tv.setMaxLines(1);
         LinearLayout.LayoutParams tlp = new LinearLayout.LayoutParams(-1, -2);
@@ -191,8 +191,8 @@ public class ShortcutActivity extends Activity {
         tv.setText(t);
         tv.setTextSize(20);
         tv.setGravity(Gravity.CENTER);
-        tv.setTextColor(Color0.text());
-        tv.setBackgroundColor(Color0.btnBg());
+        tv.setTextColor(Color0.text(this));
+        tv.setBackgroundColor(Color0.btnBg(this));
         return tv;
     }
 
@@ -378,10 +378,10 @@ public class ShortcutActivity extends Activity {
 
     // ---------- 主题/尺寸小助手 ----------
     private static class Color0 {
-        static int bg() { return 0xFF0B0D10; }
-        static int card() { return 0xFF161A20; }
-        static int text() { return 0xFFE8ECF2; }
-        static int btnBg() { return 0xFF242B34; }
+        static int bg(android.content.Context c) { return Theme.dark(c) ? 0xFF000000 : 0xFFEEF4FF; }
+        static int card(android.content.Context c) { return Theme.c(c, 0xFF161A20, 0xFFFFFFFF); }
+        static int text(android.content.Context c) { return Theme.c(c, 0xFFE8ECF2, 0xFF1F2329); }
+        static int btnBg(android.content.Context c) { return Theme.c(c, 0xFF242B34, 0xFFE3E9F5); }
     }
 
     private int dp(int v) { return (int) (v * getResources().getDisplayMetrics().density); }

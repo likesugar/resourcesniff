@@ -92,11 +92,12 @@ public class VideoDlActivity extends Activity {
     private final java.util.HashMap<Task, TextView> resMap = new java.util.HashMap<Task, TextView>();
     private final java.util.HashMap<Task, Integer> shapeMap = new java.util.HashMap<Task, Integer>();
     private int lastChip = -1;
-    private final boolean dark = true;
+    private boolean dark;
 
     @Override
     protected void onCreate(Bundle b) {
         super.onCreate(b);
+        dark = Theme.dark(this);
         loadTasks(this);
         FrameLayout root = new FrameLayout(this);
         root.setBackgroundColor(dark ? 0xFF10141C : 0xFFF2F6FF);

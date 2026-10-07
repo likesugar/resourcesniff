@@ -24,6 +24,7 @@ public class RecordActivity extends Activity {
     private Runnable tick;
     private LinearLayout list;
     private TextView tvEmpty;
+    private FrameLayout root;
     private LinearLayout tabBar;
     private LinearLayout col;
     private TextView[] tabBtns;
@@ -36,9 +37,9 @@ public class RecordActivity extends Activity {
         LinearLayout seg = tabBar;
         if (seg.getParent() == col) col.removeView(seg);
         if (bottom) {
-            LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(-1, -2);
-            lp.topMargin = dp2(8);
-            col.addView(seg, lp); // 末尾=列表下方
+            FrameLayout.LayoutParams lp = new FrameLayout.LayoutParams(-1, -2, Gravity.BOTTOM);
+            lp.leftMargin = dp2(14); lp.rightMargin = dp2(14); lp.bottomMargin = dp2(18);
+            root.addView(seg, lp); // 钉在屏幕底部, 不随内容滚动
         } else {
             col.addView(seg, 1, new LinearLayout.LayoutParams(-1, -2)); // head之后
         }
@@ -67,7 +68,7 @@ public class RecordActivity extends Activity {
         DlManager.init(this);
         try { getWindow().getDecorView().setSystemUiVisibility(View.SYSTEM_UI_FLAG_HIDE_NAVIGATION); } catch (Throwable ignored) {}
         hist = HistoryStore.load(this);
-        FrameLayout root = new FrameLayout(this);
+        root = new FrameLayout(this);
         root.setBackgroundColor(Theme.bg(this));
 
         ScrollView sv = new ScrollView(this);
@@ -118,12 +119,12 @@ public class RecordActivity extends Activity {
         final TextView segBtn = new TextView(this);
         segBtn.setText("[↨]");
         segBtn.setTextColor(Theme.dark(this) ? 0xFF9FC2FF : Theme.accent());
-        segBtn.setTextSize(14);
+        segBtn.setTextSize(12);
         segBtn.setTypeface(Typeface.DEFAULT_BOLD);
-        segBtn.setPadding(dp2(16), dp2(12), dp2(16), dp2(12));
+        segBtn.setPadding(dp2(10), dp2(7), dp2(10), dp2(7));
         segBtn.setBackgroundResource(R.drawable.bg_seg_bar);
         LinearLayout.LayoutParams slp = new LinearLayout.LayoutParams(-2, -2);
-        slp.rightMargin = dp2(10);
+        slp.rightMargin = dp2(8);
         segBtn.setLayoutParams(slp);
         segBtn.setOnClickListener(new View.OnClickListener() {
             public void onClick(View v) {
