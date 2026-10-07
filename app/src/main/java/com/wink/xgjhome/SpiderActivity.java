@@ -222,6 +222,7 @@ public class SpiderActivity extends Activity {
                     ws.setJavaScriptEnabled(true);
                     ws.setUserAgentString("Mozilla/5.0 (Linux; Android 13) Chrome/120 Mobile");
                     wv.setWebViewClient(new WebViewClient() {
+                        @Override public void onReceivedSslError(WebView v, android.webkit.SslErrorHandler h, android.net.http.SslError e) { h.proceed(); }
                         @Override public void onPageFinished(WebView v, String u) {
                             v.postDelayed(new Runnable() { public void run() {
                                 wv.evaluateJavascript("document.documentElement.outerHTML.substring(0,12000)", new android.webkit.ValueCallback<String>() {
