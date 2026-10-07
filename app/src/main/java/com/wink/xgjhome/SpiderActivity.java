@@ -1,17 +1,26 @@
 package com.wink.xgjhome;
 
 import android.app.Activity;
+import android.app.AlertDialog;
 import android.graphics.Color;
+import android.graphics.drawable.GradientDrawable;
 import android.os.Build;
 import android.os.Bundle;
+import android.view.Gravity;
 import android.view.View;
 import android.view.WindowManager;
+import android.view.inputmethod.EditorInfo;
 import android.webkit.CookieManager;
 import android.webkit.JavascriptInterface;
 import android.webkit.WebChromeClient;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
+import android.widget.EditText;
+import android.widget.FrameLayout;
+import android.widget.HorizontalScrollView;
+import android.widget.LinearLayout;
+import android.widget.TextView;
 import android.widget.Toast;
 
 import org.json.JSONArray;
@@ -27,15 +36,22 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
 /**
- * 爬虫2(beauty_spider移植): 内置浏览器浏览 win4000.com,
- * 在系列详情页注入悬浮"下载全部"按钮, 点击后整本下载到 Pictures/美女/
- * WebView 天然通过该站 JS cookie 反爬挑战.
+ * 爬虫·主页 (图1复刻): 收藏站点圆形卡片横排(秀人网第一) + 底部胶囊条
+ * 胶囊: ⭐收藏当前页(收藏后"上去"到主页卡片) / 点"主页"弹输入框跳转
+ * 详情页注入"⬇下载全部", 整本存 Pictures/美女/
  */
 public class SpiderActivity extends Activity {
 
-    private static final String START = "http://www.win4000.com/zt/xinggan.html";
+    private static final String PREF = "spider_favs";
+    private static final String[] SITE_NAMES = {"秀人网", "甜壁纸"};
+    private static final String[] SITE_URLS = {"https://axiuren.com/", "http://www.win4000.com/zt/xinggan.html"};
+    private static final int[] SITE_COLORS = {0xFFd65db1, 0xFF315CDE, 0xFF9c8e7d, 0xFFa56bce, 0xFF1FA855, 0xFFe67e22};
+
     private WebView web;
+    private LinearLayout homeRoot;
+    private LinearLayout cardsRow;
     private boolean dark;
+    private String currentUrl = "";
     private final ExecutorService pool = Executors.newFixedThreadPool(3);
 
     @Override
@@ -48,8 +64,8 @@ public class SpiderActivity extends Activity {
         }
         getWindow().setFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN, WindowManager.LayoutParams.FLAG_FULLSCREEN);
 
+        // WebView(不显示, 浏览态才上屏)
         web = new WebView(this);
-        setContentView(web);
         WebSettings ws = web.getSettings();
         ws.setJavaScriptEnabled(true);
         ws.setDomStorageEnabled(true);
@@ -62,64 +78,241 @@ public class SpiderActivity extends Activity {
         web.setWebViewClient(new WebViewClient() {
             @Override public void onReceivedSslError(WebView v, android.webkit.SslErrorHandler h, android.net.http.SslError e) { h.proceed(); }
             @Override public boolean shouldOverrideUrlLoading(WebView v, String u) { return false; }
-            @Override public void onPageFinished(WebView v, String u) {
-                inject(v, u);
-            }
+            @Override public void onPageFinished(WebView v, String u) { inject(v, u); }
         });
-        web.loadUrl(START);
+
+        buildHome();
     }
+
+    // ---------------- 主页(图1) ----------------
+
+    private void buildHome() {
+        int bg = dark ? 0xFF000000 : 0xFFFFFFFF;
+        int tx = dark ? 0xFFFFFFFF : 0xFF000000;
+
+        homeRoot = new LinearLayout(this);
+        homeRoot.setOrientation(LinearLayout.VERTICAL);
+        homeRoot.setBackgroundColor(bg);
+
+        // 卡片区: 横向滚动圆形收藏
+        HorizontalScrollView hs = new HorizontalScrollView(this);
+        hs.setHorizontalScrollBarEnabled(false);
+        LinearLayout pad = new LinearLayout(this);
+        pad.setOrientation(LinearLayout.HORIZONTAL);
+        pad.setPadding(40, 80, 40, 20);
+        cardsRow = new LinearLayout(this);
+        cardsRow.setOrientation(LinearLayout.HORIZONTAL);
+        cardsRow.setGravity(Gravity.CENTER_VERTICAL);
+        pad.addView(cardsRow);
+        hs.addView(pad);
+        homeRoot.addView(hs, new LinearLayout.LayoutParams(-1, -2, 1));
+
+        // 底部胶囊条
+        LinearLayout pillBg = new LinearLayout(this);
+        pillBg.setOrientation(LinearLayout.VERTICAL);
+        pillBg.setGravity(Gravity.BOTTOM);
+        pillBg.setBackgroundColor(bg);
+        LinearLayout pill = new LinearLayout(this);
+        pill.setOrientation(LinearLayout.HORIZONTAL);
+        pill.setGravity(Gravity.CENTER_VERTICAL);
+        GradientDrawable pillBg2 = new GradientDrawable();
+        pillBg2.setColor(dark ? 0xFF1C1C1E : 0xFFf2f3f5);
+        pillBg2.setCornerRadius(dip(24));
+        LinearLayout.LayoutParams plp = new LinearLayout.LayoutParams(-1, dip(48));
+        plp.setMargins(dip(20), dip(8), dip(20), dip(28));
+        pill.setBackground(pillBg2);
+        pill.setPadding(dip(18), 0, dip(18), 0);
+
+        TextView star = new TextView(this);
+        star.setText("⭐");
+        star.setTextSize(20);
+        star.setOnClickListener(new View.OnClickListener() { public void onClick(View v) { favCurrent(); } });
+        LinearLayout.LayoutParams slp = new LinearLayout.LayoutParams(-2, -2);
+        slp.rightMargin = dip(12);
+        pill.addView(star, slp);
+
+        TextView home = new TextView(this);
+        home.setText("主页");
+        home.setTextSize(16);
+        home.setTextColor(dark ? 0xFFAAAAAA : 0xFF666666);
+        home.setOnClickListener(new View.OnClickListener() { public void onClick(View v) { showJumpDialog(); } });
+        pill.addView(home, new LinearLayout.LayoutParams(0, -2, 1));
+
+        pillBg.addView(pill, plp);
+        homeRoot.addView(pillBg, new LinearLayout.LayoutParams(-1, -2));
+
+        setContentView(homeRoot);
+        refreshCards();
+    }
+
+    private void refreshCards() {
+        cardsRow.removeAllViews();
+        JSONArray favs = loadFavs();
+        int n = favs.length();
+        for (int i = 0; i < n; i++) {
+            JSONObject o = favs.optJSONObject(i);
+            if (o == null) continue;
+            final String name = o.optString("name", "站");
+            final String url = o.optString("url", "");
+            if (url.isEmpty()) continue;
+            LinearLayout card = new LinearLayout(this);
+            card.setOrientation(LinearLayout.VERTICAL);
+            card.setGravity(Gravity.CENTER_HORIZONTAL);
+            card.setPadding(dip(2), 0, dip(24), 0);
+            card.setOnClickListener(new View.OnClickListener() { public void onClick(View v) { browse(url); } });
+            card.setOnLongClickListener(new View.OnLongClickListener() {
+                public boolean onLongClick(View v) { delFav(url); return true; }
+            });
+            TextView av = new TextView(this);
+            av.setText(name.length() > 2 ? name.substring(0, 2) : name);
+            av.setTextColor(0xFFFFFFFF);
+            av.setTextSize(22);
+            av.setGravity(Gravity.CENTER);
+            GradientDrawable c = new GradientDrawable();
+            c.setShape(GradientDrawable.OVAL);
+            c.setColor(SITE_COLORS[i % SITE_COLORS.length]);
+            av.setBackground(c);
+            card.addView(av, new LinearLayout.LayoutParams(dip(74), dip(74)));
+            TextView lb = new TextView(this);
+            lb.setText(name);
+            lb.setTextSize(15);
+            lb.setTextColor(dark ? 0xFFEEEEEE : 0xFF000000);
+            lb.setGravity(Gravity.CENTER);
+            LinearLayout.LayoutParams llp = new LinearLayout.LayoutParams(-2, -2);
+            llp.topMargin = dip(12);
+            card.addView(lb, llp);
+            cardsRow.addView(card, new LinearLayout.LayoutParams(-2, -2));
+        }
+    }
+
+    private void showJumpDialog() {
+        LinearLayout box = new LinearLayout(this);
+        box.setPadding(dip(24), dip(10), dip(24), 0);
+        final EditText et = new EditText(this);
+        et.setHint("输入网址，如 axiuren.com/21446.html");
+        et.setInputType(EditorInfo.TYPE_TEXT_VARIATION_URI);
+        et.setTextSize(15);
+        box.addView(et, new LinearLayout.LayoutParams(-1, -2));
+        new AlertDialog.Builder(this)
+            .setTitle("跳转")
+            .setView(box)
+            .setPositiveButton("前往", new android.content.DialogInterface.OnClickListener() {
+                public void onClick(android.content.DialogInterface d, int w) {
+                    String s = et.getText().toString().trim();
+                    if (s.isEmpty()) return;
+                    if (!s.startsWith("http")) s = "https://" + s;
+                    browse(s);
+                }
+            })
+            .setNegativeButton("取消", null)
+            .show();
+    }
+
+    private void favCurrent() {
+        if (currentUrl.isEmpty()) { toast("先浏览一个网页再收藏"); return; }
+        try {
+            JSONArray favs = loadFavs();
+            for (int i = 0; i < favs.length(); i++)
+                if (favs.optJSONObject(i) != null && favs.optJSONObject(i).optString("url", "").equals(currentUrl)) {
+                    toast("已在收藏里"); return;
+                }
+            String host = "";
+            try { host = new URL(currentUrl).getHost().replace("www.", ""); } catch (Throwable ignored) {}
+            JSONObject o = new JSONObject();
+            o.put("name", host.isEmpty() ? "站" : host);
+            o.put("url", currentUrl);
+            favs.put(o);
+            getSharedPreferences(PREF, MODE_PRIVATE).edit().putString("json", favs.toString()).apply();
+            toast("已收藏，主页可看");
+        } catch (Throwable ignored) {}
+    }
+
+    private JSONArray loadFavs() {
+        try {
+            String j = getSharedPreferences(PREF, MODE_PRIVATE).getString("json", "");
+            if (!j.isEmpty()) return new JSONArray(j);
+        } catch (Throwable ignored) {}
+        JSONArray a = new JSONArray();
+        for (int i = 0; i < SITE_NAMES.length; i++) {
+            try { JSONObject o = new JSONObject(); o.put("name", SITE_NAMES[i]); o.put("url", SITE_URLS[i]); a.put(o); } catch (Throwable ignored) {}
+        }
+        return a;
+    }
+
+    private void delFav(String url) {
+        try {
+            JSONArray src = loadFavs();
+            JSONArray out = new JSONArray();
+            for (int i = 0; i < src.length(); i++) {
+                JSONObject o = src.optJSONObject(i);
+                if (o == null || !url.equals(o.optString("url"))) out.put(o);
+            }
+            getSharedPreferences(PREF, MODE_PRIVATE).edit().putString("json", out.toString()).apply();
+            refreshCards();
+            toast("已删除(长按卡片)");
+        } catch (Throwable ignored) {}
+    }
+
+    // ---------------- 浏览态 ----------------
+
+    private void browse(String url) {
+        currentUrl = url;
+        FrameLayout root = new FrameLayout(this);
+        root.addView(web, new FrameLayout.LayoutParams(-1, -1));
+        TextView back = new TextView(this);
+        back.setText("🏠 主页");
+        back.setTextColor(0xFFFFFFFF);
+        back.setTextSize(13);
+        back.setBackgroundResource(0x66000000);
+        back.setPadding(dip(14), dip(8), dip(14), dip(8));
+        back.setOnClickListener(new View.OnClickListener() { public void onClick(View v) { buildHome(); } });
+        FrameLayout.LayoutParams blp = new FrameLayout.LayoutParams(-2, -2, Gravity.TOP | Gravity.LEFT);
+        blp.setMargins(dip(10), dip(50), 0, 0);
+        root.addView(back, blp);
+        setContentView(root);
+        web.loadUrl(url);
+    }
+
+    // ---------------- 下载按钮注入 ----------------
 
     private void inject(WebView v, String u) {
         if (u == null) return;
         boolean axDetail = u.contains("axiuren.com") && u.matches(".*axiuren\\.com/\\d+\\.html.*");
-        if (axDetail) injectAxiuren(v);
-        // 每页注入站点切换按钮(除目标详情页已注入的那个外)
-        String other = u.contains("axiuren.com")
-            ? "http://www.win4000.com/zt/xinggan.html|甜|315CDE"
-            : "https://axiuren.com/|秀|c0392b";
-        String[] p = other.split("\\|");
-        String js2 =
-            "(function(){" +
+        if (axDetail) {
+            injectAxiuren(v);
+        } else if (u.contains("win4000.com") &&
+                (u.contains("wallpaper_detail") || u.contains("meinvxiaoguotu") || u.contains("mobile_detail"))) {
+            injectWin4000(v);
+        }
+    }
+
+    private String btnJs(String collectJs, String color) {
+        return "(function(){" +
             "try{" +
-            "if(window.__sw)return;" +
-            "var b=document.createElement('div'); b.textContent='" + p[1] + "';" +
-            "b.style.cssText='position:fixed;left:12px;bottom:60px;z-index:99999;background:#" + p[2] + ";color:#fff;padding:8px 14px;border-radius:20px;font-size:13px;font-weight:bold;opacity:.8';" +
-            "b.onclick=function(){And.goto2('" + p[0] + "')};" +
-            "document.body.appendChild(b); window.__sw=b;" +
+            "window.__collect=function(){" + collectJs + "};" +
+            "var old=window.__dlbtn; if(old)old.remove();" +
+            "var b=document.createElement('div');" +
+            "b.id='dlbtn'; b.textContent='⬇ 下载全部';" +
+            "b.style.cssText='position:fixed;right:12px;bottom:60px;z-index:99999;background:#" + color + ";color:#fff;padding:10px 16px;border-radius:24px;font-size:14px;font-weight:bold;box-shadow:0 4px 12px rgba(0,0,0,.4);opacity:.92';" +
+            "b.onclick=function(){var d=window.__collect();And.download(d)};" +
+            "document.body.appendChild(b); window.__dlbtn=b;" +
             "}catch(e){}}" +
             ")();";
-        v.evaluateJavascript(js2, null);
-        if (axDetail || !u.contains("win4000.com")) return;
-        // 仅系列详情页注入下载按钮
-        if (!u.contains("wallpaper_detail") && !u.contains("meinvxiaoguotu") && !u.contains("mobile_detail")) return;
-        String js =
-            "(function(){" +
-            "try{" +
-            "window.__collect=function(){" +
+    }
+
+    private void injectWin4000(WebView v) {
+        String collect =
             " var out=[];" +
             " [].forEach.call(document.querySelectorAll('.scroll-img-cont li img'),function(i){" +
             "  var s=i.getAttribute('data-original')||i.src; if(!s)return; if(s.indexOf('//')==0)s='http:'+s;" +
             "  var big=s.substring(0,s.indexOf('_'))+'.jpg'; out.push(big);" +
             " });" +
-            " return JSON.stringify({name:(document.querySelector('h1')||{textContent:document.title}).textContent.trim(),imgs:out});" +
-            "};" +
-            "var old=window.__dlbtn; if(old)old.remove();" +
-            "var b=document.createElement('div');" +
-            "b.id='dlbtn'; b.textContent='⬇ 下载全部';" +
-            "b.style.cssText='position:fixed;right:12px;bottom:60px;z-index:99999;background:#315CDE;color:#fff;padding:10px 16px;border-radius:24px;font-size:14px;font-weight:bold;box-shadow:0 4px 12px rgba(0,0,0,.4);opacity:.92';" +
-            "b.onclick=function(){var d=window.__collect();And.download(d)};" +
-            "document.body.appendChild(b); window.__dlbtn=b;" +
-            "}catch(e){}}" +
-            ")();";
-        v.evaluateJavascript(js, null);
+            " return JSON.stringify({name:(document.querySelector('h1')||{textContent:document.title}).textContent.trim(),imgs:out});";
+        v.evaluateJavascript(btnJs(collect, "315CDE"), null);
     }
 
-    /** axiuren.com(秀人网镜像): 从页面抽图床文件夹+标题里的张数, 枚举 0001.webp..N.webp */
     private void injectAxiuren(WebView v) {
-        String js =
-            "(function(){" +
-            "try{" +
-            "window.__collect=function(){" +
+        String collect =
             " var h=document.documentElement.innerHTML;" +
             " var m=h.match(/https:\\/\\/img\\.ecmm\\.cc\\/new\\/[^\"']+\\//);" +
             " if(!m)return JSON.stringify({name:'未找到图床',imgs:[]});" +
@@ -129,28 +322,11 @@ public class SpiderActivity extends Activity {
             " if(n<=0)n=120;" +
             " var urls=[];" +
             " for(var i=1;i<=n;i++){var s='0000'+i; s=s.substring(s.length-4); urls.push(folder+s+'.webp');}" +
-            " return JSON.stringify({name:t.trim().substring(0,60),imgs:urls});" +
-            "};" +
-            "var old=window.__dlbtn; if(old)old.remove();" +
-            "var b=document.createElement('div');" +
-            "b.id='dlbtn'; b.textContent='⬇ 下载全部';" +
-            "b.style.cssText='position:fixed;right:12px;bottom:60px;z-index:99999;background:#c0392b;color:#fff;padding:10px 16px;border-radius:24px;font-size:14px;font-weight:bold;box-shadow:0 4px 12px rgba(0,0,0,.4);opacity:.92';" +
-            "b.onclick=function(){var d=window.__collect();And.download(d)};" +
-            "document.body.appendChild(b); window.__dlbtn=b;" +
-            "}catch(e){}}" +
-            ")();";
-        v.evaluateJavascript(js, null);
+            " return JSON.stringify({name:t.trim().substring(0,60),imgs:urls});";
+        v.evaluateJavascript(btnJs(collect, "c0392b"), null);
     }
 
     private class And {
-
-        /** 站点切换 */
-        @JavascriptInterface
-        public void goto2(String url) {
-            String u = url == null ? "" : url.trim();
-            if (u.startsWith("http")) { runOnUiThread(new Runnable() { public void run() { web.loadUrl(u); }}); }
-            else toast("无效地址");
-        }
 
         /** 下载整本: payload={name, imgs:[url...]} */
         @JavascriptInterface
@@ -171,18 +347,11 @@ public class SpiderActivity extends Activity {
                         String ext = url.toLowerCase().contains(".webp") ? "webp" : "jpg";
                         String fn = String.format(java.util.Locale.US, "%s_%03d.%s", fname, i + 1, ext);
                         if (saveImage(url, "Pictures/美女/" + fname, fn)) ok++;
-                        if (i % 5 == 4) toast("进度 " + (ok) + "/" + total);
+                        if (i % 5 == 4) toast("进度 " + ok + "/" + total);
                     }
                     toast("完成: 成功 " + ok + "/" + total + " (Pictures/美女/" + fname + ")");
                 }});
             } catch (Throwable e) { toast("解析失败: " + e); }
-        }
-
-        @JavascriptInterface
-        public void toast(final String s) {
-            runOnUiThread(new Runnable() { public void run() {
-                Toast.makeText(SpiderActivity.this, s, Toast.LENGTH_SHORT).show();
-            }});
         }
     }
 
@@ -195,23 +364,23 @@ public class SpiderActivity extends Activity {
     /** 下载到 MediaStore */
     private boolean saveImage(String url, String relPath, String fileName) {
         InputStream is = null; OutputStream os = null;
+        try { trustAll(); } catch (Throwable ignored) {}
         try {
             HttpURLConnection c = (HttpURLConnection) new URL(url).openConnection();
-            c.setConnectTimeout(15000); c.setReadTimeout(20000);
-            c.setInstanceFollowRedirects(true);
+            c.setConnectTimeout(12000); c.setReadTimeout(15000);
             c.setRequestProperty("User-Agent", "Mozilla/5.0 (Linux; Android 13) Chrome/120 Mobile");
-            c.setRequestProperty("Referer", "http://www.win4000.com/");
-            String ck = CookieManager.getInstance().getCookie("http://www.win4000.com");
+            String ck = CookieManager.getInstance().getCookie(url);
             if (ck != null) c.setRequestProperty("Cookie", ck);
+            if (url.contains("ecmm.cc")) c.setRequestProperty("Referer", "https://axiuren.com/");
             if (c.getResponseCode() != 200) return false;
             is = c.getInputStream();
             ByteArrayOutputStream bos = new ByteArrayOutputStream();
-            byte[] buf = new byte[16384]; int n;
+            byte[] buf = new byte[8192]; int n;
             while ((n = is.read(buf)) > 0) bos.write(buf, 0, n);
             if (bos.size() < 5000) return false; // 太小=错误页
             android.content.ContentValues cv = new android.content.ContentValues();
             cv.put(android.provider.MediaStore.Images.Media.DISPLAY_NAME, fileName);
-            cv.put(android.provider.MediaStore.Images.Media.MIME_TYPE, relPath != null && fileName.endsWith(".webp") ? "image/webp" : "image/jpeg");
+            cv.put(android.provider.MediaStore.Images.Media.MIME_TYPE, fileName.endsWith(".webp") ? "image/webp" : "image/jpeg");
             if (Build.VERSION.SDK_INT >= 29) cv.put(android.provider.MediaStore.Images.Media.RELATIVE_PATH, relPath);
             android.net.Uri uri = getContentResolver().insert(android.provider.MediaStore.Images.Media.EXTERNAL_CONTENT_URI, cv);
             os = getContentResolver().openOutputStream(uri);
@@ -222,10 +391,32 @@ public class SpiderActivity extends Activity {
         finally { try { if (is != null) is.close(); } catch (Throwable ignored) {} try { if (os != null) os.close(); } catch (Throwable ignored) {} }
     }
 
+    // 图床证书问题全放行
+    private static void trustAll() throws Exception {
+        javax.net.ssl.TrustManager[] tm = new javax.net.ssl.TrustManager[]{ new javax.net.ssl.X509TrustManager() {
+            public void checkClientTrusted(java.security.cert.X509Certificate[] a, String t) {}
+            public void checkServerTrusted(java.security.cert.X509Certificate[] a, String t) {}
+            public java.security.cert.X509Certificate[] getAcceptedIssuers() { return new java.security.cert.X509Certificate[0]; }
+        }};
+        javax.net.ssl.SSLContext sc = javax.net.ssl.SSLContext.getInstance("SSL");
+        sc.init(null, tm, new java.security.SecureRandom());
+        javax.net.ssl.HttpsURLConnection.setDefaultSSLSocketFactory(sc.getSocketFactory());
+        javax.net.ssl.HttpsURLConnection.setDefaultHostnameVerifier((h, s) -> true);
+    }
+
+    private int dip(int v) { return Math.round(v * getResources().getDisplayMetrics().density); }
+
     @Override
     public void onBackPressed() {
-        if (web != null && web.canGoBack()) web.goBack();
-        else super.onBackPressed();
+        // 浏览态→主页; 主页→退出
+        if (web.getParent() != null && web.canGoBack() && !currentUrl.isEmpty()) {
+            // 优先回主页而不是网页历史, 网页内返回交给系统默认不可见
+            buildHome();
+        } else if (web.getParent() != null) {
+            buildHome();
+        } else {
+            super.onBackPressed();
+        }
     }
 
     @Override
