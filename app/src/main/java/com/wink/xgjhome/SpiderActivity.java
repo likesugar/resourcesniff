@@ -235,11 +235,21 @@ public class SpiderActivity extends Activity {
                             return null;
                         }
                         @Override public void onPageFinished(WebView v, String u) {
-                            v.postDelayed(new Runnable() { public void run() {
-                                wv.evaluateJavascript("document.documentElement.outerHTML.substring(0,12000)", new android.webkit.ValueCallback<String>() {
-                                    public void onReceiveValue(String val) { box[0] = val == null ? "" : val; synchronized (lock) { lock.notify(); } }
+                            // 每1.2秒滚一次触发lazyload, 共6次; 再收集结构化数据
+                            final android.os.Handler h2 = new android.os.Handler();
+                            for (int k = 0; k < 6; k++) h2.postDelayed(new Runnable() { public void run() {
+                                try { wv.evaluateJavascript("window.scrollTo(0,document.body.scrollHeight)", null); } catch (Throwable ignored) {}
+                            } }, 1200L * (k + 1));
+                            h2.postDelayed(new Runnable() { public void run() {
+                                String js = "JSON.stringify({href:location.href,rs:document.readyState,"
+                                    + "imgs:[].map.call(document.images,function(i){return i.src+(i.getAttribute('data-original')?' DO='+i.getAttribute('data-original'):'')}).slice(0,40),"
+                                    + "pages:(document.querySelector('#pages')||{innerHTML:''}).innerHTML,"
+                                    + "hezi:[].map.call(document.querySelectorAll('.hezi'),function(e){return e.innerHTML}).join('|||').substring(0,4000),"
+                                    + "links:[].map.call(document.querySelectorAll('a'),function(a){return a.href}).filter(function(h){return h.indexOf('page')>=0||h.indexOf('t/?id')>=0}).slice(0,20)})";
+                                wv.evaluateJavascript(js, new android.webkit.ValueCallback<String>() {
+                                    public void onReceiveValue(String val) { box[0] = val == null ? "NULL" : val; synchronized (lock) { lock.notify(); } }
                                 });
-                            } }, 6000);
+                            } }, 9000);
                         }
                     });
                     wv.loadUrl(SITE + "/t/?id=" + id);
