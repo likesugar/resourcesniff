@@ -701,6 +701,7 @@ public class MedPlanActivity extends Activity {
             .setContentIntent(pi)
             .setAutoCancel(false)
             .setOngoing(true)
+            .setTimeoutAfter(10 * 60 * 1000L)
             .addAction(0, "✓ 已服用", cpi)
             .build();
         nm.notify(medNotifId(c, planIdx, timeIdx), n);
@@ -729,10 +730,19 @@ public class MedPlanActivity extends Activity {
                 if (ts == null) continue;
                 for (int t = 0; t < ts.length(); t++) {
                     String tt = ts.optString(t);
-                    if (tt.compareTo(now) <= 0 && !medDone(c, i, t)) {
+                    int hh, mm;
+                    try { hh = Integer.parseInt(tt.split(":")[0]); mm = Integer.parseInt(tt.split(":")[1]); }
+                    catch (Throwable e) { continue; }
+                    java.util.Calendar fc = java.util.Calendar.getInstance();
+                    fc.set(java.util.Calendar.HOUR_OF_DAY, hh); fc.set(java.util.Calendar.MINUTE, mm);
+                    long lateMs = System.currentTimeMillis() - fc.getTimeInMillis();
+                    if (lateMs >= 0 && lateMs <= 30 * 60 * 1000L && !medDone(c, i, t)) { // 到点后30分钟内才显示, 错过不挂
                         String txt = o.optString("name", "") + "  " + o.optString("dose", "1") + o.optString("unit", "片")
                             + (o.optString("relation", "").isEmpty() ? "" : "（" + o.optString("relation") + "）");
                         notifyMedHold(c, i, t, "该吃药啦", txt);
+                    } else if (lateMs > 30 * 60 * 1000L) {
+                        NotificationManager nm2 = (NotificationManager) c.getSystemService(Context.NOTIFICATION_SERVICE);
+                        nm2.cancel(medNotifId(c, i, t)); // 过期撤下
                     }
                 }
             }
