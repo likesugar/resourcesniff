@@ -43,8 +43,8 @@ import java.util.concurrent.Executors;
 public class SpiderActivity extends Activity {
 
     private static final String PREF = "spider_favs";
-    private static final String[] SITE_NAMES = {"秀人网", "甜壁纸"};
-    private static final String[] SITE_URLS = {"https://axiuren.com/", "http://www.win4000.com/zt/xinggan.html"};
+    private static final String[] SITE_NAMES = {"秀人网"};
+    private static final String[] SITE_URLS = {"https://axiuren.com/"};
     private static final int[] SITE_COLORS = {0xFFd65db1, 0xFF315CDE, 0xFF9c8e7d, 0xFFa56bce, 0xFF1FA855, 0xFFe67e22};
 
     private WebView web;
@@ -263,7 +263,10 @@ public class SpiderActivity extends Activity {
         back.setText("🏠 主页");
         back.setTextColor(0xFFFFFFFF);
         back.setTextSize(13);
-        back.setBackgroundResource(0x66000000);
+        GradientDrawable bg = new GradientDrawable();
+        bg.setColor(0x66000000);
+        bg.setCornerRadius(dip(18));
+        back.setBackground(bg);
         back.setPadding(dip(14), dip(8), dip(14), dip(8));
         back.setOnClickListener(new View.OnClickListener() { public void onClick(View v) { buildHome(); } });
         FrameLayout.LayoutParams blp = new FrameLayout.LayoutParams(-2, -2, Gravity.TOP | Gravity.LEFT);
@@ -277,13 +280,7 @@ public class SpiderActivity extends Activity {
 
     private void inject(WebView v, String u) {
         if (u == null) return;
-        boolean axDetail = u.contains("axiuren.com") && u.matches(".*axiuren\\.com/\\d+\\.html.*");
-        if (axDetail) {
-            injectAxiuren(v);
-        } else if (u.contains("win4000.com") &&
-                (u.contains("wallpaper_detail") || u.contains("meinvxiaoguotu") || u.contains("mobile_detail"))) {
-            injectWin4000(v);
-        }
+        if (u.contains("axiuren.com") && u.matches(".*axiuren\\.com/\\d+\\.html.*")) injectAxiuren(v);
     }
 
     private String btnJs(String collectJs, String color) {
@@ -300,17 +297,6 @@ public class SpiderActivity extends Activity {
             ")();";
     }
 
-    private void injectWin4000(WebView v) {
-        String collect =
-            " var out=[];" +
-            " [].forEach.call(document.querySelectorAll('.scroll-img-cont li img'),function(i){" +
-            "  var s=i.getAttribute('data-original')||i.src; if(!s)return; if(s.indexOf('//')==0)s='http:'+s;" +
-            "  var big=s.substring(0,s.indexOf('_'))+'.jpg'; out.push(big);" +
-            " });" +
-            " return JSON.stringify({name:(document.querySelector('h1')||{textContent:document.title}).textContent.trim(),imgs:out});";
-        v.evaluateJavascript(btnJs(collect, "315CDE"), null);
-    }
-
     private void injectAxiuren(WebView v) {
         String collect =
             " var h=document.documentElement.innerHTML;" +
@@ -322,6 +308,9 @@ public class SpiderActivity extends Activity {
             " if(n<=0)n=120;" +
             " var urls=[];" +
             " for(var i=1;i<=n;i++){var s='0000'+i; s=s.substring(s.length-4); urls.push(folder+s+'.webp');}" +
+            " [].forEach.call(document.querySelectorAll('video,source'),function(v){var s=v.src||v.getAttribute('src'); if(s)urls.push(s);});" +
+            " var vm=h.match(/https?:\\/\\/[^\"'\\s\\\\]+\\.mp4[^\"'\\s\\\\]*/g);" +
+            " if(vm)for(var k=0;k<vm.length;k++){if(urls.indexOf(vm[k])<0)urls.push(vm[k]);}" +
             " return JSON.stringify({name:t.trim().substring(0,60),imgs:urls});";
         v.evaluateJavascript(btnJs(collect, "c0392b"), null);
     }
@@ -338,18 +327,24 @@ public class SpiderActivity extends Activity {
                 if (arr == null || arr.length() == 0) { toast("没抓到图片链接"); return; }
                 final String fname = name;
                 final int total = arr.length();
-                toast("开始下载 " + total + " 张 → Pictures/美女/" + fname);
+                final java.io.File dir = dlDir(fname);
+                toast("开始下载 " + total + " 个 → 爬虫/" + fname);
                 pool.execute(new Runnable() { public void run() {
                     int ok = 0;
                     for (int i = 0; i < total; i++) {
                         String url;
                         try { url = arr.getString(i); } catch (Throwable e) { continue; }
-                        String ext = url.toLowerCase().contains(".webp") ? "webp" : "jpg";
+                        String ext = "jpg";
+                        int dot = url.lastIndexOf('.');
+                        if (dot > 0 && dot > url.lastIndexOf('/')) {
+                            String e2 = url.substring(dot + 1).toLowerCase();
+                            if (e2.length() >= 2 && e2.length() <= 5) ext = e2;
+                        }
                         String fn = String.format(java.util.Locale.US, "%s_%03d.%s", fname, i + 1, ext);
-                        if (saveImage(url, "Pictures/美女/" + fname, fn)) ok++;
+                        if (saveFile(url, dir, fn)) ok++;
                         if (i % 5 == 4) toast("进度 " + ok + "/" + total);
                     }
-                    toast("完成: 成功 " + ok + "/" + total + " (Pictures/美女/" + fname + ")");
+                    toast("完成: 成功 " + ok + "/" + total + " (爬虫/" + fname + ")");
                 }});
             } catch (Throwable e) { toast("解析失败: " + e); }
         }
@@ -361,32 +356,34 @@ public class SpiderActivity extends Activity {
         }});
     }
 
-    /** 下载到 MediaStore */
-    private boolean saveImage(String url, String relPath, String fileName) {
+    /** 下载目录 /storage/emulated/0/Android/data/com.wink.xgjhome/爬虫/{专辑}/ */
+    private java.io.File dlDir(String album) {
+        java.io.File base = new java.io.File(getExternalFilesDir(null).getParentFile(), "爬虫");
+        java.io.File d = new java.io.File(base, album == null || album.length() == 0 ? "未命名" : album);
+        if (!d.exists()) d.mkdirs();
+        return d;
+    }
+
+    /** 文件直写 /Android/data/com.wink.xgjhome/爬虫/{专辑}/ (图片+mp4等媒体通用) */
+    private boolean saveFile(String url, java.io.File dir, String fileName) {
         InputStream is = null; OutputStream os = null;
         try { trustAll(); } catch (Throwable ignored) {}
         try {
             HttpURLConnection c = (HttpURLConnection) new URL(url).openConnection();
-            c.setConnectTimeout(12000); c.setReadTimeout(15000);
+            c.setConnectTimeout(12000); c.setReadTimeout(60000);
+            c.setInstanceFollowRedirects(true);
             c.setRequestProperty("User-Agent", "Mozilla/5.0 (Linux; Android 13) Chrome/120 Mobile");
             String ck = CookieManager.getInstance().getCookie(url);
             if (ck != null) c.setRequestProperty("Cookie", ck);
             if (url.contains("ecmm.cc")) c.setRequestProperty("Referer", "https://axiuren.com/");
             if (c.getResponseCode() != 200) return false;
             is = c.getInputStream();
-            ByteArrayOutputStream bos = new ByteArrayOutputStream();
-            byte[] buf = new byte[8192]; int n;
-            while ((n = is.read(buf)) > 0) bos.write(buf, 0, n);
-            if (bos.size() < 5000) return false; // 太小=错误页
-            android.content.ContentValues cv = new android.content.ContentValues();
-            cv.put(android.provider.MediaStore.Images.Media.DISPLAY_NAME, fileName);
-            cv.put(android.provider.MediaStore.Images.Media.MIME_TYPE, fileName.endsWith(".webp") ? "image/webp" : "image/jpeg");
-            if (Build.VERSION.SDK_INT >= 29) cv.put(android.provider.MediaStore.Images.Media.RELATIVE_PATH, relPath);
-            android.net.Uri uri = getContentResolver().insert(android.provider.MediaStore.Images.Media.EXTERNAL_CONTENT_URI, cv);
-            os = getContentResolver().openOutputStream(uri);
-            os.write(bos.toByteArray());
+            java.io.File out = new java.io.File(dir, fileName);
+            os = new java.io.FileOutputStream(out);
+            byte[] buf = new byte[8192]; int n; long sz = 0;
+            while ((n = is.read(buf)) > 0) { os.write(buf, 0, n); sz += n; }
             os.flush();
-            return true;
+            return sz >= 5000; // 太小=错误页
         } catch (Throwable e) { return false; }
         finally { try { if (is != null) is.close(); } catch (Throwable ignored) {} try { if (os != null) os.close(); } catch (Throwable ignored) {} }
     }
