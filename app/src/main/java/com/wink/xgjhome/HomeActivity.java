@@ -217,7 +217,7 @@ public class HomeActivity extends Activity {
             public void onClick(View v) { startActivity(new Intent(HomeActivity.this, RecordActivity.class)); }
         });
         findViewById(R.id.cardVideoDl).setOnClickListener(new View.OnClickListener() {
-            public void onClick(View v) { showSniffDialog(VideoDlActivity.class, "下载"); }
+            public void onClick(View v) { showSniffDialog(VideoDlActivity.class, "下载", "视频下载"); }
         });
 
         findViewById(R.id.lanToggle).setOnClickListener(new View.OnClickListener() {
@@ -395,9 +395,9 @@ public class HomeActivity extends Activity {
         } catch (Throwable e) { return null; }
     }
 
-    private void showSniffDialog() { showSniffDialog(null, "开始嗅探"); }
+    private void showSniffDialog() { showSniffDialog(null, "开始嗅探", "资源嗅探"); }
 
-    private void showSniffDialog(final Class<?> target, final String goLabel) {
+    private void showSniffDialog(final Class<?> target, final String goLabel, final String dlgTitle) {
         android.app.Dialog d = new android.app.Dialog(this);
         d.setContentView(R.layout.dialog_sniff);
         android.view.Window w = d.getWindow();
@@ -406,6 +406,8 @@ public class HomeActivity extends Activity {
             w.setLayout(android.view.ViewGroup.LayoutParams.MATCH_PARENT,
                     android.view.ViewGroup.LayoutParams.WRAP_CONTENT);
         }
+        android.widget.TextView dlgT = (android.widget.TextView) d.findViewById(R.id.tv_dialog_title);
+        if (dlgT != null) dlgT.setText(dlgTitle);
         final EditText et = d.findViewById(R.id.et_dialog_url);
         d.findViewById(R.id.btn_paste).setOnClickListener(new View.OnClickListener() {
             public void onClick(View v) {

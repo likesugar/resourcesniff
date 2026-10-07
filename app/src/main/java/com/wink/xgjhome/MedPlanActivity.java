@@ -63,9 +63,6 @@ public class MedPlanActivity extends Activity {
         root.addView(listScroll, new FrameLayout.LayoutParams(-1, -1));
 
 
-        TextView title = mkText("用药提醒", 20, true, 0xFF1F2329); title.setPadding(dp(16), dp(18), dp(16), dp(6));
-        root.addView(title, new FrameLayout.LayoutParams(-2, -2, Gravity.TOP | Gravity.CENTER_HORIZONTAL));
-        ((FrameLayout.LayoutParams) title.getLayoutParams()).topMargin = dp(32);
 
         TextView add = mkText("＋  新增用药计划", 16, true, Color.WHITE);
         add.setGravity(Gravity.CENTER);

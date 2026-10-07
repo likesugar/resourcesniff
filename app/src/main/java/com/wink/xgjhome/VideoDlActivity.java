@@ -100,7 +100,7 @@ public class VideoDlActivity extends Activity {
         dark = Theme.dark(this);
         loadTasks(this);
         FrameLayout root = new FrameLayout(this);
-        root.setBackgroundColor(dark ? 0xFF10141C : 0xFFF2F6FF);
+        root.setBackgroundColor(dark ? 0xFF000000 : 0xFFF2F6FF);
         LinearLayout col = new LinearLayout(this);
         col.setOrientation(LinearLayout.VERTICAL);
         int pad = dp(18);
@@ -133,7 +133,8 @@ public class VideoDlActivity extends Activity {
         pillRow.setOrientation(LinearLayout.HORIZONTAL);
         pillRow.setGravity(Gravity.CENTER_VERTICAL);
         GradientDrawable pb = new GradientDrawable();
-        pb.setCornerRadius(dp(24)); pb.setColor(dark ? 0xFF181E2A : 0xFFFFFFFF);
+        pb.setCornerRadius(dp(24)); pb.setColor(dark ? (Theme.oled(this) ? 0xFF000000 : 0xFF181E2A) : 0xFFFFFFFF);
+        if (dark && Theme.oled(this)) pb.setStroke(dp(1), 0xFF222222);
         if (!dark) pb.setStroke(dp(1), 0xFFE4EAF5);
         pillRow.setBackground(pb);
         pillRow.setPadding(dp(18), dp(14), dp(10), dp(14));
@@ -208,9 +209,9 @@ public class VideoDlActivity extends Activity {
         Immersive.hide(this);
         // 入口交互与资源嗅探一致: 进入即弹输入窗
         String autoUrl = getIntent() != null ? getIntent().getStringExtra("url") : null;
-        if (autoUrl != null && autoUrl.trim().length() == 0) autoUrl = null;
-        if (autoUrl != null && autoUrl.length() > 0) { submit(autoUrl); }
-        else showInputDialog();
+        if (autoUrl != null) autoUrl = autoUrl.trim();
+        if (autoUrl != null && autoUrl.length() > 0) { submit(autoUrl); } // 从首页弹窗带链接进来直接开下, 不再二次弹窗
+        else if (!getIntent().hasExtra("url")) showInputDialog(); // 普通入口才弹输入窗
         render();
     }
 
@@ -239,7 +240,8 @@ public class VideoDlActivity extends Activity {
         box.setOrientation(LinearLayout.HORIZONTAL);
         box.setGravity(Gravity.CENTER_VERTICAL);
         GradientDrawable pb = new GradientDrawable();
-        pb.setCornerRadius(dp(24)); pb.setColor(dark ? 0xFF181E2A : 0xFFFFFFFF);
+        pb.setCornerRadius(dp(24)); pb.setColor(dark ? (Theme.oled(this) ? 0xFF000000 : 0xFF181E2A) : 0xFFFFFFFF);
+        if (dark && Theme.oled(this)) pb.setStroke(dp(1), 0xFF222222);
         if (!dark) pb.setStroke(dp(1), 0xFFE4EAF5);
         box.setBackground(pb);
         box.setMinimumWidth(dp(300));
@@ -744,7 +746,8 @@ public class VideoDlActivity extends Activity {
         card.setOrientation(LinearLayout.VERTICAL);
         GradientDrawable g = new GradientDrawable();
         g.setCornerRadius(dp(24));
-        g.setColor(0xFF171C27);
+        g.setColor(Theme.dark(this) && Theme.oled(this) ? 0xFF000000 : 0xFF171C27);
+        if (Theme.dark(this) && Theme.oled(this)) g.setStroke(dp(1), 0xFF222222);
         card.setBackground(g);
         card.setPadding(dp(18), dp(16), dp(18), dp(16));
         LinearLayout r1 = new LinearLayout(this);
@@ -782,7 +785,7 @@ public class VideoDlActivity extends Activity {
             pauseBtn.setTextColor(0xFFFFB74D);
             pauseBtn.setGravity(Gravity.CENTER);
             GradientDrawable pb0 = new GradientDrawable();
-            pb0.setCornerRadius(dp(14)); pb0.setColor(0xFF232A38);
+            pb0.setCornerRadius(dp(14)); pb0.setColor(Theme.dark(this) && Theme.oled(this) ? 0xFF111111 : 0xFF232A38);
             pauseBtn.setBackground(pb0);
             pauseBtn.setPadding(dp(12), dp(10), dp(12), dp(10));
             pauseBtn.setOnClickListener(new OnClickListener() { public void onClick(View v) {
@@ -800,7 +803,7 @@ public class VideoDlActivity extends Activity {
             stopBtn.setTextColor(0xFFFF7B8A);
             stopBtn.setGravity(Gravity.CENTER);
             GradientDrawable sb0 = new GradientDrawable();
-            sb0.setCornerRadius(dp(14)); sb0.setColor(0xFF232A38);
+            sb0.setCornerRadius(dp(14)); sb0.setColor(Theme.dark(this) && Theme.oled(this) ? 0xFF111111 : 0xFF232A38);
             stopBtn.setBackground(sb0);
             stopBtn.setPadding(dp(12), dp(10), dp(12), dp(10));
             stopBtn.setOnClickListener(new OnClickListener() { public void onClick(View v) {
@@ -832,7 +835,7 @@ public class VideoDlActivity extends Activity {
             resumeBtn.setTextColor(0xFF9CCC65);
             resumeBtn.setGravity(Gravity.CENTER);
             GradientDrawable rb0 = new GradientDrawable();
-            rb0.setCornerRadius(dp(14)); rb0.setColor(0xFF232A38);
+            rb0.setCornerRadius(dp(14)); rb0.setColor(Theme.dark(this) && Theme.oled(this) ? 0xFF111111 : 0xFF232A38);
             resumeBtn.setBackground(rb0);
             resumeBtn.setPadding(dp(12), dp(10), dp(12), dp(10));
             resumeBtn.setOnClickListener(new OnClickListener() { public void onClick(View v) {
