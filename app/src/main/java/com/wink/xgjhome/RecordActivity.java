@@ -201,6 +201,8 @@ public class RecordActivity extends Activity {
     private final java.util.HashMap<String, TextView> rowInfo = new java.util.HashMap<String, TextView>();
 
     private void rebuild() {
+        // 每次重建前刷新历史记录, 合并完成的文件立即可见(免重进)
+        try { hist = HistoryStore.load(this); } catch (Throwable ignored) {}
         // key -> [type(0录制/1下载), job, live]
         final java.util.LinkedHashMap<String, Object[]> meta = new java.util.LinkedHashMap<String, Object[]>();
         for (RecManager.RecJob j : RecManager.recJobs.values()) meta.put("R" + j.id, new Object[]{0, j, (Boolean) j.active});
