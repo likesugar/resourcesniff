@@ -186,6 +186,58 @@ public class SpiderActivity extends Activity {
         @JavascriptInterface
         public void cancel(int id) { cancels.add(id); }
 
+        /** 诊断2: WebView渲染图集页抓DOM + 探测gl25路径规则 */
+        @JavascriptInterface
+        public String probe2(final int id) {
+            try { trustAll(); } catch (Throwable ignored) {}
+            final StringBuilder sb = new StringBuilder("== probe2 id=").append(id).append("\n");
+            // 路径规则探测
+            String[] cands = {
+                "https://qwevyimg.gl25.cn/t/" + id + "/1.jpg",
+                "https://qwevyimg.gl25.cn/t/" + id + "/0.jpg",
+                "https://qwevyimg.gl25.cn/t/" + id + "_1.jpg",
+                "https://qwevyimg.gl25.cn/a/1/" + id + "/1.jpg",
+                "https://qwevyimg.gl25.cn/t/1/" + id + ".jpg",
+                "https://qwevyimg.gl25.cn/u/" + id + "/1.jpg"
+            };
+            for (String u : cands) {
+                HttpURLConnection c = null;
+                try {
+                    c = (HttpURLConnection) new URL(u).openConnection();
+                    c.setConnectTimeout(8000); c.setReadTimeout(8000);
+                    c.setRequestProperty("User-Agent", "Mozilla/5.0 (Linux; Android 13) Chrome/120 Mobile");
+                    c.setRequestProperty("Referer", SITE + "/");
+                    sb.append("TRY ").append(u.replace("https://qwevyimg.gl25.cn", "")).append(" -> ").append(c.getResponseCode())
+                      .append(" ").append(c.getContentType()).append(" ").append(c.getContentLength()).append("\n");
+                } catch (Throwable e) { sb.append("TRY ").append(u).append(" -> ERR ").append(e).append("\n"); }
+                finally { if (c != null) try { c.disconnect(); } catch (Throwable ignored) {} }
+            }
+            // WebView 渲染抓 DOM
+            try {
+                final Object[] box = new Object[]{ "" };
+                final Object lock = new Object();
+                runOnUiThread(new Runnable() { public void run() {
+                    final WebView wv = new WebView(SpiderActivity.this);
+                    WebSettings ws = wv.getSettings();
+                    ws.setJavaScriptEnabled(true);
+                    ws.setUserAgentString("Mozilla/5.0 (Linux; Android 13) Chrome/120 Mobile");
+                    wv.setWebViewClient(new WebViewClient() {
+                        @Override public void onPageFinished(WebView v, String u) {
+                            v.postDelayed(new Runnable() { public void run() {
+                                wv.evaluateJavascript("document.documentElement.outerHTML.substring(0,12000)", new android.webkit.ValueCallback<String>() {
+                                    public void onReceiveValue(String val) { box[0] = val == null ? "" : val; synchronized (lock) { lock.notify(); } }
+                                });
+                            } }, 4000);
+                        }
+                    });
+                    wv.loadUrl(SITE + "/t/?id=" + id);
+                }});
+                synchronized (lock) { try { lock.wait(15000); } catch (InterruptedException ignored) {} }
+                sb.append("---- rendered DOM ----\n").append(box[0]);
+            } catch (Throwable e) { sb.append("\nwv err: ").append(e); }
+            return finishProbe(sb);
+        }
+
         /** 诊断: 抓图集详情页原文+探测图床候选URL, 结果复制到剪贴板 */
         @JavascriptInterface
         public String probe(final int id) {

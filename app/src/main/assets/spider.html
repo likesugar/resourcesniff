@@ -100,7 +100,7 @@ createApp({
     const hint   = ref('');
     const stopNext = ref(false);
 
-    const doProbe = (it) => { And.probe(it.id); };
+    const doProbe = (it) => { hint.value='诊断中…(WebView渲染约需8秒)'; And.probe2(it.id); };
     const doLogin = () => { hint.value='登录完成回来自动检测，登录后点列表刷新'; And.login(); };
     const noop = () => {};
     const goBack = () => { try { And.exit(); } catch(e) { } };
