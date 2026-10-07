@@ -197,46 +197,36 @@ public class SpiderActivity extends Activity {
                 sb.append("== album page /t/?id=").append(id)
                   .append(" len=").append(page == null ? -1 : page.length()).append("\n");
                 if (page != null) {
-                    // 抽所有图片URL
-                    java.util.regex.Matcher um = Pattern.compile("https?://[A-Za-z0-9:./_\\-]+?\\.(?:jpg|jpeg|png|webp)[A-Za-z0-9./_\\-]*").matcher(page);
-                    java.util.LinkedHashSet<String> seen = new java.util.LinkedHashSet<>();
-                    while (um.find() && seen.size() < 12) seen.add(um.group());
-                    sb.append("---- img urls(").append(seen.size()).append(") ----\n");
-                    for (String u : seen) sb.append(u).append("\n");
-                    // 首个图片URL前后300字原文
-                    java.util.regex.Matcher fm = Pattern.compile(".{0,300}(?:jpg|jpeg|png|webp).{0,100}").matcher(page);
-                    if (fm.find()) sb.append("---- context ----\n").append(fm.group());
+                    // 全文输出(截10000)
+                    sb.append("---- full ----\n").append(page, 0, Math.min(page.length(), 10000));
+                    // 顺带试封面带Referer/Cookie
                 }
             } catch (Throwable e) { sb.append("page err: ").append(e).append("\n"); }
-            // 探测页面里抽到的第一个候选图
+            // 探测封面: 裸/带Referer/带Cookie+Referer
             HttpURLConnection c0 = null;
-            java.util.regex.Matcher pm = Pattern.compile("https?://[A-Za-z0-9:./_\\-]+?\\.(?:jpg|jpeg|png|webp)").matcher(sb);
-            if (pm.find()) {
-                String u = pm.group();
+            String[] probes = {
+                "https://qwevyimg.gl25.cn/t/" + id + ".jpg|none",
+                "https://qwevyimg.gl25.cn/t/" + id + ".jpg|ref",
+                "https://qwevyimg.gl25.cn/t/" + id + ".jpg|ck"
+            };
+            for (String entry : probes) {
+                int bar = entry.lastIndexOf('|');
+                String u = entry.substring(0, bar), mode = entry.substring(bar + 1);
                 try {
                     c0 = (HttpURLConnection) new URL(u).openConnection();
                     c0.setConnectTimeout(8000); c0.setReadTimeout(8000);
                     c0.setRequestProperty("User-Agent", "Mozilla/5.0 (Linux; Android 13) Chrome/120 Mobile");
-                    c0.setRequestProperty("Referer", SITE + "/");
-                    sb.append("\nPROBE ").append(u).append(" -> ").append(c0.getResponseCode())
+                    if (mode.equals("ref") || mode.equals("ck")) c0.setRequestProperty("Referer", SITE + "/");
+                    if (mode.equals("ck")) { String ck = CookieManager.getInstance().getCookie(SITE); if (ck != null) c0.setRequestProperty("Cookie", ck); }
+                    sb.append("\nPROBE[").append(mode).append("] ").append(u).append(" -> ").append(c0.getResponseCode())
                       .append(" ").append(c0.getContentType()).append(" ").append(c0.getContentLength());
-                } catch (Throwable e) { sb.append("\nPROBE ").append(u).append(" -> ERR ").append(e); }
+                } catch (Throwable e) { sb.append("\nPROBE[").append(mode).append("] ERR ").append(e); }
                 finally { if (c0 != null) try { c0.disconnect(); } catch (Throwable ignored) {} }
             }
-            String[] cands = { };
+            return finishProbe(sb);
+        }
 
-            for (String u : cands) {
-                HttpURLConnection c = null;
-                try {
-                    c = (HttpURLConnection) new URL(u).openConnection();
-                    c.setConnectTimeout(8000); c.setReadTimeout(8000);
-                    c.setRequestProperty("User-Agent", "Mozilla/5.0 (Linux; Android 13) Chrome/120 Mobile");
-                    c.setRequestProperty("Referer", SITE + "/");
-                    sb.append("\nIMG ").append(u).append(" -> ").append(c.getResponseCode())
-                      .append(" ").append(c.getContentType()).append(" ").append(c.getContentLength());
-                } catch (Throwable e) { sb.append("\nIMG ").append(u).append(" -> ERR ").append(e); }
-                finally { if (c != null) try { c.disconnect(); } catch (Throwable ignored) {} }
-            }
+        private String finishProbe(final StringBuilder sb) {
             final String out = sb.toString();
             runOnUiThread(new Runnable() { public void run() {
                 try {
