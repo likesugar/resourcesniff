@@ -493,10 +493,15 @@ public class MedPlanActivity extends Activity {
     static JSONArray load(Context c) {
         try {
             JSONArray arr = new JSONArray(c.getSharedPreferences("medplan", 0).getString("plans", "[]"));
+            boolean changed = false;
             for (int k = 0; k < arr.length(); k++) {
                 JSONObject o = arr.optJSONObject(k);
-                if (o != null && !o.has("id")) o.put("id", String.valueOf(System.currentTimeMillis()) + "_" + k);
+                if (o != null && !o.has("id")) {
+                    o.put("id", String.valueOf(System.currentTimeMillis()) + "_" + k);
+                    changed = true; // 立即落盘, 保证确认键与读取键一致
+                }
             }
+            if (changed) save(c, arr);
             return arr;
         } catch (Throwable e) { return new JSONArray(); }
     }
