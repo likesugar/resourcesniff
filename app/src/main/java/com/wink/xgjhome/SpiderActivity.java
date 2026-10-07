@@ -196,13 +196,35 @@ public class SpiderActivity extends Activity {
                 String page = httpGet(SITE + "/t/?id=" + id, ck);
                 sb.append("== album page /t/?id=").append(id)
                   .append(" len=").append(page == null ? -1 : page.length()).append("\n");
-                if (page != null) sb.append(page, 0, Math.min(page.length(), 3500));
+                if (page != null) {
+                    // 抽所有图片URL
+                    java.util.regex.Matcher um = Pattern.compile("https?://[A-Za-z0-9:./_\\-]+?\\.(?:jpg|jpeg|png|webp)[A-Za-z0-9./_\\-]*").matcher(page);
+                    java.util.LinkedHashSet<String> seen = new java.util.LinkedHashSet<>();
+                    while (um.find() && seen.size() < 12) seen.add(um.group());
+                    sb.append("---- img urls(").append(seen.size()).append(") ----\n");
+                    for (String u : seen) sb.append(u).append("\n");
+                    // 首个图片URL前后300字原文
+                    java.util.regex.Matcher fm = Pattern.compile(".{0,300}(?:jpg|jpeg|png|webp).{0,100}").matcher(page);
+                    if (fm.find()) sb.append("---- context ----\n").append(fm.group());
+                }
             } catch (Throwable e) { sb.append("page err: ").append(e).append("\n"); }
-            String[] cands = {
-                "https://tjg.gzhuibei.com/a/1/" + id + "/0.jpg",
-                "https://tjg.gzhuibei.com/a/1/" + id + "/1.jpg",
-                "https://tjg3.gzhuibei.com/a/1/" + id + "/0.jpg"
-            };
+            // 探测页面里抽到的第一个候选图
+            HttpURLConnection c0 = null;
+            java.util.regex.Matcher pm = Pattern.compile("https?://[A-Za-z0-9:./_\\-]+?\\.(?:jpg|jpeg|png|webp)").matcher(sb);
+            if (pm.find()) {
+                String u = pm.group();
+                try {
+                    c0 = (HttpURLConnection) new URL(u).openConnection();
+                    c0.setConnectTimeout(8000); c0.setReadTimeout(8000);
+                    c0.setRequestProperty("User-Agent", "Mozilla/5.0 (Linux; Android 13) Chrome/120 Mobile");
+                    c0.setRequestProperty("Referer", SITE + "/");
+                    sb.append("\nPROBE ").append(u).append(" -> ").append(c0.getResponseCode())
+                      .append(" ").append(c0.getContentType()).append(" ").append(c0.getContentLength());
+                } catch (Throwable e) { sb.append("\nPROBE ").append(u).append(" -> ERR ").append(e); }
+                finally { if (c0 != null) try { c0.disconnect(); } catch (Throwable ignored) {} }
+            }
+            String[] cands = { };
+
             for (String u : cands) {
                 HttpURLConnection c = null;
                 try {
