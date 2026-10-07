@@ -675,9 +675,9 @@ public class MedPlanActivity extends Activity {
         NotificationChannel ch = new NotificationChannel(CH, "用药提醒", NotificationManager.IMPORTANCE_HIGH);
         ch.enableVibration(true);
         ch.enableLights(true);
-        ch.setSound(android.provider.Settings.System.DEFAULT_NOTIFICATION_URI,
+        ch.setSound(android.provider.Settings.System.DEFAULT_ALARM_ALERT_URI,
             new android.media.AudioAttributes.Builder()
-                .setUsage(android.media.AudioAttributes.USAGE_NOTIFICATION_EVENT).build());
+                .setUsage(android.media.AudioAttributes.USAGE_ALARM).build());
         ch.setBypassDnd(true);
         ch.setLockscreenVisibility(Notification.VISIBILITY_PUBLIC);
         nm.createNotificationChannel(ch);
@@ -699,9 +699,13 @@ public class MedPlanActivity extends Activity {
             .setAction("MED_CONFIRM").putExtra("i", planIdx).putExtra("t", timeIdx);
         PendingIntent cpi = PendingIntent.getBroadcast(c, 990400 + medNotifId(c, planIdx, timeIdx), conf,
             PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
+        Intent fsI = new Intent(c, MedPlanActivity.class);
+        PendingIntent fpi = PendingIntent.getActivity(c, 990600 + medNotifId(c, planIdx, timeIdx), fsI,
+            PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
         Notification n = new Notification.Builder(c, CH)
             .setSmallIcon(c.getApplicationInfo().icon)
             .setCategory(Notification.CATEGORY_ALARM)
+            .setFullScreenIntent(fpi, true)
             .setDefaults(Notification.DEFAULT_SOUND | Notification.DEFAULT_VIBRATE)
             .setContentTitle(title).setContentText(text)
             .setContentIntent(pi)
@@ -815,9 +819,13 @@ public class MedPlanActivity extends Activity {
         Intent open = new Intent(c, MedPlanActivity.class)
             .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP);
         PendingIntent pi = PendingIntent.getActivity(c, 990002, open, PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
+        Intent fsI = new Intent(c, MedPlanActivity.class);
+        PendingIntent fpi = PendingIntent.getActivity(c, 990600 + medNotifId(c, planIdx, timeIdx), fsI,
+            PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
         Notification n = new Notification.Builder(c, CH)
             .setSmallIcon(c.getApplicationInfo().icon)
             .setCategory(Notification.CATEGORY_ALARM)
+            .setFullScreenIntent(fpi, true)
             .setDefaults(Notification.DEFAULT_SOUND | Notification.DEFAULT_VIBRATE)
             .setContentTitle(title).setContentText(text)
             .setContentIntent(pi)
