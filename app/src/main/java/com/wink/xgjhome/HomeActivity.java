@@ -217,7 +217,7 @@ public class HomeActivity extends Activity {
             public void onClick(View v) { startActivity(new Intent(HomeActivity.this, RecordActivity.class)); }
         });
         findViewById(R.id.cardVideoDl).setOnClickListener(new View.OnClickListener() {
-            public void onClick(View v) { startActivity(new Intent(HomeActivity.this, VideoDlActivity.class).putExtra("auto_dialog", true)); }
+            public void onClick(View v) { showSniffDialog(VideoDlActivity.class, "下载"); }
         });
 
         findViewById(R.id.lanToggle).setOnClickListener(new View.OnClickListener() {
@@ -395,7 +395,9 @@ public class HomeActivity extends Activity {
         } catch (Throwable e) { return null; }
     }
 
-    private void showSniffDialog() {
+    private void showSniffDialog() { showSniffDialog(null, "开始嗅探"); }
+
+    private void showSniffDialog(final Class<?> target, final String goLabel) {
         android.app.Dialog d = new android.app.Dialog(this);
         d.setContentView(R.layout.dialog_sniff);
         android.view.Window w = d.getWindow();
@@ -420,10 +422,13 @@ public class HomeActivity extends Activity {
         d.findViewById(R.id.btn_cancel).setOnClickListener(new View.OnClickListener() {
             public void onClick(View v) { d.dismiss(); }
         });
-        d.findViewById(R.id.btn_go).setOnClickListener(new View.OnClickListener() {
+        android.widget.TextView goBtn = (android.widget.TextView) d.findViewById(R.id.btn_go);
+        goBtn.setText(goLabel);
+        goBtn.setOnClickListener(new View.OnClickListener() {
             public void onClick(View v) {
-                Intent i = new Intent(HomeActivity.this, SniffActivity.class);
-                i.putExtra("input", et.getText().toString().trim());
+                String u = et.getText().toString().trim();
+                Intent i = new Intent(HomeActivity.this, target != null ? target : SniffActivity.class);
+                if (target != null) i.putExtra("url", u); else i.putExtra("input", u);
                 startActivity(i);
                 d.dismiss();
             }

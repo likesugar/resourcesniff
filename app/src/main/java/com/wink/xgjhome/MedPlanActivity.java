@@ -63,7 +63,7 @@ public class MedPlanActivity extends Activity {
         root.addView(listScroll, new FrameLayout.LayoutParams(-1, -1));
 
 
-        TextView title = mkText("用药提醒", 20, true, 0xFF1F2329); title.setPadding(dp(16), dp(34), dp(16), dp(10));
+        TextView title = mkText("用药提醒", 20, true, 0xFF1F2329); title.setPadding(dp(16), dp(18), dp(16), dp(6));
         root.addView(title, new FrameLayout.LayoutParams(-2, -2, Gravity.TOP | Gravity.CENTER_HORIZONTAL));
         ((FrameLayout.LayoutParams) title.getLayoutParams()).topMargin = dp(32);
 
@@ -98,13 +98,6 @@ public class MedPlanActivity extends Activity {
 
     private void renderList() {
         listHost.removeAllViews();
-        try {
-            android.content.SharedPreferences pf = getSharedPreferences("medplan", 0);
-            TextView st = mkText("守护 " + pf.getString("watch_last", "-") + " · 闹钟 " + pf.getString("alarm_last", "-")
-                + " · 待提醒 " + dueCount(), 11, false, Theme.c(this, 0xFF8A919E, 0xFF6B7280));
-            st.setPadding(dp(4), dp(6), 0, dp(8));
-            listHost.addView(st);
-        } catch (Throwable ignored) {}
         if (plans.length() == 0) {
             TextView e = mkText("还没有用药计划\n点下方「＋ 新增用药计划」创建", 14, false, Theme.c(this, 0xFF8A919E, 0xFF6B7280));
             e.setGravity(Gravity.CENTER);

@@ -208,6 +208,7 @@ public class VideoDlActivity extends Activity {
         Immersive.hide(this);
         // 入口交互与资源嗅探一致: 进入即弹输入窗
         String autoUrl = getIntent() != null ? getIntent().getStringExtra("url") : null;
+        if (autoUrl != null && autoUrl.trim().length() == 0) autoUrl = null;
         if (autoUrl != null && autoUrl.length() > 0) { submit(autoUrl); }
         else showInputDialog();
         render();
