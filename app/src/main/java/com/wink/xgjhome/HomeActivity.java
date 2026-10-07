@@ -217,7 +217,7 @@ public class HomeActivity extends Activity {
             public void onClick(View v) { startActivity(new Intent(HomeActivity.this, RecordActivity.class)); }
         });
         findViewById(R.id.cardVideoDl).setOnClickListener(new View.OnClickListener() {
-            public void onClick(View v) { showSniffDialog(VideoDlActivity.class, "下载", "视频下载"); }
+            public void onClick(View v) { showSniffDialog(VideoDlActivity.class, "下载", "视频下载", "进入"); }
         });
 
         findViewById(R.id.lanToggle).setOnClickListener(new View.OnClickListener() {
@@ -395,9 +395,9 @@ public class HomeActivity extends Activity {
         } catch (Throwable e) { return null; }
     }
 
-    private void showSniffDialog() { showSniffDialog(null, "开始嗅探", "资源嗅探"); }
+    private void showSniffDialog() { showSniffDialog(null, "开始嗅探", "资源嗅探", "取消"); }
 
-    private void showSniffDialog(final Class<?> target, final String goLabel, final String dlgTitle) {
+    private void showSniffDialog(final Class<?> target, final String goLabel, final String dlgTitle, final String leftLabel) {
         android.app.Dialog d = new android.app.Dialog(this);
         d.setContentView(R.layout.dialog_sniff);
         android.view.Window w = d.getWindow();
@@ -421,8 +421,13 @@ public class HomeActivity extends Activity {
                 } catch (Exception e) { }
             }
         });
-        d.findViewById(R.id.btn_cancel).setOnClickListener(new View.OnClickListener() {
-            public void onClick(View v) { d.dismiss(); }
+        android.widget.TextView cancelBtn = (android.widget.TextView) d.findViewById(R.id.btn_cancel);
+        if (!"取消".equals(leftLabel)) cancelBtn.setText(leftLabel);
+        cancelBtn.setOnClickListener(new View.OnClickListener() {
+            public void onClick(View v) {
+                if (target != null) { startActivity(new Intent(HomeActivity.this, target)); }
+                d.dismiss();
+            }
         });
         android.widget.TextView goBtn = (android.widget.TextView) d.findViewById(R.id.btn_go);
         goBtn.setText(goLabel);
