@@ -649,6 +649,7 @@ public class MedPlanActivity extends Activity {
                 context.getSharedPreferences("medplan", 0).edit().putString("alarm_last",
                     new SimpleDateFormat("HH:mm:ss", Locale.US).format(new Date())).apply();
                 if ("MED_TICK".equals(intent.getAction())) {
+                    if (inWatchWindow(context)) MedWatchService.ensure(context);
                     checkAndNotifyDue(context);
                     armTick(context);
                     return;
@@ -736,6 +737,29 @@ public class MedPlanActivity extends Activity {
                 }
             }
         } catch (Throwable ignored) {}
+    }
+
+    /** 守护窗口: 任意服药时间点的前1小时~后1小时之间才需要守护通知 */
+    static boolean inWatchWindow(Context c) {
+        try {
+            JSONArray plans = load(c);
+            java.util.Calendar nowC = java.util.Calendar.getInstance();
+            int nowM = nowC.get(java.util.Calendar.HOUR_OF_DAY) * 60 + nowC.get(java.util.Calendar.MINUTE);
+            for (int i = 0; i < plans.length(); i++) {
+                JSONObject o = plans.optJSONObject(i);
+                JSONArray ts = o == null ? null : o.optJSONArray("times");
+                if (ts == null) continue;
+                for (int t = 0; t < ts.length(); t++) {
+                    String tt = ts.optString(t);
+                    int hh, mm;
+                    try { hh = Integer.parseInt(tt.split(":")[0]); mm = Integer.parseInt(tt.split(":")[1]); }
+                    catch (Throwable e) { continue; }
+                    int m = hh * 60 + mm;
+                    if (nowM >= m - 60 && nowM <= m + 60) return true;
+                }
+            }
+            return false;
+        } catch (Throwable e) { return false; }
     }
 
     static String medKey(Context c, int planIdx, int timeIdx) {

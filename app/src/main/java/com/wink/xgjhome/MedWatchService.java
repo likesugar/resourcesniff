@@ -24,22 +24,27 @@ public class MedWatchService extends Service {
             nc.setShowBadge(false);
             ((android.app.NotificationManager) getSystemService(NOTIFICATION_SERVICE)).createNotificationChannel(nc);
         } catch (Throwable ignored) {}
+        if (!MedPlanActivity.inWatchWindow(this)) { // 窗口外启动直接收摊, 不弹守护通知
+            stopSelf();
+            return;
+        }
         startForeground(20003, buildNote("用药提醒守护中"));
         h.postDelayed(tick, 3000);
     }
 
     private final Runnable tick = new Runnable() { public void run() {
-        boolean hasPlans = false;
+        boolean active = false;
         try {
-            hasPlans = MedPlanActivity.load(MedWatchService.this).length() > 0;
-            if (hasPlans) {
+            active = MedPlanActivity.inWatchWindow(MedWatchService.this)
+                && MedPlanActivity.load(MedWatchService.this).length() > 0;
+            if (active) {
                 MedPlanActivity.checkAndNotifyDue(MedWatchService.this);
                 MedPlanActivity.armTick(MedWatchService.this);
                 getSharedPreferences("medplan", 0).edit().putString("watch_last",
                     android.text.format.DateFormat.format("HH:mm:ss", System.currentTimeMillis()).toString()).apply();
             }
         } catch (Throwable ignored) {}
-        if (!hasPlans && ++idle > 30) { // 无计划约10分钟后自动收摊
+        if (!active) { // 窗口外(距最近提醒超过1小时或无计划)守护通知不显示, 服务收摊; 闹钟到点会自动重拉
             stopForeground(true);
             stopSelf();
             return;
