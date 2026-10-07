@@ -40,6 +40,8 @@ public class MedPlanActivity extends Activity {
     private static final String CH = "medplan";
     private LinearLayout listHost; private FrameLayout formHost;
     private ScrollView listScroll;
+    private String formPic = "";
+    private Runnable picTag;
     private JSONArray plans;
 
     // 表单临时状态
@@ -58,7 +60,7 @@ public class MedPlanActivity extends Activity {
         listScroll = new ScrollView(this);
         listHost = new LinearLayout(this);
         listHost.setOrientation(LinearLayout.VERTICAL);
-        listHost.setPadding(dp(16), dp(84), dp(16), dp(140));
+        listHost.setPadding(dp(16), dp(40), dp(16), dp(140));
         listScroll.addView(listHost);
         root.addView(listScroll, new FrameLayout.LayoutParams(-1, -1));
 
@@ -120,8 +122,28 @@ public class MedPlanActivity extends Activity {
             cell.setPadding(dp(16), dp(16), dp(16), dp(16));
             LinearLayout.LayoutParams clp = new LinearLayout.LayoutParams(0, -2, 1f);
             if (i % 2 == 1) clp.leftMargin = dp(14);
-            // 图标 + 药名
-            TextView name = mkText(o.optString("name", ""), 15, true, 0xFF1F2329);
+            // 相册照片缩略(若有) + 药名
+            String pic = o.optString("pic", "");
+            if (pic.length() > 0 && new java.io.File(pic).exists()) {
+                try {
+                    android.graphics.BitmapFactory.Options o2 = new android.graphics.BitmapFactory.Options();
+                    o2.inSampleSize = 4;
+                    android.graphics.Bitmap bm = android.graphics.BitmapFactory.decodeFile(pic, o2);
+                    if (bm != null) {
+                        android.widget.ImageView iv = new android.widget.ImageView(this);
+                        iv.setScaleType(android.widget.ImageView.ScaleType.CENTER_CROP);
+                        iv.setImageBitmap(bm);
+                        iv.setClipToOutline(true);
+                        iv.setOutlineProvider(new android.view.ViewOutlineProvider() {
+                            public void getOutline(android.view.View v, android.graphics.Outline ol) {
+                                ol.setRoundRect(0, 0, v.getWidth(), v.getHeight(), dp(12));
+                            }
+                        });
+                        cell.addView(iv, new LinearLayout.LayoutParams(dp(56), dp(56)));
+                    }
+                } catch (Throwable ignored) {}
+            }
+            TextView name = mkText(o.optString("name", ""), 15, true, Theme.c(this, 0xFFF2F4F8, 0xFF1F2329));
             name.setPadding(0, dp(8), 0, 0);
             cell.addView(name);
             TextView dose = mkText(o.optString("dose", "1") + o.optString("unit", "片") + " · " + o.optString("relation", ""), 12, false, Theme.c(this, 0xFF8A919E, 0xFF6B7280));
@@ -179,6 +201,25 @@ public class MedPlanActivity extends Activity {
     }
 
     // ---------- 表单 ----------
+    @Override
+    protected void onActivityResult(int req, int res, Intent data) {
+        super.onActivityResult(req, res, data);
+        if (req == 7001 && res == RESULT_OK && data != null && data.getData() != null) {
+            try {
+                java.io.File dir = new java.io.File(getExternalFilesDir(null), "med_pics");
+                dir.mkdirs();
+                java.io.File dst = new java.io.File(dir, "pic_" + System.currentTimeMillis() + ".jpg");
+                java.io.InputStream in = getContentResolver().openInputStream(data.getData());
+                java.io.FileOutputStream fo = new java.io.FileOutputStream(dst);
+                byte[] b = new byte[16384]; int n;
+                while ((n = in.read(b)) > 0) fo.write(b, 0, n);
+                in.close(); fo.close();
+                formPic = dst.getAbsolutePath();
+                if (picTag != null) picTag.run();
+            } catch (Throwable e) { toast("照片保存失败"); }
+        }
+    }
+
     private void showForm(int idx) {
         editIdx = idx;
         formTimes = new JSONArray();
@@ -204,6 +245,44 @@ public class MedPlanActivity extends Activity {
         bottomBar.setBackgroundResource(Theme.dark(this) ? R.drawable.bg_card_oled : R.drawable.bg_card_white);
         bottomBar.setPadding(dp(16), dp(12), dp(16), dp(12));
         formHost.addView(bottomBar, new FrameLayout.LayoutParams(-1, -2, Gravity.BOTTOM));
+
+        formPic = idx >= 0 ? plans.optJSONObject(idx).optString("pic", "") : "";
+        // 相册照片(药物名称上方)
+        final android.widget.ImageView picThumb = new android.widget.ImageView(this);
+        picThumb.setScaleType(android.widget.ImageView.ScaleType.CENTER_CROP);
+        LinearLayout picRow = new LinearLayout(this);
+        picRow.setGravity(Gravity.CENTER_VERTICAL);
+        picRow.setPadding(0, dp(6), 0, dp(10));
+        LinearLayout picWrap = new LinearLayout(this);
+        picWrap.setOrientation(LinearLayout.VERTICAL);
+        picWrap.setGravity(Gravity.CENTER_HORIZONTAL);
+        LinearLayout.LayoutParams ptl = new LinearLayout.LayoutParams(dp(64), dp(64));
+        picWrap.addView(picThumb, ptl);
+        TextView picBtn = mkText("📷 选择相册照片", 13, true, 0xFF315CDE);
+        picBtn.setPadding(dp(12), 0, 0, 0);
+        picRow.addView(picWrap);
+        picRow.addView(picBtn);
+        final android.graphics.Bitmap[] picHolder = new android.graphics.Bitmap[1];
+        Runnable showPic = () -> {
+            android.graphics.Bitmap bm = null;
+            try {
+                if (formPic.length() > 0 && new java.io.File(formPic).exists())
+                    bm = android.graphics.BitmapFactory.decodeFile(formPic, new android.graphics.BitmapFactory.Options());
+            } catch (Throwable ignored) {}
+            picHolder[0] = bm;
+            if (bm != null) picThumb.setImageBitmap(bm);
+            else picThumb.setImageResource(R.drawable.bg_input);
+        };
+        showPic.run();
+        picBtn.setOnClickListener(v -> {
+            try {
+                Intent pi = new Intent(Intent.ACTION_PICK, android.provider.MediaStore.Images.Media.EXTERNAL_CONTENT_URI);
+                pi.setType("image/*");
+                startActivityForResult(pi, 7001);
+            } catch (Throwable ignored) { toast("无法打开相册"); }
+        });
+        picTag = showPic;
+        card.addView(picRow);
 
         final EditText name = rowInput(card, "", "药品名称", "请输入药品名称", idx >= 0 ? plans.optJSONObject(idx).optString("name", "") : "");
 
@@ -356,6 +435,7 @@ public class MedPlanActivity extends Activity {
             try {
                 JSONObject o = new JSONObject();
                 o.put("name", n);
+                o.put("pic", formPic);
                 o.put("dose", dose.getText().toString().trim());
                 o.put("unit", unit[0]);
                 o.put("times", formTimes);
@@ -580,7 +660,7 @@ public class MedPlanActivity extends Activity {
                 if (o != null && t >= 0 && !medDone(context, i, t)) {
                     String txt = o.optString("name", "") + "  " + o.optString("dose", "1") + o.optString("unit", "片")
                         + (o.optString("relation", "").isEmpty() ? "" : "（" + o.optString("relation") + "）");
-                    notifyMedHold(context, i, t, "该吃药啦（确认后才停止提醒）", txt);
+                    notifyMedHold(context, i, t, "该吃药啦", txt);
                 }
                 scheduleAll(context); // 排下一个时间点
             } catch (Throwable ignored) {}
@@ -600,7 +680,7 @@ public class MedPlanActivity extends Activity {
         nm.createNotificationChannel(r2);
     }
 
-    static int medNotifId(int planIdx, int timeIdx) { return 990200 + planIdx * 20 + timeIdx; }
+    static int medNotifId(Context c, int planIdx, int timeIdx) { return medKey(c, planIdx, timeIdx).hashCode(); }
 
     /** 到点提醒: 常驻通知, 只有确认才消失 */
     static void notifyMedHold(Context c, int planIdx, int timeIdx, String title, String text) {
@@ -611,7 +691,7 @@ public class MedPlanActivity extends Activity {
         PendingIntent pi = PendingIntent.getActivity(c, 990002, open, PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
         Intent conf = new Intent(c, MedConfirmReceiver.class)
             .setAction("MED_CONFIRM").putExtra("i", planIdx).putExtra("t", timeIdx);
-        PendingIntent cpi = PendingIntent.getBroadcast(c, 990400 + medNotifId(planIdx, timeIdx), conf,
+        PendingIntent cpi = PendingIntent.getBroadcast(c, 990400 + medNotifId(c, planIdx, timeIdx), conf,
             PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
         Notification n = new Notification.Builder(c, CH)
             .setSmallIcon(c.getApplicationInfo().icon)
@@ -621,7 +701,7 @@ public class MedPlanActivity extends Activity {
             .setOngoing(true)
             .addAction(0, "✓ 已服用", cpi)
             .build();
-        nm.notify(medNotifId(planIdx, timeIdx), n);
+        nm.notify(medNotifId(c, planIdx, timeIdx), n);
     }
 
     /** 确认服药: 标记+撤通知 */
@@ -630,7 +710,7 @@ public class MedPlanActivity extends Activity {
         c.getSharedPreferences("medplan", 0).edit()
             .putBoolean(medKey(c, planIdx, timeIdx), true).apply();
         NotificationManager nm = (NotificationManager) c.getSystemService(Context.NOTIFICATION_SERVICE);
-        nm.cancel(medNotifId(planIdx, timeIdx));
+        nm.cancel(medNotifId(c, planIdx, timeIdx));
     }
 
     /** app活着即兜底: 补挂所有到点未确认通知 */
@@ -650,7 +730,7 @@ public class MedPlanActivity extends Activity {
                     if (tt.compareTo(now) <= 0 && !medDone(c, i, t)) {
                         String txt = o.optString("name", "") + "  " + o.optString("dose", "1") + o.optString("unit", "片")
                             + (o.optString("relation", "").isEmpty() ? "" : "（" + o.optString("relation") + "）");
-                        notifyMedHold(c, i, t, "该吃药啦（确认后才停止提醒）", txt);
+                        notifyMedHold(c, i, t, "该吃药啦", txt);
                     }
                 }
             }
