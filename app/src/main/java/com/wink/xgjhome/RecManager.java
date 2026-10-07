@@ -442,7 +442,7 @@ public class RecManager {
 
     /** ts 文件 → MP4 入相册 Movies/录制 */
     static void convertFileToMp4(final RecJob job) {
-        job.state = "转换MP4中…";
+        job.state = "合并视频";
         new Thread(new Runnable() { public void run() {
             try {
                 String mp4Name = job.name.endsWith(".ts") ? job.name.substring(0, job.name.length() - 3) + ".mp4" : job.name + ".mp4";
@@ -687,7 +687,7 @@ public class RecManager {
     }
 
     static void mergeSegs(final RecJob job) {
-        job.state = "转换MP4中…";
+        job.state = "合并视频";
         new Thread(new Runnable() { public void run() {
             try {
                 java.io.File[] segs = job.file.listFiles();
@@ -713,10 +713,8 @@ public class RecManager {
                     }, new com.arthenica.ffmpegkit.StatisticsCallback() {
                         public void apply(com.arthenica.ffmpegkit.Statistics stat) {
                             try {
-                                int p = (int) (100L * mp4.length() / totalInF);
-                                if (p > 99) p = 99;
-                                if (p < 1) p = 1;
-                                job.state = "合并MP4中 " + p + "%";
+                                job.state = "合并视频";
+                                job.bytes = mp4.length();
                             } catch (Throwable ignored) {}
                         }
                     });
@@ -724,10 +722,8 @@ public class RecManager {
                     && !st.getState().equals(com.arthenica.ffmpegkit.SessionState.FAILED)
                     ) {
                     try {
-                        int p = (int) (100L * mp4.length() / totalInF);
-                        if (p > 99) p = 99;
-                        if (p < 1) p = 1;
-                        job.state = "合并MP4中 " + p + "%";
+                        job.state = "合并视频";
+                        job.bytes = mp4.length();
                     } catch (Throwable ignored) {}
                     try { Thread.sleep(500); } catch (Throwable e) { }
                 }
@@ -763,7 +759,7 @@ public class RecManager {
     }
 
     static void convertToMp4(final RecJob job) {
-        job.state = "转换MP4中…";
+        job.state = "合并视频";
         try {
             String src = com.arthenica.ffmpegkit.FFmpegKitConfig.getSafParameterForRead(sCtx, job.storeUri);
             java.io.File tmp = new java.io.File(sCtx.getCacheDir(), "conv_" + System.currentTimeMillis() + ".mp4");

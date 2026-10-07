@@ -135,7 +135,7 @@ public class RecordActivity extends Activity {
         col.addView(tabBar);
 
         tvEmpty = new TextView(this);
-        tvEmpty.setText("暂无录制任务");
+        tvEmpty.setText("没有数据(^▽^)");
         tvEmpty.setTextColor(0xFF8A919E);
         tvEmpty.setGravity(Gravity.CENTER);
         tvEmpty.setPadding(0, 120, 0, 0);
@@ -143,6 +143,10 @@ public class RecordActivity extends Activity {
 
         list = new LinearLayout(this);
         list.setOrientation(LinearLayout.VERTICAL);
+        // 丝滑过渡: 行增删淡入淡出+位移, 行位变化平滑移动
+        android.animation.LayoutTransition lt = new android.animation.LayoutTransition();
+        lt.enableTransitionType(android.animation.LayoutTransition.CHANGING);
+        list.setLayoutTransition(lt);
         col.addView(list);
 
         sv.addView(col);
