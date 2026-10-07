@@ -219,6 +219,9 @@ public class HomeActivity extends Activity {
         findViewById(R.id.cardVideoDl).setOnClickListener(new View.OnClickListener() {
             public void onClick(View v) { showVdlDialog(); }
         });
+        findViewById(R.id.cardSpider).setOnClickListener(new View.OnClickListener() {
+            public void onClick(View v) { startActivity(new Intent(HomeActivity.this, SpiderActivity.class)); }
+        });
 
         findViewById(R.id.lanToggle).setOnClickListener(new View.OnClickListener() {
             public void onClick(View v) { showLanDialog(); }
