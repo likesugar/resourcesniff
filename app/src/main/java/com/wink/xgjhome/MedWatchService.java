@@ -20,7 +20,7 @@ public class MedWatchService extends Service {
     @Override public void onCreate() {
         super.onCreate();
         try {
-            NotificationChannel nc = new NotificationChannel(CH, "用药提醒守护", NotificationManager.IMPORTANCE_MIN);
+            NotificationChannel nc = new NotificationChannel(CH, "用药提醒守护", NotificationManager.IMPORTANCE_LOW);
             nc.setShowBadge(false);
             ((android.app.NotificationManager) getSystemService(NOTIFICATION_SERVICE)).createNotificationChannel(nc);
         } catch (Throwable ignored) {}
