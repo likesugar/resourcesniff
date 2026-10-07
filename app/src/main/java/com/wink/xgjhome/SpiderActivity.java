@@ -265,6 +265,45 @@ public class SpiderActivity extends Activity {
             return finishProbe(sb);
         }
 
+        /** 诊断3: 可见WebView打开图集页, 记录全部图片请求, 30秒后汇总复制 */
+        @JavascriptInterface
+        public String probe3(final int id) {
+            try { trustAll(); } catch (Throwable ignored) {}
+            final java.util.Set<String> hits = java.util.Collections.synchronizedSet(new java.util.LinkedHashSet<String>());
+            runOnUiThread(new Runnable() { public void run() {
+                final android.widget.FrameLayout root = new android.widget.FrameLayout(SpiderActivity.this);
+                final WebView wv = new WebView(SpiderActivity.this);
+                WebSettings ws = wv.getSettings();
+                ws.setJavaScriptEnabled(true);
+                ws.setUserAgentString("Mozilla/5.0 (Linux; Android 13) Chrome/120 Mobile");
+                ws.setDomStorageEnabled(true);
+                ws.setMixedContentMode(WebSettings.MIXED_CONTENT_ALWAYS_ALLOW);
+                wv.setWebViewClient(new WebViewClient() {
+                    @Override public void onReceivedSslError(WebView v, android.webkit.SslErrorHandler h, android.net.http.SslError e) { h.proceed(); }
+                    @Override public android.webkit.WebResourceResponse shouldInterceptRequest(WebView v, android.webkit.WebResourceRequest req) {
+                        String u = req.getUrl().toString();
+                        if (u.contains(".jpg") || u.contains(".jpeg") || u.contains(".png") || u.contains(".webp")) hits.add(u);
+                        return null;
+                    }
+                });
+                root.addView(wv, new android.widget.FrameLayout.LayoutParams(-1, -1));
+                android.widget.Button btn = new android.widget.Button(SpiderActivity.this);
+                btn.setText("完成并复制诊断(" + id + ")");
+                root.addView(btn, new android.widget.FrameLayout.LayoutParams(-2, -2));
+                btn.setOnClickListener(new View.OnClickListener() { public void onClick(View v) {
+                    StringBuilder sb = new StringBuilder("== probe3 id=").append(id).append("\n");
+                    sb.append("---- img requests(").append(hits.size()).append(") ----\n");
+                    for (String u : hits) sb.append(u).append("\n");
+                    finishProbe(sb);
+                    ((android.view.ViewGroup) root.getParent()).removeView(root);
+                    wv.destroy();
+                }});
+                setContentView(root);
+                wv.loadUrl(SITE + "/t/?id=" + id);
+            }});
+            return "ok-see-screen";
+        }
+
         /** 诊断: 抓图集详情页原文+探测图床候选URL, 结果复制到剪贴板 */
         @JavascriptInterface
         public String probe(final int id) {
