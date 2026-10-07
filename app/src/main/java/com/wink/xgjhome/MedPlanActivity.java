@@ -37,7 +37,7 @@ import java.util.Locale;
 /** 用药提醒(小工具18.0同款): 用药计划 + 多时间点强提醒 */
 public class MedPlanActivity extends Activity {
 
-    private static final String CH = "medplan";
+    private static final String CH = "medplan_v2"; // 换id强制重建: 旧渠道被系统缓存低优先级, 不走状态栏/横幅
     private LinearLayout listHost; private FrameLayout formHost;
     private ScrollView listScroll;
     private String formPic = "";
@@ -675,6 +675,10 @@ public class MedPlanActivity extends Activity {
         NotificationChannel ch = new NotificationChannel(CH, "用药提醒", NotificationManager.IMPORTANCE_HIGH);
         ch.enableVibration(true);
         ch.enableLights(true);
+        ch.setSound(android.provider.Settings.System.DEFAULT_NOTIFICATION_URI,
+            new android.media.AudioAttributes.Builder()
+                .setUsage(android.media.AudioAttributes.USAGE_NOTIFICATION_EVENT).build());
+        ch.setBypassDnd(true);
         ch.setLockscreenVisibility(Notification.VISIBILITY_PUBLIC);
         nm.createNotificationChannel(ch);
         NotificationChannel r2 = new NotificationChannel("remind", "日程提醒", NotificationManager.IMPORTANCE_HIGH);
@@ -697,6 +701,8 @@ public class MedPlanActivity extends Activity {
             PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
         Notification n = new Notification.Builder(c, CH)
             .setSmallIcon(c.getApplicationInfo().icon)
+            .setCategory(Notification.CATEGORY_ALARM)
+            .setDefaults(Notification.DEFAULT_SOUND | Notification.DEFAULT_VIBRATE)
             .setContentTitle(title).setContentText(text)
             .setContentIntent(pi)
             .setAutoCancel(false)
@@ -811,6 +817,8 @@ public class MedPlanActivity extends Activity {
         PendingIntent pi = PendingIntent.getActivity(c, 990002, open, PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
         Notification n = new Notification.Builder(c, CH)
             .setSmallIcon(c.getApplicationInfo().icon)
+            .setCategory(Notification.CATEGORY_ALARM)
+            .setDefaults(Notification.DEFAULT_SOUND | Notification.DEFAULT_VIBRATE)
             .setContentTitle(title).setContentText(text)
             .setContentIntent(pi)
             .setAutoCancel(true)
