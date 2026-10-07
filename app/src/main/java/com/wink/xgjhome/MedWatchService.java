@@ -24,11 +24,13 @@ public class MedWatchService extends Service {
             nc.setShowBadge(false);
             ((android.app.NotificationManager) getSystemService(NOTIFICATION_SERVICE)).createNotificationChannel(nc);
         } catch (Throwable ignored) {}
-        if (!MedPlanActivity.inWatchWindow(this)) { // 窗口外启动直接收摊, 不弹守护通知
+        // 必须先 startForeground 再收摊, 否则 ForegroundServiceDidNotStartInTime 崩溃
+        startForeground(20003, buildNote("用药提醒守护中"));
+        if (!MedPlanActivity.inWatchWindow(this)) {
+            stopForeground(true);
             stopSelf();
             return;
         }
-        startForeground(20003, buildNote("用药提醒守护中"));
         h.postDelayed(tick, 3000);
     }
 
@@ -64,6 +66,7 @@ public class MedWatchService extends Service {
 
     public static void ensure(Context c) {
         try {
+            if (!MedPlanActivity.inWatchWindow(c)) return; // 窗口外不起服务, 免得触发改前5秒规则
             Intent i = new Intent(c, MedWatchService.class);
             if (android.os.Build.VERSION.SDK_INT >= 26) c.startForegroundService(i);
             else c.startService(i);
