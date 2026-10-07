@@ -699,14 +699,11 @@ public class MedPlanActivity extends Activity {
             .setAction("MED_CONFIRM").putExtra("i", planIdx).putExtra("t", timeIdx);
         PendingIntent cpi = PendingIntent.getBroadcast(c, 990400 + medNotifId(c, planIdx, timeIdx), conf,
             PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
-        Intent fsI = new Intent(c, MedPlanActivity.class);
+                Intent fsI = new Intent(c, MedPlanActivity.class);
         PendingIntent fpi = PendingIntent.getActivity(c, 990600 + medNotifId(c, planIdx, timeIdx), fsI,
             PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
         Notification n = new Notification.Builder(c, CH)
             .setSmallIcon(c.getApplicationInfo().icon)
-            .setCategory(Notification.CATEGORY_ALARM)
-            .setFullScreenIntent(fpi, true)
-            .setDefaults(Notification.DEFAULT_SOUND | Notification.DEFAULT_VIBRATE)
             .setContentTitle(title).setContentText(text)
             .setContentIntent(pi)
             .setAutoCancel(false)
