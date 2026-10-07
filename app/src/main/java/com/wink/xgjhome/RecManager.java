@@ -509,6 +509,9 @@ public class RecManager {
             dir.mkdirs();
             job.file = dir;
             recJobs.put(job.id, job);
+            // 全部后台化: 抖音兜底探测含网络+sleep, 主线程跑会冻死UI(2026-10-07 实测卡住根因)
+            new Thread(new Runnable() { public void run() {
+            try {
             saveLiveRec(job);
             acquireWake();
             // 抖音: 只录原画——兜底变体(_sd/_hd/_uhd)时, 构造_or4原画地址每2秒探测直到可用
@@ -545,15 +548,16 @@ public class RecManager {
             startBgPlayer(job);
             startBgSession(job);
             startWatchdog(job);
-        } catch (Throwable e) {
-            try {
-                RecJob jb = new RecJob();
-                jb.id = ++recSeq;
-                jb.name = "直播·原画（失败）";
-                jb.state = "启动失败: " + e.getClass().getSimpleName();
-                stoppedJobs.put(jb.id, jb);
-            } catch (Throwable ignored) {}
-        }
+            } catch (Throwable e) {
+                try {
+                    RecJob jb = new RecJob();
+                    jb.id = ++recSeq;
+                    jb.name = "直播·原画（失败）";
+                    jb.state = "启动失败: " + e.getClass().getSimpleName();
+                    stoppedJobs.put(jb.id, jb);
+                } catch (Throwable ignored) {}
+            }
+            } }).start();
     }
 
     static void startWatchdog(final RecJob job) {
