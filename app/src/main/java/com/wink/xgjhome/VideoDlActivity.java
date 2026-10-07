@@ -127,51 +127,6 @@ public class VideoDlActivity extends Activity {
         title.setOnClickListener(new OnClickListener() { public void onClick(View v) { showInputDialog(); }});
         col.addView(head);
 
-        // 粘贴视频链接 pill(点击标题弹出)
-        final LinearLayout pillRow = new LinearLayout(this);
-        pillRow.setVisibility(android.view.View.GONE);
-        pillRow.setOrientation(LinearLayout.HORIZONTAL);
-        pillRow.setGravity(Gravity.CENTER_VERTICAL);
-        GradientDrawable pb = new GradientDrawable();
-        pb.setCornerRadius(dp(24)); pb.setColor(dark ? (Theme.oled(this) ? 0xFF000000 : 0xFF181E2A) : 0xFFFFFFFF);
-        if (dark && Theme.oled(this)) pb.setStroke(dp(1), 0xFF222222);
-        if (!dark) pb.setStroke(dp(1), 0xFFE4EAF5);
-        pillRow.setBackground(pb);
-        pillRow.setPadding(dp(18), dp(14), dp(10), dp(14));
-        LinearLayout.LayoutParams prlp = new LinearLayout.LayoutParams(-1, -2);
-        prlp.topMargin = dp(16);
-        TextView link = new TextView(this);
-        link.setText("🔗"); link.setTextSize(16);
-        pillRow.addView(link);
-        input = new EditText(this);
-        input.setHint("粘贴视频链接");
-        input.setBackground(null);
-        input.setSingleLine(true);
-        input.setTextSize(15);
-        input.setTextColor(dark ? 0xFFE8ECF4 : 0xFF1F2329);
-        input.setHintTextColor(dark ? 0xFF6B7684 : 0xFF9AA3AE);
-        input.setPadding(dp(10), 0, 0, 0);
-        pillRow.addView(input, new LinearLayout.LayoutParams(0, -2, 1f));
-        try {
-            android.content.ClipboardManager cm = (android.content.ClipboardManager) getSystemService(CLIPBOARD_SERVICE);
-            if (cm != null && cm.getPrimaryClip() != null && cm.getPrimaryClip().getItemAt(0) != null && cm.getPrimaryClip().getItemAt(0).getText() != null) {
-                String cu = cm.getPrimaryClip().getItemAt(0).getText().toString().trim();
-                java.util.regex.Matcher m = java.util.regex.Pattern.compile("https?://\\S+").matcher(cu);
-                if (m.find()) {
-                    String cu2 = m.group();
-                    cu2 = cu2.replaceAll("[\\u4e00-\\u9fff，。！？、：；【】（）\\u3000-\\u303f\\uff00-\\uffef]+$", "");
-                    input.setText(cu2);
-                }
-            }
-        } catch (Throwable ignored) {}
-        TextView go = new TextView(this);
-        go.setText("→"); go.setTextSize(20);
-        go.setTextColor(dark ? 0xFFB4C5FF : 0xFF315CDE);
-        go.setPadding(dp(12), 0, dp(6), 0);
-        go.setOnClickListener(new OnClickListener() { public void onClick(View v) { submit(); }});
-        pillRow.addView(go);
-        col.addView(pillRow, prlp);
-
         // chips
         HorizontalScrollView hs = new HorizontalScrollView(this);
         hs.setHorizontalScrollBarEnabled(false);
@@ -210,8 +165,8 @@ public class VideoDlActivity extends Activity {
         // 入口交互与资源嗅探一致: 进入即弹输入窗
         String autoUrl = getIntent() != null ? getIntent().getStringExtra("url") : null;
         if (autoUrl != null) autoUrl = autoUrl.trim();
-        if (autoUrl != null && autoUrl.length() > 0) { submit(autoUrl); } // 从首页弹窗带链接进来直接开下, 不再二次弹窗
-        else if (!getIntent().hasExtra("url")) showInputDialog(); // 普通入口才弹输入窗
+        if (autoUrl != null && autoUrl.length() > 0) { submit(autoUrl); } // 从首页弹窗带链接进来直接开下
+        // 不再自动弹输入窗(输入统一走首页弹窗)
         render();
     }
 
