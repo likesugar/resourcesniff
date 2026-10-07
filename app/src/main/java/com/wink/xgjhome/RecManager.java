@@ -495,8 +495,7 @@ public class RecManager {
     static void startBgRec(final String url) { startBgRec(url, null); }
 
     static void startBgRec(final String url, final String title) {
-        try {
-            final RecJob job = new RecJob();
+        final RecJob job = new RecJob();
             job.id = ++recSeq;
             job.notifId = 9000 + job.id;
             job.url = url;
