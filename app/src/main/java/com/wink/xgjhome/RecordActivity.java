@@ -76,10 +76,10 @@ public class RecordActivity extends Activity {
         head.addView(title);
         TextView recNow = new TextView(this);
         recNow.setText("📋 读取剪贴板录制");
-        recNow.setTextColor(Color.WHITE);
+        recNow.setTextColor(Theme.dark(this) ? 0xFF9FC2FF : Theme.accent());
         recNow.setTextSize(14);
         recNow.setPadding(20, 12, 20, 12);
-        recNow.setBackgroundColor(0xFF24485E);
+        recNow.setBackgroundColor(Theme.dark(this) ? 0xFF1A2C46 : 0xFFE1EAFB);
         recNow.setOnClickListener(new View.OnClickListener() {
             public void onClick(View v) {
                 String u = null;
@@ -143,7 +143,7 @@ public class RecordActivity extends Activity {
 
         tvEmpty = new TextView(this);
         tvEmpty.setText("没有数据(^▽^)");
-        tvEmpty.setTextColor(0xFF8A919E);
+        tvEmpty.setTextColor(Theme.sub(this));
         tvEmpty.setGravity(Gravity.CENTER);
         tvEmpty.setPadding(0, 120, 0, 0);
         col.addView(tvEmpty);
@@ -156,6 +156,22 @@ public class RecordActivity extends Activity {
         list.setLayoutTransition(lt);
         col.addView(list);
 
+        // 左右滑动切换分类
+        sv.setOnTouchListener(new View.OnTouchListener() {
+            float dX, dY;
+            public boolean onTouch(View v, android.view.MotionEvent e) {
+                if (e.getActionMasked() == android.view.MotionEvent.ACTION_DOWN) { dX = e.getX(); dY = e.getY(); return false; }
+                if (e.getActionMasked() == android.view.MotionEvent.ACTION_UP) {
+                    float dx = e.getX() - dX, dy = e.getY() - dY;
+                    if (Math.abs(dx) > dp2(70) && Math.abs(dx) > Math.abs(dy) * 2) {
+                        int n = tabBtns.length;
+                        if (dx < 0 && curTab < n - 1) { curTab++; restyleTabs(); rebuild(); return true; }
+                        if (dx > 0 && curTab > 0) { curTab--; restyleTabs(); rebuild(); return true; }
+                    }
+                }
+                return false;
+            }
+        });
         sv.addView(col);
         root.addView(sv);
         setContentView(root);
@@ -286,7 +302,7 @@ public class RecordActivity extends Activity {
         thumb.setBackgroundColor(Theme.dark(this) ? 0xFF161B26 : 0xFFE7EDF8);
         TextView play = new TextView(this);
         play.setText("⇣");
-        play.setTextColor(0xFF8A919E);
+        play.setTextColor(Theme.sub(this));
         play.setGravity(Gravity.CENTER);
         thumb.addView(play, new FrameLayout.LayoutParams(-1, -1));
         row.addView(thumb);
@@ -340,7 +356,7 @@ public class RecordActivity extends Activity {
         thumb.setBackgroundColor(Theme.dark(this) ? 0xFF161B26 : 0xFFE7EDF8);
         TextView play = new TextView(this);
         play.setText("▶");
-        play.setTextColor(0xFF8A919E);
+        play.setTextColor(Theme.sub(this));
         play.setGravity(Gravity.CENTER);
         thumb.addView(play, new FrameLayout.LayoutParams(-1, -1));
         row.addView(thumb);
@@ -481,7 +497,7 @@ public class RecordActivity extends Activity {
         thumb.setBackgroundColor(Theme.dark(this) ? 0xFF161B26 : 0xFFE7EDF8);
         TextView play = new TextView(this);
         play.setText("▶");
-        play.setTextColor(0xFF8A919E);
+        play.setTextColor(Theme.sub(this));
         play.setGravity(Gravity.CENTER);
         thumb.addView(play, new FrameLayout.LayoutParams(-1, -1));
         row.addView(thumb);
