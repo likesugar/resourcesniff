@@ -704,6 +704,9 @@ public class MedPlanActivity extends Activity {
             PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
         Notification n = new Notification.Builder(c, CH)
             .setSmallIcon(c.getApplicationInfo().icon)
+            .setCategory(Notification.CATEGORY_ALARM)
+            .setFullScreenIntent(fpi, true)
+            .setDefaults(Notification.DEFAULT_SOUND | Notification.DEFAULT_VIBRATE)
             .setContentTitle(title).setContentText(text)
             .setContentIntent(pi)
             .setAutoCancel(false)
@@ -816,14 +819,8 @@ public class MedPlanActivity extends Activity {
         Intent open = new Intent(c, MedPlanActivity.class)
             .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP);
         PendingIntent pi = PendingIntent.getActivity(c, 990002, open, PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
-        Intent fsI = new Intent(c, MedPlanActivity.class);
-        PendingIntent fpi = PendingIntent.getActivity(c, 990600 + medNotifId(c, planIdx, timeIdx), fsI,
-            PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
         Notification n = new Notification.Builder(c, CH)
             .setSmallIcon(c.getApplicationInfo().icon)
-            .setCategory(Notification.CATEGORY_ALARM)
-            .setFullScreenIntent(fpi, true)
-            .setDefaults(Notification.DEFAULT_SOUND | Notification.DEFAULT_VIBRATE)
             .setContentTitle(title).setContentText(text)
             .setContentIntent(pi)
             .setAutoCancel(true)
