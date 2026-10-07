@@ -126,6 +126,13 @@ public class SettingsActivity extends Activity {
                     .show();
             }
         });
+        findViewById(R.id.cardOled).setOnClickListener(new View.OnClickListener() {
+            public void onClick(View v) {
+                boolean o = getSharedPreferences("settings", MODE_PRIVATE).getBoolean("oled", true);
+                getSharedPreferences("settings", MODE_PRIVATE).edit().putBoolean("oled", !o).apply();
+                applyTheme();
+            }
+        });
         findViewById(R.id.cardNotify).setOnClickListener(new View.OnClickListener() {
             public void onClick(View v) {
                 try {
@@ -332,29 +339,32 @@ public class SettingsActivity extends Activity {
     }
 
     @Override
-    protected void onResume() { super.onResume(); refresh(); }
+    protected void onResume() { super.onResume(); dark = getSharedPreferences("settings", MODE_PRIVATE).getBoolean("dark", false); applyTheme(); refresh(); }
 
     private int color(int darkC, int lightC) { return dark ? darkC : lightC; }
 
     private void applyTheme() {
-        int bg = color(0xFF11151D, 0xFFEEF4FF);
-        int card = color(0xFF191F2E, 0xFFFFFFFF);
+        boolean oled = getSharedPreferences("settings", MODE_PRIVATE).getBoolean("oled", true);
+        int bg = color(oled ? 0xFF000000 : 0xFF11151D, 0xFFEEF4FF);
+        int card = color(oled ? 0xFF000000 : 0xFF191F2E, 0xFFFFFFFF);
         int title = color(0xFFE8ECF4, 0xFF1F2329);
         int sub = color(0xFF8A94A6, 0xFF8A94A6);
         int accent = color(0xFFB4C5FF, 0xFF315CDE);
         int div = color(0xFF2A3142, 0xFFEDEFF3);
         findViewById(R.id.settingsRoot).setBackgroundColor(bg);
-        int[] titles = {R.id.tvTitle, R.id.t1, R.id.t2, R.id.t3, R.id.t4, R.id.t5, R.id.t6, R.id.tvAboutTitle2};
+        int[] titles = {R.id.tvTitle, R.id.t1, R.id.t2, R.id.t3, R.id.t4, R.id.t5, R.id.t6, R.id.tOled, R.id.tvAboutTitle2};
         for (int id : titles) ((TextView) findViewById(id)).setTextColor(title);
-        int[] subs = {R.id.label1, R.id.label2, R.id.biliState, R.id.dyState, R.id.ytState,
+        int[] subs = {R.id.label1, R.id.label2, R.id.biliState, R.id.dyState, R.id.ytState, R.id.descOled,
                 R.id.desc1, R.id.desc2, R.id.desc3, R.id.desc4, R.id.desc5, R.id.desc6, R.id.tvAboutText2};
         for (int id : subs) ((TextView) findViewById(id)).setTextColor(sub);
         int[] accents = {R.id.biliAction, R.id.dyAction, R.id.ytAction, R.id.btnClearAll, R.id.arrow, R.id.btnBack, R.id.custAction};
         for (int id : accents) ((TextView) findViewById(id)).setTextColor(accent);
-        int[] cards = {R.id.card1, R.id.card2, R.id.card3, R.id.cardNotify, R.id.cardAbout2};
-        for (int id : cards) findViewById(id).setBackgroundResource(dark ? R.drawable.bg_card_md3_dark : R.drawable.bg_card_md3);
+        int[] cards = {R.id.card1, R.id.card2, R.id.card3, R.id.cardOled, R.id.cardNotify, R.id.cardAbout2};
+        for (int id : cards) findViewById(id).setBackgroundResource(dark ? (oled ? R.drawable.bg_card_oled : R.drawable.bg_card_md3_dark) : R.drawable.bg_card_md3);
         int[] divs = {R.id.div1, R.id.div2, R.id.div3};
         for (int id : divs) findViewById(id).setBackgroundColor(div);
+        TextView tvO = (TextView) findViewById(R.id.tvOled);
+        if (tvO != null) tvO.setText(oled ? "开" : "关");
         if (Build.VERSION.SDK_INT >= 23) {
             getWindow().getDecorView().setSystemUiVisibility(
                     dark ? 0 : View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR | View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR);

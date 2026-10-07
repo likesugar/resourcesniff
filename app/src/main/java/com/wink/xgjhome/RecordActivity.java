@@ -32,9 +32,10 @@ public class RecordActivity extends Activity {
     private void restyleTabs() {
         for (int i = 0; i < tabBtns.length; i++) {
             boolean sel = i == curTab;
-            tabBtns[i].setTextColor(sel ? Color.WHITE : 0xFF8A919E);
+            tabBtns[i].setTextColor(sel ? Color.WHITE : Theme.sub(this));
             tabBtns[i].setTypeface(sel ? Typeface.DEFAULT_BOLD : Typeface.DEFAULT);
-            tabLines[i].setBackgroundColor(sel ? 0xFF3D7BFF : 0x00000000);
+            tabBtns[i].setBackgroundResource(sel ? R.drawable.bg_seg_sel : 0);
+            tabLines[i].setBackgroundColor(0x00000000);
         }
     }
 
@@ -52,7 +53,7 @@ public class RecordActivity extends Activity {
         try { getWindow().getDecorView().setSystemUiVisibility(View.SYSTEM_UI_FLAG_HIDE_NAVIGATION); } catch (Throwable ignored) {}
         hist = HistoryStore.load(this);
         FrameLayout root = new FrameLayout(this);
-        root.setBackgroundColor(Color.BLACK);
+        root.setBackgroundColor(Theme.bg(this));
 
         ScrollView sv = new ScrollView(this);
         sv.setFillViewport(true);
@@ -68,7 +69,7 @@ public class RecordActivity extends Activity {
         title.setText("下载");
         title.setTextSize(22);
         title.setTypeface(Typeface.DEFAULT_BOLD);
-        title.setTextColor(Color.WHITE);
+        title.setTextColor(Theme.text(this));
         LinearLayout.LayoutParams hlp = new LinearLayout.LayoutParams(0, -2);
         hlp.weight = 1;
         title.setLayoutParams(hlp);
@@ -101,10 +102,11 @@ public class RecordActivity extends Activity {
         head.addView(recNow);
         col.addView(head);
 
-        // 扁平化顶部导航栏：全部/视频/录制/下载
+        // MD3 胶囊顶栏：全部/视频/录制/下载
         LinearLayout tabBar = new LinearLayout(this);
         tabBar.setOrientation(LinearLayout.HORIZONTAL);
-        tabBar.setPadding(0, 0, 0, 16);
+        tabBar.setBackgroundResource(Theme.segBarRes(this));
+        tabBar.setPadding(dp2(4), dp2(4), dp2(4), dp2(4));
         final String[] tabs = {"全部", "视频", "录制", "下载"};
         tabBtns = new TextView[tabs.length];
         tabLines = new View[tabs.length];
@@ -115,18 +117,23 @@ public class RecordActivity extends Activity {
             tc.setGravity(Gravity.CENTER_HORIZONTAL);
             LinearLayout.LayoutParams tlp = new LinearLayout.LayoutParams(0, -2, 1f);
             tc.setLayoutParams(tlp);
+            tc.setPadding(dp2(2), 0, dp2(2), 0);
             TextView tb = new TextView(this);
             tb.setText(tabs[i]);
-            tb.setTextSize(15);
+            tb.setTextSize(14);
             tb.setGravity(Gravity.CENTER);
-            tb.setPadding(0, 16, 0, 12);
+            tb.setTypeface(Typeface.DEFAULT_BOLD);
+            tb.setBackgroundResource(R.drawable.bg_seg_sel);
+            tb.setPadding(0, dp2(10), 0, dp2(10));
             tb.setOnClickListener(new View.OnClickListener() {
                 public void onClick(View v) { curTab = idx; restyleTabs(); rebuild(); }
             });
             View line = new View(this);
             line.setBackgroundColor(0x00000000);
-            tc.addView(tb, new LinearLayout.LayoutParams(-1, -2));
-            tc.addView(line, new LinearLayout.LayoutParams(-1, 4));
+            LinearLayout.LayoutParams blp = new LinearLayout.LayoutParams(-1, -2);
+            blp.setMargins(dp2(2), 0, dp2(2), 0);
+            tc.addView(tb, blp);
+            tc.addView(line, new LinearLayout.LayoutParams(-1, 1));
             tabBtns[i] = tb;
             tabLines[i] = line;
             tabBar.addView(tc);
@@ -266,12 +273,17 @@ public class RecordActivity extends Activity {
         LinearLayout row = new LinearLayout(this);
         row.setOrientation(LinearLayout.HORIZONTAL);
         row.setGravity(Gravity.CENTER_VERTICAL);
-        row.setPadding(0, 24, 0, 24);
+        row.setBackgroundResource(Theme.rowRes(this));
+        row.setPadding(dp2(12), dp2(14), dp2(12), dp2(14));
+        LinearLayout.LayoutParams rowLp0 = (LinearLayout.LayoutParams) row.getLayoutParams();
+        LinearLayout.LayoutParams rowLp = new LinearLayout.LayoutParams(-1, -2);
+        rowLp.setMargins(dp2(4), dp2(6), dp2(4), dp2(6));
+        row.setLayoutParams(rowLp);
         FrameLayout thumb = new FrameLayout(this);
         LinearLayout.LayoutParams tp = new LinearLayout.LayoutParams(140, 90);
         tp.rightMargin = 24;
         thumb.setLayoutParams(tp);
-        thumb.setBackgroundColor(0xFF1E242E);
+        thumb.setBackgroundColor(Theme.dark(this) ? 0xFF161B26 : 0xFFE7EDF8);
         TextView play = new TextView(this);
         play.setText("⇣");
         play.setTextColor(0xFF8A919E);
@@ -285,21 +297,21 @@ public class RecordActivity extends Activity {
         mid.setLayoutParams(mp);
         TextView tvName = new TextView(this);
         tvName.setText(j.title);
-        tvName.setTextColor(Color.WHITE);
+        tvName.setTextColor(Theme.text(this));
         tvName.setTextSize(16);
         tvName.setTypeface(Typeface.DEFAULT_BOLD);
         tvName.setSingleLine(true);
         mid.addView(tvName);
         TextView tvInfo = new TextView(this);
         tvInfo.setText(dlInfo(j));
-        tvInfo.setTextColor(0xFF8A919E);
+        tvInfo.setTextColor(Theme.sub(this));
         tvInfo.setTextSize(13);
         tvInfo.setLineSpacing(4, 1);
         mid.addView(tvInfo);
         row.addView(mid);
         TextView more = new TextView(this);
         more.setText("⋮");
-        more.setTextColor(Color.WHITE);
+        more.setTextColor(Theme.sub(this));
         more.setTextSize(22);
         more.setGravity(Gravity.CENTER);
         more.setPadding(24, 24, 24, 24);
@@ -315,12 +327,17 @@ public class RecordActivity extends Activity {
         LinearLayout row = new LinearLayout(this);
         row.setOrientation(LinearLayout.HORIZONTAL);
         row.setGravity(Gravity.CENTER_VERTICAL);
-        row.setPadding(0, 24, 0, 24);
+        row.setBackgroundResource(Theme.rowRes(this));
+        row.setPadding(dp2(12), dp2(14), dp2(12), dp2(14));
+        LinearLayout.LayoutParams rowLp0 = (LinearLayout.LayoutParams) row.getLayoutParams();
+        LinearLayout.LayoutParams rowLp = new LinearLayout.LayoutParams(-1, -2);
+        rowLp.setMargins(dp2(4), dp2(6), dp2(4), dp2(6));
+        row.setLayoutParams(rowLp);
         FrameLayout thumb = new FrameLayout(this);
         LinearLayout.LayoutParams tp = new LinearLayout.LayoutParams(140, 90);
         tp.rightMargin = 24;
         thumb.setLayoutParams(tp);
-        thumb.setBackgroundColor(0xFF1E242E);
+        thumb.setBackgroundColor(Theme.dark(this) ? 0xFF161B26 : 0xFFE7EDF8);
         TextView play = new TextView(this);
         play.setText("▶");
         play.setTextColor(0xFF8A919E);
@@ -334,21 +351,21 @@ public class RecordActivity extends Activity {
         mid.setLayoutParams(mp);
         TextView tvName = new TextView(this);
         tvName.setText(it.title);
-        tvName.setTextColor(Color.WHITE);
+        tvName.setTextColor(Theme.text(this));
         tvName.setTextSize(16);
         tvName.setTypeface(Typeface.DEFAULT_BOLD);
         tvName.setSingleLine(true);
         mid.addView(tvName);
         TextView tvInfo = new TextView(this);
         tvInfo.setText("类型: " + it.type + "\n状态: 已完成");
-        tvInfo.setTextColor(0xFF8A919E);
+        tvInfo.setTextColor(Theme.sub(this));
         tvInfo.setTextSize(13);
         tvInfo.setLineSpacing(4, 1);
         mid.addView(tvInfo);
         row.addView(mid);
         TextView more = new TextView(this);
         more.setText("⋮");
-        more.setTextColor(Color.WHITE);
+        more.setTextColor(Theme.sub(this));
         more.setTextSize(22);
         more.setGravity(Gravity.CENTER);
         more.setPadding(24, 24, 24, 24);
@@ -449,14 +466,19 @@ public class RecordActivity extends Activity {
         LinearLayout row = new LinearLayout(this);
         row.setOrientation(LinearLayout.HORIZONTAL);
         row.setGravity(Gravity.CENTER_VERTICAL);
-        row.setPadding(0, 24, 0, 24);
+        row.setBackgroundResource(Theme.rowRes(this));
+        row.setPadding(dp2(12), dp2(14), dp2(12), dp2(14));
+        LinearLayout.LayoutParams rowLp0 = (LinearLayout.LayoutParams) row.getLayoutParams();
+        LinearLayout.LayoutParams rowLp = new LinearLayout.LayoutParams(-1, -2);
+        rowLp.setMargins(dp2(4), dp2(6), dp2(4), dp2(6));
+        row.setLayoutParams(rowLp);
 
         // 左侧占位缩略块（▶）
         FrameLayout thumb = new FrameLayout(this);
         LinearLayout.LayoutParams tp = new LinearLayout.LayoutParams(140, 90);
         tp.rightMargin = 24;
         thumb.setLayoutParams(tp);
-        thumb.setBackgroundColor(0xFF1E242E);
+        thumb.setBackgroundColor(Theme.dark(this) ? 0xFF161B26 : 0xFFE7EDF8);
         TextView play = new TextView(this);
         play.setText("▶");
         play.setTextColor(0xFF8A919E);
@@ -473,7 +495,7 @@ public class RecordActivity extends Activity {
 
         TextView tvName = new TextView(this);
         tvName.setText(qualify(j));
-        tvName.setTextColor(Color.WHITE);
+        tvName.setTextColor(Theme.text(this));
         tvName.setTextSize(16);
         tvName.setTypeface(Typeface.DEFAULT_BOLD);
         tvName.setSingleLine(true);
@@ -482,7 +504,7 @@ public class RecordActivity extends Activity {
         TextView tvInfo = new TextView(this);
         tvInfo.setText(buildInfo(j, live));
         if (infoRef != null) infoRef.set(tvInfo);
-        tvInfo.setTextColor(0xFF8A919E);
+        tvInfo.setTextColor(Theme.sub(this));
         tvInfo.setTextSize(13);
         tvInfo.setLineSpacing(4, 1);
         mid.addView(tvInfo);
@@ -491,7 +513,7 @@ public class RecordActivity extends Activity {
         // 右侧 ⋮ 菜单
         TextView more = new TextView(this);
         more.setText("⋮");
-        more.setTextColor(Color.WHITE);
+        more.setTextColor(Theme.sub(this));
         more.setTextSize(22);
         more.setGravity(Gravity.CENTER);
         more.setPadding(24, 24, 24, 24);

@@ -121,7 +121,10 @@ public class HomeActivity extends Activity {
                     ((TextView) c).setTextColor(dark ? 0xFF9AA3AE : 0xFF8A94A6);
                 }
             }
-            if (t.equals("card")) c.setBackgroundResource(dark ? R.drawable.bg_card_md3_dark : R.drawable.bg_card_md3);
+            if (t.equals("card")) {
+                boolean oled = getSharedPreferences("settings", MODE_PRIVATE).getBoolean("oled", true);
+                c.setBackgroundResource(dark ? (oled ? R.drawable.bg_card_oled : R.drawable.bg_card_md3_dark) : R.drawable.bg_card_md3);
+            }
             if (c instanceof android.view.ViewGroup) applyTraversal((android.view.ViewGroup) c, dark);
         }
     }
