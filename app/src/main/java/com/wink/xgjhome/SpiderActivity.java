@@ -197,9 +197,15 @@ public class SpiderActivity extends Activity {
                 sb.append("== album page /t/?id=").append(id)
                   .append(" len=").append(page == null ? -1 : page.length()).append("\n");
                 if (page != null) {
-                    // 全文输出(截10000)
-                    sb.append("---- full ----\n").append(page, 0, Math.min(page.length(), 10000));
-                    // 顺带试封面带Referer/Cookie
+                    // 抽页面里所有 gl25/图片域字符串
+                    java.util.regex.Matcher gm = Pattern.compile("[A-Za-z0-9:/._\\-]*(?:gl25|img|tjg)[A-Za-z0-9:/._\\-]*").matcher(page);
+                    java.util.LinkedHashSet<String> gs = new java.util.LinkedHashSet<>();
+                    while (gm.find() && gs.size() < 25) gs.add(gm.group());
+                    sb.append("---- domains ----\n");
+                    for (String g : gs) sb.append(g).append("\n");
+                    // 尾部原文(正文图片区在后面)
+                    int from = Math.max(0, page.length() - 5000);
+                    sb.append("---- tail ----\n").append(page.substring(from));
                 }
             } catch (Throwable e) { sb.append("page err: ").append(e).append("\n"); }
             // 探测封面: 裸/带Referer/带Cookie+Referer
