@@ -170,6 +170,7 @@ public class RecordActivity extends Activity {
 
         sv.addView(col);
         root.addView(sv);
+        placeSegBar(); // 必须在 sv 之后加入, 保证胶囊栏浮在滚动层之上可点击
         setContentView(root);
         Immersive.hide(this);
 
