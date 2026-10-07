@@ -739,7 +739,7 @@ public class MedPlanActivity extends Activity {
         } catch (Throwable ignored) {}
     }
 
-    /** 守护窗口: 任意服药时间点的前1小时~后1小时之间才需要守护通知 */
+    /** 守护窗口: 提醒前1小时起, 直到该时间点确认后才停止(未确认一直需要守护) */
     static boolean inWatchWindow(Context c) {
         try {
             JSONArray plans = load(c);
@@ -755,7 +755,10 @@ public class MedPlanActivity extends Activity {
                     try { hh = Integer.parseInt(tt.split(":")[0]); mm = Integer.parseInt(tt.split(":")[1]); }
                     catch (Throwable e) { continue; }
                     int m = hh * 60 + mm;
-                    if (nowM >= m - 60 && nowM <= m + 60) return true;
+                    int mStart = m - 60; // 前一天深夜的窗口可能跨零点
+                    boolean due = nowM >= mStart;
+                    if (nowM < 180 && m >= 1260) due = true; // 零点附近: 前晚22点后的窗口跨天
+                    if (due && !medDone(c, i, t)) return true;
                 }
             }
             return false;
