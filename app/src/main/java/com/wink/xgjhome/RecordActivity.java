@@ -24,10 +24,25 @@ public class RecordActivity extends Activity {
     private Runnable tick;
     private LinearLayout list;
     private TextView tvEmpty;
+    private LinearLayout tabBar;
+    private LinearLayout col;
     private TextView[] tabBtns;
     private View[] tabLines;
     private int curTab = 0;  // 0全部 1视频 2录制 3下载
     private java.util.ArrayList<HistoryStore.Item> hist;
+
+    private void placeSegBar() {
+        boolean bottom = getSharedPreferences("settings", MODE_PRIVATE).getBoolean("seg_bottom", false);
+        LinearLayout seg = tabBar;
+        if (seg.getParent() == col) col.removeView(seg);
+        if (bottom) {
+            LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(-1, -2);
+            lp.topMargin = dp2(8);
+            col.addView(seg, lp); // 末尾=列表下方
+        } else {
+            col.addView(seg, 1, new LinearLayout.LayoutParams(-1, -2)); // head之后
+        }
+    }
 
     private void restyleTabs() {
         for (int i = 0; i < tabBtns.length; i++) {
@@ -57,7 +72,7 @@ public class RecordActivity extends Activity {
 
         ScrollView sv = new ScrollView(this);
         sv.setFillViewport(true);
-        LinearLayout col = new LinearLayout(this);
+        col = new LinearLayout(this);
         col.setOrientation(LinearLayout.VERTICAL);
         col.setPadding(24, 40, 24, 24);
 
@@ -99,11 +114,30 @@ public class RecordActivity extends Activity {
                 Toast.makeText(RecordActivity.this, "已开始录制", Toast.LENGTH_SHORT).show();
             }
         });
+        // [↨] 胶囊顶栏 顶部/底部 切换
+        final TextView segBtn = new TextView(this);
+        segBtn.setText("[↨]");
+        segBtn.setTextColor(Theme.dark(this) ? 0xFF9FC2FF : Theme.accent());
+        segBtn.setTextSize(14);
+        segBtn.setTypeface(Typeface.DEFAULT_BOLD);
+        segBtn.setPadding(dp2(16), dp2(12), dp2(16), dp2(12));
+        segBtn.setBackgroundResource(R.drawable.bg_seg_bar);
+        LinearLayout.LayoutParams slp = new LinearLayout.LayoutParams(-2, -2);
+        slp.rightMargin = dp2(10);
+        segBtn.setLayoutParams(slp);
+        segBtn.setOnClickListener(new View.OnClickListener() {
+            public void onClick(View v) {
+                boolean bottom = getSharedPreferences("settings", MODE_PRIVATE).getBoolean("seg_bottom", false);
+                getSharedPreferences("settings", MODE_PRIVATE).edit().putBoolean("seg_bottom", !bottom).apply();
+                placeSegBar();
+            }
+        });
+        head.addView(segBtn);
         head.addView(recNow);
         col.addView(head);
 
         // MD3 胶囊顶栏：全部/视频/录制/下载
-        LinearLayout tabBar = new LinearLayout(this);
+        tabBar = new LinearLayout(this);
         tabBar.setOrientation(LinearLayout.HORIZONTAL);
         tabBar.setBackgroundResource(Theme.segBarRes(this));
         tabBar.setPadding(dp2(4), dp2(4), dp2(4), dp2(4));
@@ -139,7 +173,7 @@ public class RecordActivity extends Activity {
             tabBar.addView(tc);
         }
         restyleTabs();
-        col.addView(tabBar);
+        placeSegBar();
 
         tvEmpty = new TextView(this);
         tvEmpty.setText("没有数据(^▽^)");
@@ -156,22 +190,6 @@ public class RecordActivity extends Activity {
         list.setLayoutTransition(lt);
         col.addView(list);
 
-        // 左右滑动切换分类
-        sv.setOnTouchListener(new View.OnTouchListener() {
-            float dX, dY;
-            public boolean onTouch(View v, android.view.MotionEvent e) {
-                if (e.getActionMasked() == android.view.MotionEvent.ACTION_DOWN) { dX = e.getX(); dY = e.getY(); return false; }
-                if (e.getActionMasked() == android.view.MotionEvent.ACTION_UP) {
-                    float dx = e.getX() - dX, dy = e.getY() - dY;
-                    if (Math.abs(dx) > dp2(70) && Math.abs(dx) > Math.abs(dy) * 2) {
-                        int n = tabBtns.length;
-                        if (dx < 0 && curTab < n - 1) { curTab++; restyleTabs(); rebuild(); return true; }
-                        if (dx > 0 && curTab > 0) { curTab--; restyleTabs(); rebuild(); return true; }
-                    }
-                }
-                return false;
-            }
-        });
         sv.addView(col);
         root.addView(sv);
         setContentView(root);

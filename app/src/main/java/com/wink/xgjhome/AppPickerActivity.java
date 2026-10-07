@@ -37,7 +37,7 @@ public class AppPickerActivity extends Activity {
         pm = getPackageManager();
         LinearLayout root = new LinearLayout(this);
         root.setOrientation(LinearLayout.VERTICAL);
-        root.setBackgroundColor(0xFF0B0D10);
+        root.setBackgroundColor(Theme.c(AppPickerActivity.this, 0xFF000000, 0xFFEEF4FF));
 
         // 顶栏：标题+数量 | 系统应用开关
         LinearLayout top = new LinearLayout(this);
@@ -48,12 +48,12 @@ public class AppPickerActivity extends Activity {
         tcol.setOrientation(LinearLayout.VERTICAL);
         TextView title = new TextView(this);
         title.setText("应用选择");
-        title.setTextColor(0xFFE8ECF2);
+        title.setTextColor(Theme.c(AppPickerActivity.this, 0xFFF2F4F8, 0xFF1F2329));
         title.setTextSize(18);
         title.getPaint().setFakeBoldText(true);
         tcol.addView(title);
         tvCount = new TextView(this);
-        tvCount.setTextColor(0xFF8A919E);
+        tvCount.setTextColor(Theme.c(AppPickerActivity.this, 0xFF8A919E, 0xFF6B7280));
         tvCount.setTextSize(13);
         tcol.addView(tvCount);
         top.addView(tcol, new LinearLayout.LayoutParams(0, -2, 1f));
@@ -75,8 +75,8 @@ public class AppPickerActivity extends Activity {
         EditText etSearch = new EditText(this);
         etSearch.setHint("搜索应用/包名");
         etSearch.setBackground(null);
-        etSearch.setTextColor(0xFFE8ECF2);
-        etSearch.setHintTextColor(0xFF5C6470);
+        etSearch.setTextColor(Theme.c(AppPickerActivity.this, 0xFFF2F4F8, 0xFF1F2329));
+        etSearch.setHintTextColor(Theme.c(AppPickerActivity.this, 0xFF5C6470, 0xFF9AA5B4));
         etSearch.setTextSize(14);
         etSearch.setSingleLine(true);
         row2.addView(etSearch, new LinearLayout.LayoutParams(0, -2, 1f));
@@ -85,11 +85,11 @@ public class AppPickerActivity extends Activity {
         tg2.setTextSize(12);
         tg2.setTextColor(0xFF3D7BFF);
         tg2.setPadding(dp(10), dp(6), dp(10), dp(6));
-        tg2.setBackgroundColor(0xFF1B222B);
+        tg2.setBackgroundColor(Theme.c(AppPickerActivity.this, 0xFF1B222B, 0xFFE7EDF8));
         tg2.setOnClickListener(new View.OnClickListener() { public void onClick(View v) {
             hideNoActs = !hideNoActs;
             tg2.setText(hideNoActs ? "无活动:隐" : "无活动:显");
-            tg2.setTextColor(hideNoActs ? 0xFF3D7BFF : 0xFF8A919E);
+            tg2.setTextColor(hideNoActs ? 0xFF3D7BFF : Theme.c(AppPickerActivity.this, 0xFF8A919E, 0xFF6B7280));
             if (!hideNoActs && !actsScanned) {
                 tg2.setText("扫描中…");
                 new Thread(new Runnable() { public void run() {
@@ -114,16 +114,16 @@ public class AppPickerActivity extends Activity {
         final TextView tg3 = new TextView(this);
         tg3.setText("仅可直启:关");
         tg3.setTextSize(12);
-        tg3.setTextColor(0xFF8A919E);
+        tg3.setTextColor(Theme.c(AppPickerActivity.this, 0xFF8A919E, 0xFF6B7280));
         tg3.setPadding(dp(10), dp(6), dp(10), dp(6));
-        tg3.setBackgroundColor(0xFF1B222B);
+        tg3.setBackgroundColor(Theme.c(AppPickerActivity.this, 0xFF1B222B, 0xFFE7EDF8));
         LinearLayout.LayoutParams t3p = new LinearLayout.LayoutParams(-2, -2);
         t3p.leftMargin = dp(8);
         tg3.setLayoutParams(t3p);
         tg3.setOnClickListener(new View.OnClickListener() { public void onClick(View v) {
             onlyExported = !onlyExported;
             tg3.setText(onlyExported ? "仅可直启:开" : "仅可直启:关");
-            tg3.setTextColor(onlyExported ? 0xFF3D7BFF : 0xFF8A919E);
+            tg3.setTextColor(onlyExported ? 0xFF3D7BFF : Theme.c(AppPickerActivity.this, 0xFF8A919E, 0xFF6B7280));
             applyFilter();
         }});
         row2.addView(tg3);
@@ -176,7 +176,7 @@ public class AppPickerActivity extends Activity {
         if (!loaded) {
             TextView loading = new TextView(this);
             loading.setText("加载中…");
-            loading.setTextColor(0xFF8A919E);
+            loading.setTextColor(Theme.c(AppPickerActivity.this, 0xFF8A919E, 0xFF6B7280));
             loading.setTextSize(14);
             loading.setGravity(Gravity.CENTER);
             loading.setPadding(0, dp(40), 0, 0);
@@ -199,8 +199,8 @@ public class AppPickerActivity extends Activity {
         }
         tvCount.setText("共" + shown.size() + "个（系统应用" + (showSystem ? "已显示" : "已隐藏") + "）");
         tvToggle.setText(showSystem ? "隐藏系统应用" : "显示系统应用");
-        tvToggle.setTextColor(showSystem ? 0xFF3D7BFF : 0xFF8A919E);
-        tvToggle.setBackgroundColor(0xFF1B222B);
+        tvToggle.setTextColor(showSystem ? 0xFF3D7BFF : Theme.c(AppPickerActivity.this, 0xFF8A919E, 0xFF6B7280));
+        tvToggle.setBackgroundColor(Theme.c(AppPickerActivity.this, 0xFF1B222B, 0xFFE7EDF8));
         renderList();
     }
 
@@ -254,13 +254,13 @@ public class AppPickerActivity extends Activity {
             mid.setLayoutParams(mlp);
             TextView nm = new TextView(this);
             nm.setText(labelOf(pi));
-            nm.setTextColor(0xFFE8ECF2);
+            nm.setTextColor(Theme.c(AppPickerActivity.this, 0xFFF2F4F8, 0xFF1F2329));
             nm.setTextSize(15);
             nm.getPaint().setFakeBoldText(true);
             mid.addView(nm);
             TextView pkg = new TextView(this);
             pkg.setText(pi.packageName);
-            pkg.setTextColor(0xFF8A919E);
+            pkg.setTextColor(Theme.c(AppPickerActivity.this, 0xFF8A919E, 0xFF6B7280));
             pkg.setTextSize(12);
             mid.addView(pkg);
             row.addView(mid);

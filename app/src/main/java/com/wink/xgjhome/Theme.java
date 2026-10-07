@@ -12,6 +12,7 @@ public class Theme {
     public static int border(Context c){ return dark(c) ? (oled(c) ? 0xFF222222 : 0xFF232A3A) : 0xFFE3E9F5; }
     public static int text(Context c)  { return dark(c) ? 0xFFF2F4F8 : 0xFF1F2329; }
     public static int sub(Context c)   { return dark(c) ? 0xFF8A919E : 0xFF6B7280; }
+    public static int c(Context c, int darkC, int lightC) { return dark(c) ? darkC : lightC; }
     public static int accent()         { return 0xFF3D7BFF; }
 
     /** 行卡片背景资源 */

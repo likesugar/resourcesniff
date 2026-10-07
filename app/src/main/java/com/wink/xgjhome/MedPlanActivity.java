@@ -52,7 +52,7 @@ public class MedPlanActivity extends Activity {
         super.onCreate(b);
         plans = load(this);
         FrameLayout root = new FrameLayout(this);
-        root.setBackgroundColor(0xFFEAF2FF);
+        root.setBackgroundColor(Theme.c(this, 0xFF000000, 0xFFEAF2FF));
         root.setId(17901);
 
         listScroll = new ScrollView(this);
@@ -81,7 +81,7 @@ public class MedPlanActivity extends Activity {
         root.addView(add, alp);
 
         formHost = new FrameLayout(this);
-        formHost.setBackgroundColor(0xFFEAF2FF);
+        formHost.setBackgroundColor(Theme.c(this, 0xFF000000, 0xFFEAF2FF));
         formHost.setVisibility(View.GONE);
         root.addView(formHost, new FrameLayout.LayoutParams(-1, -1));
 
@@ -104,12 +104,12 @@ public class MedPlanActivity extends Activity {
         try {
             android.content.SharedPreferences pf = getSharedPreferences("medplan", 0);
             TextView st = mkText("守护 " + pf.getString("watch_last", "-") + " · 闹钟 " + pf.getString("alarm_last", "-")
-                + " · 待提醒 " + dueCount(), 11, false, 0xFF8A94A6);
+                + " · 待提醒 " + dueCount(), 11, false, Theme.c(this, 0xFF8A919E, 0xFF6B7280));
             st.setPadding(dp(4), dp(6), 0, dp(8));
             listHost.addView(st);
         } catch (Throwable ignored) {}
         if (plans.length() == 0) {
-            TextView e = mkText("还没有用药计划\n点下方「＋ 新增用药计划」创建", 14, false, 0xFF8A94A6);
+            TextView e = mkText("还没有用药计划\n点下方「＋ 新增用药计划」创建", 14, false, Theme.c(this, 0xFF8A919E, 0xFF6B7280));
             e.setGravity(Gravity.CENTER);
             e.setPadding(0, dp(120), 0, 0);
             listHost.addView(e);
@@ -129,7 +129,7 @@ public class MedPlanActivity extends Activity {
             }
             LinearLayout cell = new LinearLayout(this);
             cell.setOrientation(LinearLayout.VERTICAL);
-            cell.setBackgroundResource(R.drawable.bg_card_white);
+            cell.setBackgroundResource(Theme.dark(this) ? R.drawable.bg_card_oled : R.drawable.bg_card_white);
             cell.setPadding(dp(16), dp(16), dp(16), dp(16));
             LinearLayout.LayoutParams clp = new LinearLayout.LayoutParams(0, -2, 1f);
             if (i % 2 == 1) clp.leftMargin = dp(14);
@@ -137,7 +137,7 @@ public class MedPlanActivity extends Activity {
             TextView name = mkText(o.optString("name", ""), 15, true, 0xFF1F2329);
             name.setPadding(0, dp(8), 0, 0);
             cell.addView(name);
-            TextView dose = mkText(o.optString("dose", "1") + o.optString("unit", "片") + " · " + o.optString("relation", ""), 12, false, 0xFF8A94A6);
+            TextView dose = mkText(o.optString("dose", "1") + o.optString("unit", "片") + " · " + o.optString("relation", ""), 12, false, Theme.c(this, 0xFF8A919E, 0xFF6B7280));
             dose.setPadding(0, dp(4), 0, 0);
             cell.addView(dose);
             // 首个时间胶囊
@@ -214,7 +214,7 @@ public class MedPlanActivity extends Activity {
         formHost.addView(fs, new FrameLayout.LayoutParams(-1, -1));
         LinearLayout bottomBar = new LinearLayout(this);
         bottomBar.setOrientation(LinearLayout.HORIZONTAL);
-        bottomBar.setBackgroundResource(R.drawable.bg_card_white);
+        bottomBar.setBackgroundResource(Theme.dark(this) ? R.drawable.bg_card_oled : R.drawable.bg_card_white);
         bottomBar.setPadding(dp(16), dp(12), dp(16), dp(12));
         formHost.addView(bottomBar, new FrameLayout.LayoutParams(-1, -2, Gravity.BOTTOM));
 
@@ -238,7 +238,7 @@ public class MedPlanActivity extends Activity {
         final String[] unit = {idx >= 0 ? plans.optJSONObject(idx).optString("unit", "片") : "片"};
         final LinearLayout unitBox = new LinearLayout(this);
         for (final String u : new String[]{"片", "粒"}) {
-            TextView c = mkText(u, 14, u.equals(unit[0]), u.equals(unit[0]) ? 0xFF315CDE : 0xFF8A94A6);
+            TextView c = mkText(u, 14, u.equals(unit[0]), u.equals(unit[0]) ? 0xFF315CDE : Theme.c(this, 0xFF8A919E, 0xFF6B7280));
             c.setBackgroundResource(u.equals(unit[0]) ? R.drawable.bg_chip_blue : R.drawable.bg_chip_gray);
             c.setPadding(dp(18), dp(8), dp(18), dp(8));
             LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(-2, -2);
@@ -313,7 +313,7 @@ public class MedPlanActivity extends Activity {
         startCell.setOrientation(LinearLayout.VERTICAL);
         startCell.setBackgroundResource(R.drawable.bg_input);
         startCell.setPadding(dp(14), dp(10), dp(14), dp(10));
-        TextView sLabel = mkText("开始", 11, false, 0xFF8A94A6);
+        TextView sLabel = mkText("开始", 11, false, Theme.c(this, 0xFF8A919E, 0xFF6B7280));
         final TextView startV = mkText(fmt(formStart), 14, true, 0xFF1F2329);
         startCell.addView(sLabel); startCell.addView(startV);
         startCell.setOnClickListener(v -> pickDate(formStart, t -> { formStart = t; startV.setText(fmt(t)); }));
@@ -321,8 +321,8 @@ public class MedPlanActivity extends Activity {
         endCell.setOrientation(LinearLayout.VERTICAL);
         endCell.setBackgroundResource(R.drawable.bg_input);
         endCell.setPadding(dp(14), dp(10), dp(14), dp(10));
-        TextView eLabel = mkText("结束", 11, false, 0xFF8A94A6);
-        final TextView endV = mkText(formEnd > 0 ? fmt(formEnd) : "未设置", 14, true, formEnd > 0 ? 0xFF1F2329 : 0xFFB7BFCC);
+        TextView eLabel = mkText("结束", 11, false, Theme.c(this, 0xFF8A919E, 0xFF6B7280));
+        final TextView endV = mkText(formEnd > 0 ? fmt(formEnd) : "未设置", 14, true, formEnd > 0 ? 0xFF1F2329 : Theme.c(this, 0xFFB7BFCC, 0xFFB7BFCC));
         endCell.addView(eLabel); endCell.addView(endV);
         endCell.setOnClickListener(v -> pickDate(formEnd > 0 ? formEnd : System.currentTimeMillis(), t -> { formEnd = t; endV.setText(fmt(t)); endV.setTextColor(0xFF1F2329); }));
         LinearLayout.LayoutParams scp = new LinearLayout.LayoutParams(0, -2, 1f);
@@ -395,7 +395,7 @@ public class MedPlanActivity extends Activity {
         box.removeAllViews();
         for (final String o : opts) {
             boolean on = o.equals(cur[0]);
-            TextView c = mkText(o, 14, on, on ? 0xFF315CDE : 0xFF8A94A6);
+            TextView c = mkText(o, 14, on, on ? 0xFF315CDE : Theme.c(this, 0xFF8A919E, 0xFF6B7280));
             c.setBackgroundResource(on ? R.drawable.bg_chip_blue : R.drawable.bg_chip_gray);
             c.setPadding(dp(18), dp(8), dp(18), dp(8));
             LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(-2, -2);
@@ -427,7 +427,7 @@ public class MedPlanActivity extends Activity {
         EditText et = new EditText(this);
         et.setHint(hint); et.setText(val); et.setSingleLine(true);
         et.setTextSize(15); et.setTextColor(0xFF1F2329);
-        et.setHintTextColor(0xFFB7BFCC);
+        et.setHintTextColor(Theme.c(this, 0xFFB7BFCC, 0xFFB7BFCC));
         et.setBackgroundResource(R.drawable.bg_input);
         et.setPadding(dp(14), dp(10), dp(14), dp(10));
         LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(-1, -2);
