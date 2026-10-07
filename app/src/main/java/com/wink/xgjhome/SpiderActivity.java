@@ -70,7 +70,26 @@ public class SpiderActivity extends Activity {
     }
 
     private void inject(WebView v, String u) {
-        if (u == null || !u.contains("win4000.com")) return;
+        if (u == null) return;
+        boolean axDetail = u.contains("axiuren.com") && u.matches(".*axiuren\\.com/\\d+\\.html.*");
+        if (axDetail) injectAxiuren(v);
+        // 每页注入站点切换按钮(除目标详情页已注入的那个外)
+        String other = u.contains("axiuren.com")
+            ? "http://www.win4000.com/zt/xinggan.html|甜|315CDE"
+            : "https://axiuren.com/|秀|c0392b";
+        String[] p = other.split("\\|");
+        String js2 =
+            "(function(){" +
+            "try{" +
+            "if(window.__sw)return;" +
+            "var b=document.createElement('div'); b.textContent='" + p[1] + "';" +
+            "b.style.cssText='position:fixed;left:12px;bottom:60px;z-index:99999;background:#" + p[2] + ";color:#fff;padding:8px 14px;border-radius:20px;font-size:13px;font-weight:bold;opacity:.8';" +
+            "b.onclick=function(){And.goto2('" + p[0] + "')};" +
+            "document.body.appendChild(b); window.__sw=b;" +
+            "}catch(e){}}" +
+            ")();";
+        v.evaluateJavascript(js2, null);
+        if (axDetail || !u.contains("win4000.com")) return;
         // 仅系列详情页注入下载按钮
         if (!u.contains("wallpaper_detail") && !u.contains("meinvxiaoguotu") && !u.contains("mobile_detail")) return;
         String js =
@@ -95,7 +114,43 @@ public class SpiderActivity extends Activity {
         v.evaluateJavascript(js, null);
     }
 
+    /** axiuren.com(秀人网镜像): 从页面抽图床文件夹+标题里的张数, 枚举 0001.webp..N.webp */
+    private void injectAxiuren(WebView v) {
+        String js =
+            "(function(){" +
+            "try{" +
+            "window.__collect=function(){" +
+            " var h=document.documentElement.innerHTML;" +
+            " var m=h.match(/https:\\/\\/img\\.ecmm\\.cc\\/new\\/[^\"']+\\//);" +
+            " if(!m)return JSON.stringify({name:'未找到图床',imgs:[]});" +
+            " var folder=m[0];" +
+            " var t=(document.querySelector('h1')||{textContent:document.title}).textContent;" +
+            " var pm=t.match(/(\\d+)\\s*P/i); var n=pm?parseInt(pm[1]):0;" +
+            " if(n<=0)n=120;" +
+            " var urls=[];" +
+            " for(var i=1;i<=n;i++){var s='0000'+i; s=s.substring(s.length-4); urls.push(folder+s+'.webp');}" +
+            " return JSON.stringify({name:t.trim().substring(0,60),imgs:urls});" +
+            "};" +
+            "var old=window.__dlbtn; if(old)old.remove();" +
+            "var b=document.createElement('div');" +
+            "b.id='dlbtn'; b.textContent='⬇ 下载全部';" +
+            "b.style.cssText='position:fixed;right:12px;bottom:60px;z-index:99999;background:#c0392b;color:#fff;padding:10px 16px;border-radius:24px;font-size:14px;font-weight:bold;box-shadow:0 4px 12px rgba(0,0,0,.4);opacity:.92';" +
+            "b.onclick=function(){var d=window.__collect();And.download(d)};" +
+            "document.body.appendChild(b); window.__dlbtn=b;" +
+            "}catch(e){}}" +
+            ")();";
+        v.evaluateJavascript(js, null);
+    }
+
     private class And {
+
+        /** 站点切换 */
+        @JavascriptInterface
+        public void goto2(String url) {
+            String u = url == null ? "" : url.trim();
+            if (u.startsWith("http")) { runOnUiThread(new Runnable() { public void run() { web.loadUrl(u); }}); }
+            else toast("无效地址");
+        }
 
         /** 下载整本: payload={name, imgs:[url...]} */
         @JavascriptInterface
@@ -113,7 +168,8 @@ public class SpiderActivity extends Activity {
                     for (int i = 0; i < total; i++) {
                         String url;
                         try { url = arr.getString(i); } catch (Throwable e) { continue; }
-                        String fn = String.format(java.util.Locale.US, "%s_%03d.jpg", fname, i + 1);
+                        String ext = url.toLowerCase().contains(".webp") ? "webp" : "jpg";
+                        String fn = String.format(java.util.Locale.US, "%s_%03d.%s", fname, i + 1, ext);
                         if (saveImage(url, "Pictures/美女/" + fname, fn)) ok++;
                         if (i % 5 == 4) toast("进度 " + (ok) + "/" + total);
                     }
@@ -155,7 +211,7 @@ public class SpiderActivity extends Activity {
             if (bos.size() < 5000) return false; // 太小=错误页
             android.content.ContentValues cv = new android.content.ContentValues();
             cv.put(android.provider.MediaStore.Images.Media.DISPLAY_NAME, fileName);
-            cv.put(android.provider.MediaStore.Images.Media.MIME_TYPE, "image/jpeg");
+            cv.put(android.provider.MediaStore.Images.Media.MIME_TYPE, relPath != null && fileName.endsWith(".webp") ? "image/webp" : "image/jpeg");
             if (Build.VERSION.SDK_INT >= 29) cv.put(android.provider.MediaStore.Images.Media.RELATIVE_PATH, relPath);
             android.net.Uri uri = getContentResolver().insert(android.provider.MediaStore.Images.Media.EXTERNAL_CONTENT_URI, cv);
             os = getContentResolver().openOutputStream(uri);
