@@ -212,29 +212,44 @@ public class SpiderActivity extends Activity {
                 } catch (Throwable e) { sb.append("TRY ").append(u).append(" -> ERR ").append(e).append("\n"); }
                 finally { if (c != null) try { c.disconnect(); } catch (Throwable ignored) {} }
             }
-            // WebView 渲染抓 DOM
+            // WebView 渲染: 拦截所有资源请求 + 抓DOM
             try {
                 final Object[] box = new Object[]{ "" };
                 final Object lock = new Object();
+                final java.util.Set<String> hits = java.util.Collections.synchronizedSet(new java.util.LinkedHashSet<String>());
                 runOnUiThread(new Runnable() { public void run() {
                     final WebView wv = new WebView(SpiderActivity.this);
                     WebSettings ws = wv.getSettings();
                     ws.setJavaScriptEnabled(true);
                     ws.setUserAgentString("Mozilla/5.0 (Linux; Android 13) Chrome/120 Mobile");
+                    ws.setDomStorageEnabled(true);
+                    ws.setMixedContentMode(WebSettings.MIXED_CONTENT_ALWAYS_ALLOW);
                     wv.setWebViewClient(new WebViewClient() {
                         @Override public void onReceivedSslError(WebView v, android.webkit.SslErrorHandler h, android.net.http.SslError e) { h.proceed(); }
+                        @Override public android.webkit.WebResourceResponse shouldInterceptRequest(WebView v, android.webkit.WebResourceRequest req) {
+                            try {
+                                String u = req.getUrl().toString();
+                                if (!u.contains("sqmuying") && (u.contains(".jpg") || u.contains(".jpeg") || u.contains(".png") || u.contains(".webp") || u.contains("gl25") || u.contains("img")))
+                                    hits.add(u);
+                            } catch (Throwable ignored) {}
+                            return null;
+                        }
                         @Override public void onPageFinished(WebView v, String u) {
                             v.postDelayed(new Runnable() { public void run() {
                                 wv.evaluateJavascript("document.documentElement.outerHTML.substring(0,12000)", new android.webkit.ValueCallback<String>() {
                                     public void onReceiveValue(String val) { box[0] = val == null ? "" : val; synchronized (lock) { lock.notify(); } }
                                 });
-                            } }, 4000);
+                            } }, 6000);
                         }
                     });
                     wv.loadUrl(SITE + "/t/?id=" + id);
                 }});
-                synchronized (lock) { try { lock.wait(15000); } catch (InterruptedException ignored) {} }
+                synchronized (lock) { try { lock.wait(18000); } catch (InterruptedException ignored) {} }
+                sb.append("---- img requests(").append(hits.size()).append(") ----\n");
+                int i = 0;
+                for (String h2 : hits) { sb.append(h2).append("\n"); if (++i > 25) break; }
                 sb.append("---- rendered DOM ----\n").append(box[0]);
+                try { web.post(new Runnable() { public void run() { } }); } catch (Throwable ignored) {}
             } catch (Throwable e) { sb.append("\nwv err: ").append(e); }
             return finishProbe(sb);
         }
