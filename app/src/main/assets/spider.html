@@ -64,6 +64,7 @@
       <div class="row1">
         <span class="cid">#{{ it.id }}</span>
         <span class="cname">{{ it.name }} · {{ it.total }}P</span>
+        <span class="cname" @click="doProbe(it)" style="opacity:.55">ⓘ</span>
         <button class="btn" :class="{stop: prog[it.id] && prog[it.id].state==='run'}"
                 @click="toggle(it)">
           {{ btnText(it) }}
@@ -99,6 +100,7 @@ createApp({
     const hint   = ref('');
     const stopNext = ref(false);
 
+    const doProbe = (it) => { And.probe(it.id); };
     const doLogin = () => { hint.value='登录完成回来自动检测，登录后点列表刷新'; And.login(); };
     const noop = () => {};
     const goBack = () => { try { And.exit(); } catch(e) { } };
@@ -157,7 +159,7 @@ createApp({
       if (!document.hidden) { logged.value = And.loginState()==='yes'; }
     });
 
-    return { theme, logged, items, prog, page, loading, hint, stopNext, doLogin, noop, goBack, load, toggle, btnText };
+    return { theme, logged, items, prog, page, loading, hint, stopNext, doLogin, doProbe, noop, goBack, load, toggle, btnText };
   }
 }).mount('#app');
 </script>

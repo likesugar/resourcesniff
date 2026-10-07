@@ -12,6 +12,7 @@ import android.webkit.WebChromeClient;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
+import android.widget.Toast;
 
 import org.json.JSONArray;
 import org.json.JSONObject;
@@ -185,6 +186,46 @@ public class SpiderActivity extends Activity {
         @JavascriptInterface
         public void cancel(int id) { cancels.add(id); }
 
+        /** 诊断: 抓图集详情页原文+探测图床候选URL, 结果复制到剪贴板 */
+        @JavascriptInterface
+        public String probe(final int id) {
+            final StringBuilder sb = new StringBuilder();
+            try { trustAll(); } catch (Throwable ignored) {}
+            try {
+                String ck = CookieManager.getInstance().getCookie(SITE);
+                String page = httpGet(SITE + "/t/?id=" + id, ck);
+                sb.append("== album page /t/?id=").append(id)
+                  .append(" len=").append(page == null ? -1 : page.length()).append("\n");
+                if (page != null) sb.append(page, 0, Math.min(page.length(), 3500));
+            } catch (Throwable e) { sb.append("page err: ").append(e).append("\n"); }
+            String[] cands = {
+                "https://tjg.gzhuibei.com/a/1/" + id + "/0.jpg",
+                "https://tjg.gzhuibei.com/a/1/" + id + "/1.jpg",
+                "https://tjg3.gzhuibei.com/a/1/" + id + "/0.jpg"
+            };
+            for (String u : cands) {
+                HttpURLConnection c = null;
+                try {
+                    c = (HttpURLConnection) new URL(u).openConnection();
+                    c.setConnectTimeout(8000); c.setReadTimeout(8000);
+                    c.setRequestProperty("User-Agent", "Mozilla/5.0 (Linux; Android 13) Chrome/120 Mobile");
+                    c.setRequestProperty("Referer", SITE + "/");
+                    sb.append("\nIMG ").append(u).append(" -> ").append(c.getResponseCode())
+                      .append(" ").append(c.getContentType()).append(" ").append(c.getContentLength());
+                } catch (Throwable e) { sb.append("\nIMG ").append(u).append(" -> ERR ").append(e); }
+                finally { if (c != null) try { c.disconnect(); } catch (Throwable ignored) {} }
+            }
+            final String out = sb.toString();
+            runOnUiThread(new Runnable() { public void run() {
+                try {
+                    android.content.ClipboardManager cm = (android.content.ClipboardManager) getSystemService(CLIPBOARD_SERVICE);
+                    cm.setPrimaryClip(android.content.ClipData.newPlainText("probe", out));
+                    Toast.makeText(SpiderActivity.this, "诊断信息已复制，粘贴给比特", Toast.LENGTH_LONG).show();
+                } catch (Throwable ignored) {}
+            }});
+            return "ok";
+        }
+
         /** 返回首页 */
         @JavascriptInterface
         public void exit() { runOnUiThread(new Runnable() { public void run() { finish(); }}); }
@@ -217,13 +258,15 @@ public class SpiderActivity extends Activity {
         finally { try { if (is != null) is.close(); } catch (Throwable ignored) {} try { if (os != null) os.close(); } catch (Throwable ignored) {} }
     }
 
-    private String httpGet(String url) {
+    private String httpGet(String url) { return httpGet(url, null); }
+
+    private String httpGet(String url, String cookieOverride) {
         try {
             HttpURLConnection c = (HttpURLConnection) new URL(url).openConnection();
             c.setConnectTimeout(15000); c.setReadTimeout(20000);
             c.setInstanceFollowRedirects(true);
             c.setRequestProperty("User-Agent", "Mozilla/5.0 (Linux; Android 13) Chrome/120 Mobile");
-            String cookie = CookieManager.getInstance().getCookie(SITE);
+            String cookie = cookieOverride != null ? cookieOverride : CookieManager.getInstance().getCookie(SITE);
             if (cookie != null) c.setRequestProperty("Cookie", cookie);
             if (c.getResponseCode() != 200) return null;
             InputStream is = c.getInputStream();
