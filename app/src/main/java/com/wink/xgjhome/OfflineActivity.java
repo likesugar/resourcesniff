@@ -445,11 +445,10 @@ public class OfflineActivity extends Activity {
                 FileOutputStream fos = new FileOutputStream(f);
                 fos.write(out.getBytes(StandardCharsets.UTF_8));
                 fos.close();
-                JSONObject m = new JSONObject();
-                File mf = new File(d, "map.json");
-                if (mf.exists()) { try { m = new JSONObject(readSnapshot(mf.getAbsolutePath())); } catch (Throwable ignored) {} }
-                m.put(pageUrl, f.getName());
-                writeMap(mf, m); // 主页先落盘, 爬子页期间离线也能开主页
+                final File mf = new File(d, "map.json");
+                final JSONObject m = new JSONObject();
+                try { m.put(pageUrl, f.getName()); } catch (Throwable ignored) {}
+                mapPut(mf, pageUrl, f.getName()); // 主页先落盘(锁+读合并+原子写)
                 // HtmlDown2 多页机制: 同域文章链接一并抓取(单站一次)
                 File flag = new File(d, "crawled.flag");
                 if (!flag.exists()) {
@@ -497,6 +496,13 @@ public class OfflineActivity extends Activity {
         } catch (Throwable e) { }
     }
 
+    private synchronized void mapPut(File mf, String key, String file) {
+        JSONObject m = new JSONObject();
+        try { m = new JSONObject(readSnapshot(mf.getAbsolutePath())); } catch (Throwable ignored) {}
+        try { m.put(key, file); } catch (Throwable ignored) {}
+        writeAtomic(mf, m.toString().getBytes(StandardCharsets.UTF_8));
+    }
+
     private void writeMap(File mf, JSONObject m) {
         try {
             FileOutputStream fm = new FileOutputStream(mf);
@@ -536,12 +542,9 @@ public class OfflineActivity extends Activity {
                             String out = processHtml(h, u);
                             File f2 = new File(d, "page_" + md5(u).substring(0, 8) + ".html");
                             writeAtomic(f2, out.getBytes(StandardCharsets.UTF_8));
-                            synchronized (m) {
-                                m.put(u, f2.getName());
-                                String fu = fin.toString();
-                                if (!fu.equals(u) && fu.startsWith("http")) { m.put(fu, f2.getName()); dlog("REDIR " + u + " -> " + fu); }
-                                writeMap(mf, m); // 每存一篇立即落盘
-                            }
+                            mapPut(mf, u, f2.getName());
+                            String fu = fin.toString();
+                            if (!fu.equals(u) && fu.startsWith("http")) { mapPut(mf, fu, f2.getName()); dlog("REDIR " + u + " -> " + fu); }
                             cnt.incrementAndGet();
                             dlog("SAVED " + u);
                         } else { dlog("SKIP " + u); }
