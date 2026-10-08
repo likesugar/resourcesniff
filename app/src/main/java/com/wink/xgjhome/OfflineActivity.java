@@ -247,11 +247,14 @@ public class OfflineActivity extends Activity {
                 @Override public void onReceivedSslError(WebView v, android.webkit.SslErrorHandler h, android.net.http.SslError e) { h.proceed(); }
                 @Override public boolean shouldOverrideUrlLoading(WebView v, String u) { return false; }
                 @Override public void onReceivedError(WebView v, int code, String desc, String failing) {
-                    // 断网 → 回退快照
+                    // 断网 → 回退快照 (内容注入, 不走file://协议)
                     String snap = snapshotFor(pendingSnapFor);
                     if (!snap.isEmpty() && failing != null && failing.contains(pendingSnapFor)) {
-                        v.loadUrl("file://" + snap);
-                        toast("离线快照");
+                        String html = readSnapshot(snap);
+                        if (!html.isEmpty()) {
+                            v.loadDataWithBaseURL(pendingSnapFor, html, "text/html", "utf-8", null);
+                            toast("离线快照");
+                        }
                     }
                 }
                 @Override public void onPageFinished(WebView v, String u) {
@@ -294,8 +297,13 @@ public class OfflineActivity extends Activity {
         blp.setMargins(dip(10), dip(50), 0, 0);
         root.addView(back, blp);
         setContentView(root);
-        // file:// 直接开, http 先试网络
-        web.loadUrl(url);
+        // 上传的本地html: 内容注入打开(不用file://)
+        if (url.startsWith("file://")) {
+            String html = readSnapshot(url.substring("file://".length()));
+            web.loadDataWithBaseURL(null, html, "text/html", "utf-8", null);
+        } else {
+            web.loadUrl(url);
+        }
     }
 
     @Override
@@ -308,9 +316,21 @@ public class OfflineActivity extends Activity {
     // ---------------- 数据 ----------------
 
     private File snapDir() {
-        File d = new File(getFilesDir(), "offline_snap");
+        // 公共可访问目录: /storage/emulated/0/Android/data/com.wink.xgjhome/files/离线快照/
+        File d = new File(getExternalFilesDir(null), "离线快照");
         if (!d.exists()) d.mkdirs();
         return d;
+    }
+
+    private String readSnapshot(String path) {
+        try {
+            java.io.FileInputStream fis = new java.io.FileInputStream(path);
+            java.io.ByteArrayOutputStream b = new java.io.ByteArrayOutputStream();
+            byte[] buf = new byte[8192]; int n;
+            while ((n = fis.read(buf)) > 0) b.write(buf, 0, n);
+            fis.close();
+            return new String(b.toByteArray(), StandardCharsets.UTF_8);
+        } catch (Throwable e) { return ""; }
     }
 
     private String snapshotFor(String url) {
