@@ -418,29 +418,16 @@ public class ChatActivity extends Activity {
             msgList.post(new Runnable() { public void run() { scroll.fullScroll(ScrollView.FOCUS_DOWN); } });
     }
 
-    /** 点击文件气泡: 从发送方HTTP拉取 */
+    /** 点击文件气泡: 确保本地可用(没有就按需从源拉) */
     private void downloadFile(final JSONObject o) {
         if (o.optString("uid").equals(ChatHub.selfId())) { toast("这是自己发的文件"); return; }
-        final String fip = o.optString("fip", "");
-        final int fport = o.optInt("fport", 0);
-        final long fts = o.optLong("fts", 0);
+        final long fts = o.optLong("fts", o.optLong("ts", 0));
         final String fname = o.optString("fname", "file");
-        if (fip.isEmpty() || fport <= 0) { toast("文件服务不可用"); return; }
         toast("开始接收 " + fname + "…");
         new Thread(new Runnable() { public void run() {
-            try {
-                java.io.File dir = new java.io.File(getExternalFilesDir(null), "聊天文件");
-                if (!dir.exists()) dir.mkdirs();
-                java.io.File out = new java.io.File(dir, fts + "_" + fname);
-                java.net.HttpURLConnection c = (java.net.HttpURLConnection) new java.net.URL("http://" + fip + ":" + fport + "/chatfile?ts=" + fts).openConnection();
-                c.setConnectTimeout(8000); c.setReadTimeout(60000);
-                java.io.InputStream is = c.getInputStream();
-                java.io.FileOutputStream fos = new java.io.FileOutputStream(out);
-                byte[] b = new byte[8192]; int n;
-                while ((n = is.read(b)) > 0) fos.write(b, 0, n);
-                is.close(); fos.close();
-                toast("已收到: 爬虫文件目录/聊天文件/" + fname);
-            } catch (Throwable e) { toast("接收失败: " + e); }
+            java.io.File f = ChatHub.ensureFile(fts);
+            if (f != null) toast("已收到: Android/data/.../files/聊天文件/" + fname);
+            else toast("接收失败(发送方不在线?)");
         }}).start();
     }
 

@@ -102,6 +102,7 @@ public class LanShareServer {
             int q = path.indexOf("ts=");
             if (q > 0) try { ts = Long.parseLong(path.substring(q + 3).replaceAll("[^0-9].*$", "")); } catch (Throwable ignored) {}
             java.io.File f = ChatHub.getServeFile(ts);
+            if (f == null || !f.exists()) f = ChatHub.ensureFile(ts); // 按需从源拉取(代理)
             if (f == null || !f.exists()) {
                 OutputStream os = s.getOutputStream();
                 os.write("HTTP/1.1 404 Not Found\r\nContent-Length: 0\r\nConnection: close\r\n\r\n".getBytes());

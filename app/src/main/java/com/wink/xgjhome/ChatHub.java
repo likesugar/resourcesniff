@@ -138,6 +138,43 @@ public class ChatHub {
     public static void serveFile(long ts, java.io.File f) { serveFiles.put(ts, f); }
     public static java.io.File getServeFile(long ts) { return serveFiles.get(ts); }
 
+    /** 按ts查消息(匹配消息ts或文件fts) */
+    public static JSONObject findByTs(long ts) {
+        synchronized (log) {
+            for (JSONObject o : log) if (o.optLong("ts", 0) == ts) return o;
+            for (JSONObject o : log) if (o.optLong("fts", 0) == ts) return o;
+        }
+        return null;
+    }
+
+    /** 确保某ts的文件本地可用: 没有就从消息里的源地址拉 */
+    public static java.io.File ensureFile(long ts) {
+        java.io.File f = serveFiles.get(ts);
+        if (f != null && f.exists()) return f;
+        JSONObject o = findByTs(ts);
+        if (o == null || o.optString("fname", "").isEmpty()) return null;
+        final String fip = o.optString("fip", "");
+        final int fport = o.optInt("fport", 0);
+        final String fname = o.optString("fname", "file");
+        if (fip.isEmpty() || fport <= 0) return null;
+        try {
+            java.io.File dir = new java.io.File(ctx.getExternalFilesDir(null), "聊天文件");
+            if (!dir.exists()) dir.mkdirs();
+            java.io.File out = new java.io.File(dir, ts + "_" + fname);
+            if (!out.exists()) {
+                java.net.HttpURLConnection c = (java.net.HttpURLConnection) new java.net.URL("http://" + fip + ":" + fport + "/chatfile?ts=" + ts).openConnection();
+                c.setConnectTimeout(8000); c.setReadTimeout(60000);
+                java.io.InputStream is = c.getInputStream();
+                java.io.FileOutputStream fos = new java.io.FileOutputStream(out);
+                byte[] b = new byte[8192]; int n;
+                while ((n = is.read(b)) > 0) fos.write(b, 0, n);
+                is.close(); fos.close();
+            }
+            serveFiles.put(ts, out);
+            return out;
+        } catch (Throwable e) { return null; }
+    }
+
     /** 收到文件消息自动下载落地 → 注册到文件服务(本机/电脑可下载) */
     private static void autoFetchFile(final JSONObject o) {
         final String fname = o.optString("fname", "");
