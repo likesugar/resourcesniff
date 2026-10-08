@@ -8,6 +8,7 @@ import android.view.Gravity;
 import android.view.View;
 import android.view.WindowManager;
 import android.view.inputmethod.EditorInfo;
+import android.webkit.WebResourceResponse;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
@@ -22,25 +23,37 @@ import android.widget.Toast;
 import org.json.JSONArray;
 import org.json.JSONObject;
 
+import java.io.ByteArrayOutputStream;
 import java.io.File;
+import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.InputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.Map;
+import java.util.HashMap;
 
-/** 网页离线: 圆形站点卡主页(图1复刻), 点击浏览并自动存HTML快照, 断网自动回退快照; 也可上传html文件 */
+/**
+ * 网页离线(浏览器式保存): 在线浏览自动把整页资源(CSS/JS/图片/字体)内联成自包含HTML快照;
+ * 离线时同URL回放, 已保存页面之间的链接可互相跳转(链接套页面)。
+ */
 public class OfflineActivity extends Activity {
 
     private static final String PREF = "offline_sites";
-    private static final int[] COLORS = {0xFFd65db1, 0xFF9c8e7d, 0xFFa56bce, 0xFF315CDE, 0xFF1FA855, 0xFFe67e22};
+    private static final String[] SITE_NAMES = {"秀人网"};
+    private static final String[] SITE_URLS = {"https://axiuren.com/"};
+    private static final int[] COLORS = {0xFFd65db1, 0xFF315CDE, 0xFF9c8e7d, 0xFFa56bce, 0xFF1FA855, 0xFFe67e22};
 
     private LinearLayout homeRoot;
     private LinearLayout cardsRow;
-    private WebView web;
+    private LinearLayout pill;
     private boolean dark;
+    private WebView web;
     private String pendingSnapFor = "";
+    private boolean snapBusy = false;
 
     @Override
     protected void onCreate(Bundle b) {
@@ -49,6 +62,9 @@ public class OfflineActivity extends Activity {
         getWindow().setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE);
         buildHome();
     }
+
+    private int dip(int v) { return Math.round(v * getResources().getDisplayMetrics().density); }
+    private void toast(String s) { Toast.makeText(this, s, Toast.LENGTH_SHORT).show(); }
 
     // ---------------- 主页(图1复刻) ----------------
 
@@ -61,63 +77,46 @@ public class OfflineActivity extends Activity {
         HorizontalScrollView hs = new HorizontalScrollView(this);
         hs.setHorizontalScrollBarEnabled(false);
         cardsRow = new LinearLayout(this);
+        cardsRow.setOrientation(LinearLayout.HORIZONTAL);
         cardsRow.setGravity(Gravity.CENTER_VERTICAL);
-        cardsRow.setPadding(dip(24), dip(40), dip(24), 0);
+        int hpad = dip(20);
+        cardsRow.setPadding(hpad, dip(28), hpad, dip(20));
         hs.addView(cardsRow);
-        homeRoot.addView(hs);
+        homeRoot.addView(hs, new LinearLayout.LayoutParams(-1, 0, 1f));
 
-        TextView hint = new TextView(this);
-        hint.setText("  点开自动保存快照 · 断网可看最近版本\n  底部输入新网址 · 右上＋上传HTML");
-        hint.setTextSize(12);
-        hint.setTextColor(0xFF999999);
-        hint.setPadding(dip(28), dip(30), 0, 0);
-        homeRoot.addView(hint);
-
-        FrameLayout fl = new FrameLayout(this);
-        fl.addView(homeRoot, new FrameLayout.LayoutParams(-1, -1));
-
-        // 右上 + (上传HTML)
-        TextView plus = new TextView(this);
-        plus.setText("＋");
-        plus.setTextSize(22);
-        plus.setTextColor(dark ? 0xFFEEEEEE : 0xFF1F2329);
-        plus.setPadding(dip(18), dip(14), dip(18), dip(14));
-        plus.setOnClickListener(new View.OnClickListener() { public void onClick(View v) { uploadHtml(); } });
-        fl.addView(plus, new FrameLayout.LayoutParams(-2, -2, Gravity.TOP | Gravity.RIGHT));
-
-        // 底部胶囊
-        LinearLayout pill = new LinearLayout(this);
+        pill = new LinearLayout(this);
         pill.setOrientation(LinearLayout.HORIZONTAL);
         pill.setGravity(Gravity.CENTER_VERTICAL);
         GradientDrawable pbg = new GradientDrawable();
         pbg.setColor(dark ? 0xFF1C1F26 : 0xFFF2F3F5);
-        pbg.setCornerRadius(dip(28));
+        pbg.setCornerRadius(dip(26));
         pill.setBackground(pbg);
-        pill.setPadding(dip(22), dip(14), dip(22), dip(14));
-        TextView mag = new TextView(this);
-        mag.setText("🔍");
-        mag.setTextSize(17);
-        pill.addView(mag);
-        TextView lab = new TextView(this);
-        lab.setText("  网页离线");
-        lab.setTextSize(17);
-        lab.setTextColor(dark ? 0xFFEEEEEE : 0xFF1F2329);
-        lab.setTypeface(null, android.graphics.Typeface.BOLD);
-        pill.addView(lab);
+        pill.setPadding(dip(16), dip(10), dip(16), dip(10));
+        LinearLayout.LayoutParams plp = new LinearLayout.LayoutParams(-1, -2);
+        plp.setMargins(dip(16), dip(10), dip(16), dip(24));
+        TextView star = new TextView(this);
+        star.setText("⭐");
+        star.setTextSize(16);
+        pill.addView(star);
+        TextView label = new TextView(this);
+        label.setText("  网页离线 · 点此添加网址");
+        label.setTextSize(14);
+        label.setTextColor(dark ? 0xFF9AA0A6 : 0xFF5F6368);
+        pill.addView(label);
         pill.setOnClickListener(new View.OnClickListener() { public void onClick(View v) { showAddDialog(); } });
-        FrameLayout.LayoutParams plp = new FrameLayout.LayoutParams(-1, -2, Gravity.BOTTOM);
-        plp.setMargins(dip(16), 0, dip(16), dip(24));
-        fl.addView(pill, plp);
+        homeRoot.addView(pill, plp);
 
-        setContentView(fl);
+        setContentView(homeRoot);
         refreshCards();
     }
 
     private void refreshCards() {
         cardsRow.removeAllViews();
         JSONArray a = load();
-        for (int i = 0; i < a.length(); i++) {
-            final JSONObject o = a.optJSONObject(i);
+        int n = a.length();
+        for (int i0 = 0; i0 < n; i0++) {
+            final int i = i0;
+            JSONObject o = a.optJSONObject(i);
             if (o == null) continue;
             final String name = o.optString("name", "站");
             final String url = o.optString("url", "");
@@ -148,38 +147,38 @@ public class OfflineActivity extends Activity {
             card.addView(lb, llp);
             cardsRow.addView(card, new LinearLayout.LayoutParams(-2, -2));
         }
-        // 上传卡
-        LinearLayout up = new LinearLayout(this);
-        up.setOrientation(LinearLayout.VERTICAL);
-        up.setGravity(Gravity.CENTER_HORIZONTAL);
-        up.setPadding(dip(2), 0, dip(24), 0);
-        up.setOnClickListener(new View.OnClickListener() { public void onClick(View v) { uploadHtml(); } });
-        TextView ua = new TextView(this);
-        ua.setText("＋");
-        ua.setTextColor(0xFFFFFFFF);
-        ua.setTextSize(26);
-        ua.setGravity(Gravity.CENTER);
-        GradientDrawable uc = new GradientDrawable();
-        uc.setShape(GradientDrawable.OVAL);
-        uc.setColor(0xFF666666);
-        ua.setBackground(uc);
-        up.addView(ua, new LinearLayout.LayoutParams(dip(74), dip(74)));
-        TextView ul = new TextView(this);
-        ul.setText("上传HTML");
-        ul.setTextSize(12);
-        ul.setTextColor(dark ? 0xFFCCCCCC : 0xFF444444);
-        ul.setGravity(Gravity.CENTER);
-        LinearLayout.LayoutParams ulp = new LinearLayout.LayoutParams(-2, -2);
-        ulp.topMargin = dip(12);
-        up.addView(ul, ulp);
-        cardsRow.addView(up, new LinearLayout.LayoutParams(-2, -2));
+        // "+" 上传
+        LinearLayout add = new LinearLayout(this);
+        add.setOrientation(LinearLayout.VERTICAL);
+        add.setGravity(Gravity.CENTER_HORIZONTAL);
+        add.setPadding(dip(2), 0, dip(8), 0);
+        add.setOnClickListener(new View.OnClickListener() { public void onClick(View v) { uploadHtml(); } });
+        TextView av2 = new TextView(this);
+        av2.setText("＋");
+        av2.setTextSize(30);
+        av2.setTextColor(0xFFFFFFFF);
+        av2.setGravity(Gravity.CENTER);
+        GradientDrawable c2 = new GradientDrawable();
+        c2.setShape(GradientDrawable.OVAL);
+        c2.setColor(dark ? 0xFF2A2F3A : 0xFFE8EAED);
+        av2.setBackground(c2);
+        add.addView(av2, new LinearLayout.LayoutParams(dip(74), dip(74)));
+        TextView lb2 = new TextView(this);
+        lb2.setText("上传");
+        lb2.setTextSize(15);
+        lb2.setTextColor(dark ? 0xFF9AA0A6 : 0xFF5F6368);
+        lb2.setGravity(Gravity.CENTER);
+        LinearLayout.LayoutParams ll2 = new LinearLayout.LayoutParams(-2, -2);
+        ll2.topMargin = dip(12);
+        add.addView(lb2, ll2);
+        cardsRow.addView(add, new LinearLayout.LayoutParams(-2, -2));
     }
 
     private void showAddDialog() {
         LinearLayout box = new LinearLayout(this);
         box.setPadding(dip(24), dip(10), dip(24), 0);
         final EditText et = new EditText(this);
-        et.setHint("输入网址，如 tulpa.cn");
+        et.setHint("输入网址");
         et.setInputType(EditorInfo.TYPE_TEXT_VARIATION_URI);
         box.addView(et);
         new AlertDialog.Builder(this)
@@ -197,11 +196,33 @@ public class OfflineActivity extends Activity {
             .show();
     }
 
+    private String hostOf(String u) {
+        try { return new URL(u).getHost().replace("www.", ""); } catch (Throwable e) { return "站"; }
+    }
+
+    private void addSite(String name, String url) {
+        JSONArray a = load();
+        for (int i = 0; i < a.length(); i++) {
+            JSONObject o = a.optJSONObject(i);
+            if (o != null && url.equals(o.optString("url"))) { toast("已存在"); browse(url); return; }
+        }
+        try {
+            JSONObject o = new JSONObject();
+            o.put("name", name);
+            o.put("url", url);
+            o.put("color", COLORS[a.length() % COLORS.length]);
+            a.put(o);
+            save(a);
+            refreshCards();
+        } catch (Throwable ignored) {}
+        browse(url);
+    }
+
     private void uploadHtml() {
         android.content.Intent i = new android.content.Intent(android.content.Intent.ACTION_GET_CONTENT);
         i.setType("*/*");
         i.addCategory(android.content.Intent.CATEGORY_OPENABLE);
-        startActivityForResult(android.content.Intent.createChooser(i, "选择HTML文件"), 9002);
+        startActivityForResult(android.content.Intent.createChooser(i, "选择HTML/ZIP"), 9002);
     }
 
     @Override
@@ -213,6 +234,8 @@ public class OfflineActivity extends Activity {
             android.database.Cursor c = getContentResolver().query(data.getData(), null, null, null, null);
             if (c != null) { try { int ni = c.getColumnIndex(android.provider.OpenableColumns.DISPLAY_NAME);
                 if (ni >= 0 && c.moveToFirst()) name = c.getString(ni); } finally { c.close(); } }
+            boolean isZip = name.toLowerCase().endsWith(".zip");
+            if (isZip) { importZip(data.getData(), name); return; }
             File dir = snapDir();
             File f = new File(dir, md5(name + System.currentTimeMillis()) + ".html");
             InputStream is = getContentResolver().openInputStream(data.getData());
@@ -220,12 +243,11 @@ public class OfflineActivity extends Activity {
             byte[] b = new byte[8192]; int n;
             while ((n = is.read(b)) > 0) fos.write(b, 0, n);
             is.close(); fos.close();
-            JSONArray a = load();
             JSONObject o = new JSONObject();
-            o.put("name", name.replaceAll("\\.html?$", ""));
+            o.put("name", name.replaceAll("(?i)\\.html?$", ""));
             o.put("url", "file://" + f.getAbsolutePath());
-            o.put("snap", f.getName());
-            o.put("color", COLORS[a.length() % COLORS.length]);
+            o.put("color", COLORS[load().length() % COLORS.length]);
+            JSONArray a = load();
             a.put(o);
             save(a);
             refreshCards();
@@ -233,96 +255,113 @@ public class OfflineActivity extends Activity {
         } catch (Throwable e) { toast("导入失败: " + e); }
     }
 
-    // ---------------- 浏览 + 快照 ----------------
+    private void importZip(android.net.Uri uri, String zipName) {
+        try {
+            String site = "z" + System.currentTimeMillis();
+            File dir = new File(new File(getFilesDir(), "offline_zip"), site);
+            if (!dir.exists()) dir.mkdirs();
+            java.util.zip.ZipInputStream zis = new java.util.zip.ZipInputStream(getContentResolver().openInputStream(uri));
+            java.util.zip.ZipEntry e;
+            int count = 0;
+            File index = null;
+            while ((e = zis.getNextEntry()) != null) {
+                if (e.isDirectory()) continue;
+                String fn = e.getName();
+                if (fn.contains("..")) continue;
+                File out = new File(dir, fn);
+                File parent = out.getParentFile();
+                if (parent != null && !parent.exists()) parent.mkdirs();
+                FileOutputStream fos = new FileOutputStream(out);
+                byte[] b = new byte[8192]; int n;
+                while ((n = zis.read(b)) > 0) fos.write(b, 0, n);
+                fos.close();
+                count++;
+                if (index == null && (fn.endsWith("index.html") || fn.endsWith("index.htm"))) index = out;
+                if (index == null && fn.endsWith(".html") && !fn.contains("/")) index = out;
+            }
+            zis.close();
+            if (index == null) { toast("包里没找到html"); return; }
+            final String vurl = "http://ziplocal." + site + "/" + site + "/";
+            zipDirs.put(site, dir);
+            JSONObject o = new JSONObject();
+            o.put("name", zipName.replaceAll("(?i)\\.zip$", ""));
+            o.put("url", "http://ziplocal." + site + "/" + (dir.toPath().relativize(index.toPath()).toString().replace('\\', '/')));
+            o.put("zipdir", dir.getAbsolutePath());
+            o.put("color", COLORS[load().length() % COLORS.length]);
+            JSONArray a = load();
+            a.put(o);
+            save(a);
+            refreshCards();
+            toast("已导入 " + count + " 个文件");
+        } catch (Throwable e) { toast("导入失败: " + e); }
+    }
+
+    // ---------------- 浏览 + 整页快照 ----------------
 
     private void browse(String url) {
-        if (web == null) {
-            web = new WebView(this);
-            WebSettings ws = web.getSettings();
-            ws.setJavaScriptEnabled(true);
-            ws.setDomStorageEnabled(true);
-            ws.setUserAgentString("Mozilla/5.0 (Linux; Android 13) Chrome/120 Mobile");
-            ws.setMixedContentMode(android.webkit.WebSettings.MIXED_CONTENT_ALWAYS_ALLOW);
-            web.setWebViewClient(new WebViewClient() {
-                @Override public void onReceivedSslError(WebView v, android.webkit.SslErrorHandler h, android.net.http.SslError e) { h.proceed(); }
-                @Override public boolean shouldOverrideUrlLoading(WebView v, String u) { return false; }
-                // 站内跳页: 每页独立快照集(已抓过跳过); 离线模式点未缓存链接→自动转在线补抓
-                @Override public void onPageStarted(WebView v, String u, android.graphics.Bitmap fav) {
-                    if (!u.startsWith("http") || u.equals(pendingSnapFor)) return;
-                    if (hasFullSnap(u)) {
-                        boolean wasOffline = offlineMode;
-                        pendingSnapFor = u;
-                        if (wasOffline) { offlineMode = true; captureMode = false; }
-                        return;
-                    }
-                    if (captureMode || offlineMode) {
-                        pendingSnapFor = u;
-                        offlineMode = false; captureMode = true;
-                        beginCapture(u);
-                    }
-                }
-                // Via式整站快照: 拦截资源落地 / 离线回放
-                @Override public android.webkit.WebResourceResponse shouldInterceptRequest(WebView v, android.webkit.WebResourceRequest req) {
-                    String u = req.getUrl().toString();
-                    if (!u.startsWith("http")) return null;
-                    if (captureMode) return captureRes(u, pendingSnapFor);
-                    if (offlineMode) return serveOffline(u);
-                    return null;
-                }
-                @Override public void onReceivedError(WebView v, int code, String desc, String failing) {
-                    // 加载失败 → 整站离线回放(Via式) → 兜底单页
-                    if (failing != null && failing.contains(pendingSnapFor)) {
-                        buildOfflineIndex(); // 全量索引兜底(新旧快照目录都接住)
-                        if (!offlineIndex.isEmpty()) { openOffline(pendingSnapFor); return; }
-                    }
-                    if (failing != null && failing.contains(pendingSnapFor)) {
-                        String snap = snapshotFor(pendingSnapFor);
-                        String html = snap.isEmpty() ? "" : readSnapshot(snap);
-                        if (!html.isEmpty()) {
-                            v.loadDataWithBaseURL(pendingSnapFor, html, "text/html", "utf-8", null);
-                            toast("离线快照(单页)");
-                        }
-                    }
-                }
-                @Override public void onPageFinished(WebView v, String u) {
-                    if (captureMode) v.postDelayed(new Runnable() { public void run() { flushCapture(); } }, 4000);
-                }
-            });
-        }
-        pendingSnapFor = url.startsWith("http") ? url : "";
-        FrameLayout root = new FrameLayout(this);
-        if (web.getParent() instanceof android.view.ViewGroup) ((android.view.ViewGroup) web.getParent()).removeView(web);
-        root.addView(web, new FrameLayout.LayoutParams(-1, -1));
-        TextView back = new TextView(this);
-        back.setText("🏠 离线主页");
-        back.setTextColor(0xFFFFFFFF);
-        back.setTextSize(13);
-        GradientDrawable bg = new GradientDrawable();
-        bg.setColor(0x66000000);
-        bg.setCornerRadius(dip(18));
-        back.setBackground(bg);
-        back.setPadding(dip(14), dip(8), dip(14), dip(8));
-        back.setOnClickListener(new View.OnClickListener() { public void onClick(View v) { buildHome(); } });
-        FrameLayout.LayoutParams blp = new FrameLayout.LayoutParams(-2, -2, Gravity.TOP | Gravity.LEFT);
-        blp.setMargins(dip(10), dip(50), 0, 0);
-        root.addView(back, blp);
-        setContentView(root);
+        ensureWeb();
+        showBrowser();
         if (url.startsWith("file://")) {
-            captureMode = false; offlineMode = false;
             String html = readSnapshot(url.substring("file://".length()));
             web.loadDataWithBaseURL(null, html, "text/html", "utf-8", null);
             return;
         }
-        // 在线浏览 = 自动抓快照(Via式); 断网自动回放; 手动入口在长按菜单
+        if (url.startsWith("http://ziplocal.")) {
+            offlineMode = false;
+            web.loadUrl(url);
+            return;
+        }
         pendingSnapFor = url;
-        offlineMode = false; captureMode = true;
-        beginCapture(url);
-        web.loadUrl(url);
+        offlineMode = false;
+        if (netOk(url)) {
+            web.loadUrl(url); // 在线: 加载完自动整页快照
+        } else if (hasSnap(url)) {
+            offlineMode = true;
+            buildOfflineIndex();
+            web.loadUrl(url);
+            toast("离线浏览");
+        } else {
+            toast("无网络且无快照");
+        }
     }
 
-    /** 浏览器界面装配(供各模式复用) */
+    private void ensureWeb() {
+        if (web != null) return;
+        web = new WebView(this);
+        WebSettings ws = web.getSettings();
+        ws.setJavaScriptEnabled(true);
+        ws.setDomStorageEnabled(true);
+        ws.setUserAgentString("Mozilla/5.0 (Linux; Android 13) Chrome/120 Mobile");
+        ws.setMixedContentMode(WebSettings.MIXED_CONTENT_ALWAYS_ALLOW);
+        try { ws.setAllowFileAccess(true); } catch (Throwable ignored) {}
+        web.setWebViewClient(new WebViewClient() {
+            @Override public void onReceivedSslError(WebView v, android.webkit.SslErrorHandler h, android.net.http.SslError e) { h.proceed(); }
+            @Override public boolean shouldOverrideUrlLoading(WebView v, String u) { return false; }
+            @Override public android.webkit.WebResourceResponse shouldInterceptRequest(WebView v, android.webkit.WebResourceRequest req) {
+                String u = req.getUrl().toString();
+                if (u.startsWith("http://ziplocal.")) return serveZip(u);
+                if (offlineMode && u.startsWith("http")) return serveOffline(u);
+                return null;
+            }
+            @Override public void onReceivedError(WebView v, int code, String desc, String failing) {
+                if (offlineMode || failing == null || !failing.startsWith("http")) return;
+                buildOfflineIndex();
+                if (offlineIndex.containsKey(failing) || offlineIndex.containsKey(pendingSnapFor)) {
+                    offlineMode = true;
+                    web.post(new Runnable() { public void run() { web.loadUrl(pendingSnapFor); } });
+                    toast("已切换离线浏览");
+                }
+            }
+            @Override public void onPageFinished(WebView v, String u) {
+                if (!u.startsWith("http") || snapBusy) return;
+                pendingSnapFor = u;
+                v.postDelayed(new Runnable() { public void run() { snapshotPage(u); } }, 2500);
+            }
+        });
+    }
+
     private void showBrowser() {
-        if (web == null) { browse("about:blank"); }
+        if (web == null) ensureWeb();
         FrameLayout root = new FrameLayout(this);
         if (web.getParent() instanceof android.view.ViewGroup) ((android.view.ViewGroup) web.getParent()).removeView(web);
         root.addView(web, new FrameLayout.LayoutParams(-1, -1));
@@ -342,92 +381,219 @@ public class OfflineActivity extends Activity {
         setContentView(root);
     }
 
-    // ---------------- Via式整站快照 ----------------
-
-    private boolean captureMode = false;
-    private boolean offlineMode = false;
-    private File capDir = null;
-    private final java.util.Map<String, File> capMap = new java.util.concurrent.ConcurrentHashMap<>();
-
-    /** 一个网站一个文件夹(按域名): 离线快照/tulpa.cn/ */
-    private File fullDir(String siteUrl) {
-        String host;
-        try { host = new URL(siteUrl).getHost().replace("www.", ""); }
-        catch (Throwable e) { host = md5(siteUrl); }
-        host = host.replaceAll("[^a-zA-Z0-9.-]", "_");
-        File d = new File(snapDir(), host);
-        if (!d.exists()) d.mkdirs();
-        return d;
+    /** 整页自包含快照: 抓outerHTML → 内联全部资源 → 存站目录 */
+    private void snapshotPage(String url) {
+        if (snapBusy) return;
+        snapBusy = true;
+        final String pageUrl = url;
+        web.evaluateJavascript("document.documentElement.outerHTML", new android.webkit.ValueCallback<String>() {
+            public void onReceiveValue(String val) {
+                new Thread(new Runnable() { public void run() {
+                    try {
+                        String html = val == null ? "" : val;
+                        if (html.length() > 1 && html.charAt(0) == '"') {
+                            html = html.substring(1, html.length() - 1)
+                                .replace("\\\"", "\"").replace("\\\\", "\\").replace("\\n", "\n").replace("\\r", "");
+                        }
+                        if (html.length() < 200) { snapBusy = false; return; }
+                        String out = inlineHtml(html, pageUrl);
+                        File f = new File(snapDir(), md5(pageUrl) + ".html");
+                        FileOutputStream fos = new FileOutputStream(f);
+                        fos.write(out.getBytes(StandardCharsets.UTF_8));
+                        fos.close();
+                        // map: 站目录 map.json {url→file}
+                        File mdir = siteDir(pageUrl);
+                        JSONObject m = new JSONObject();
+                        File mf = new File(mdir, "map.json");
+                        if (mf.exists()) { try { m = new JSONObject(readSnapshot(mf.getAbsolutePath())); } catch (Throwable ignored) {} }
+                        m.put(pageUrl, f.getName());
+                        FileOutputStream fm = new FileOutputStream(mf);
+                        fm.write(m.toString().getBytes(StandardCharsets.UTF_8));
+                        fm.close();
+                        runOnUiThread(new Runnable() { public void run() { toast("✓ 已离线保存本页"); } });
+                    } catch (Throwable ignored) {}
+                    snapBusy = false;
+                }}).start();
+            }
+        });
     }
 
-    private boolean hasFullSnap(String url) { return new File(fullDir(url), "map.json").exists(); }
-
-    private void beginCapture(String url) {
-        capDir = fullDir(url);
-        // 载入该站已有映射, 资源与页面累积不重抓
-        try {
-            File mf = new File(capDir, "map.json");
-            if (mf.exists()) {
-                JSONObject m = new JSONObject(readSnapshot(mf.getAbsolutePath()));
-                java.util.Iterator<?> it = m.keys();
-                while (it.hasNext()) {
-                    String u = (String) it.next();
-                    File f = new File(capDir, m.optString(u));
-                    if (f.exists()) capMap.put(u, f);
+    /** 内联: css/js/img 全部抓取并转内联/data URI (浏览器"另存为单文件"同款) */
+    private String inlineHtml(String html, String pageUrl) {
+        // 1. stylesheet link
+        java.util.regex.Matcher lm = java.util.regex.Pattern
+            .compile("<link[^>]+rel=[\"']?stylesheet[\"']?[^>]*>", java.util.regex.Pattern.CASE_INSENSITIVE).matcher(html);
+        StringBuilder sb1 = new StringBuilder();
+        while (lm.find()) {
+            String tag = lm.group();
+            String href = attr(tag, "href");
+            if (href != null) {
+                String abs = absUrl(href, pageUrl);
+                if (abs != null) {
+                    String css = fetchText(abs, pageUrl);
+                    if (css != null) {
+                        css = inlineCssUrls(css, abs);
+                        tag = "<style>/*" + abs + "*/\n" + css + "\n</style>";
+                    }
                 }
             }
-        } catch (Throwable ignored) {}
+            sb1.append(java.util.regex.Matcher.quoteReplacement(tag));
+        }
+        if (sb1.length() > 0) html = lm.reset().appendTail(new StringBuilder(html)).toString(); // noop guard
+        // 逐个link替换(重新扫描避免matcher复用问题)
+        java.util.regex.Matcher lm2 = java.util.regex.Pattern
+            .compile("<link[^>]+rel=[\"']?stylesheet[\"']?[^>]*>", java.util.regex.Pattern.CASE_INSENSITIVE).matcher(html);
+        StringBuilder out1 = new StringBuilder();
+        int last = 0;
+        while (lm2.find()) {
+            String tag = lm2.group();
+            String href = attr(tag, "href");
+            String rep = tag;
+            if (href != null) {
+                String abs = absUrl(href, pageUrl);
+                if (abs != null) {
+                    String css = fetchText(abs, pageUrl);
+                    if (css != null) {
+                        css = inlineCssUrls(css, abs);
+                        rep = "<style>/*" + abs + "*/\n" + css + "\n</style>";
+                    }
+                }
+            }
+            out1.append(html, last, lm2.start()).append(rep);
+            last = lm2.end();
+        }
+        out1.append(html.substring(last));
+        html = out1.toString();
+        // 2. script src
+        html = replaceAttr(html, "script", "src", pageUrl, true);
+        // 3. img src / data-src
+        html = replaceAttr(html, "img", "src", pageUrl, false);
+        html = replaceAttr(html, "img", "data-src", pageUrl, false);
+        // 4. source src
+        html = replaceAttr(html, "source", "src", pageUrl, false);
+        return html;
     }
 
-    /** 落盘当前页的URL映射(不关抓取, 跳页继续) */
-    private void flushCapture() {
-        if (!captureMode || capMap.isEmpty() || capDir == null) return;
-        try {
-            JSONObject m = new JSONObject();
-            for (java.util.Map.Entry<String, File> e : capMap.entrySet()) m.put(e.getKey(), e.getValue().getName());
-            FileOutputStream fos = new FileOutputStream(new File(capDir, "map.json"));
-            fos.write(m.toString().getBytes(StandardCharsets.UTF_8));
-            fos.close();
-        } catch (Throwable ignored) {}
-        capMap.clear();
+    private String replaceAttr(String html, String tag, String attr, String pageUrl, boolean inlineScript) {
+        java.util.regex.Pattern p = java.util.regex.Pattern
+            .compile("<" + tag + "[^>]+\\b" + attr + "=[\"']([^\"']+)[\"'][^>]*>", java.util.regex.Pattern.CASE_INSENSITIVE);
+        java.util.regex.Matcher m = p.matcher(html);
+        StringBuilder out = new StringBuilder();
+        int last = 0;
+        while (m.find()) {
+            String tagAll = m.group();
+            String abs = absUrl(m.group(1), pageUrl);
+            String rep = tagAll;
+            if (abs != null) {
+                if (inlineScript) {
+                    String js = fetchText(abs, pageUrl);
+                    if (js != null) {
+                        String srcTag = tagAll;
+                        rep = "<script>/*" + abs + "*/\n" + js + "\n</script>";
+                        if (srcTag.contains("type=")) rep = rep; // 保留
+                    }
+                } else {
+                    String data = fetchDataUri(abs, pageUrl);
+                    if (data != null) rep = tagAll.replaceFirst(attr + "=[\"'][^\"']+[\"']", attr + "=\"" + java.util.regex.Matcher.quoteReplacement(data) + "\"");
+                }
+            }
+            out.append(html, last, m.start()).append(rep);
+            last = m.end();
+        }
+        out.append(html.substring(last));
+        return out.toString();
     }
 
-    /** 拦截下载: 自拉资源→落盘→回流; 主文档保存但放行走网络(防整页白屏) */
-    private android.webkit.WebResourceResponse captureRes(String u, String referer) {
-        boolean isMain = u.equals(referer);
-        File out = new File(capDir, md5(u) + ".res");
-        if (out.exists()) { capMap.put(u, out); return isMain ? null : serveRes(out, guessType(u)); }
+    private String attr(String tag, String name) {
+        java.util.regex.Matcher m = java.util.regex.Pattern
+            .compile("\\b" + name + "=[\"']([^\"']+)[\"']", java.util.regex.Pattern.CASE_INSENSITIVE).matcher(tag);
+        return m.find() ? m.group(1) : null;
+    }
+
+    private String absUrl(String href, String base) {
+        if (href == null) return null;
+        href = href.trim();
+        if (href.startsWith("data:") || href.startsWith("#") || href.startsWith("javascript:")) return null;
+        try { return new URL(new URL(base), href).toString(); } catch (Throwable e) { return null; }
+    }
+
+    private String fetchText(String url, String referer) {
+        byte[] d = fetchBytes(url, referer);
+        if (d == null) return null;
+        return new String(d, StandardCharsets.UTF_8);
+    }
+
+    private String fetchDataUri(String url, String referer) {
+        byte[] d = fetchBytes(url, referer);
+        if (d == null || d.length > 6 * 1024 * 1024) return null;
+        String mime = guessType(url, d);
+        return "data:" + mime + ";base64," + android.util.Base64.encodeToString(d, android.util.Base64.NO_WRAP);
+    }
+
+    private byte[] fetchBytes(String url, String referer) {
         try {
-            HttpURLConnection c = (HttpURLConnection) new URL(u).openConnection();
-            c.setConnectTimeout(8000); c.setReadTimeout(10000);
+            HttpURLConnection c = (HttpURLConnection) new URL(url).openConnection();
+            c.setConnectTimeout(8000); c.setReadTimeout(12000);
             c.setInstanceFollowRedirects(true);
             c.setRequestProperty("User-Agent", "Mozilla/5.0 (Linux; Android 13) Chrome/120 Mobile");
-            c.setRequestProperty("Referer", referer == null || referer.isEmpty() ? u : referer);
+            c.setRequestProperty("Referer", referer == null ? url : referer);
             if (c.getResponseCode() != 200) return null;
             InputStream is = c.getInputStream();
-            java.io.ByteArrayOutputStream b = new java.io.ByteArrayOutputStream();
+            ByteArrayOutputStream b = new ByteArrayOutputStream();
             byte[] buf = new byte[8192]; int n;
             while ((n = is.read(buf)) > 0) b.write(buf, 0, n);
             is.close();
-            byte[] data = b.toByteArray();
-            if (data.length > 8 * 1024 * 1024) return null;
-            FileOutputStream fos = new FileOutputStream(out);
-            fos.write(data); fos.close();
-            capMap.put(u, out);
-            flushCapture(); // 即时刷写, 中途退出不丢映射
-            return isMain ? null : new android.webkit.WebResourceResponse(guessType(u), null, new java.io.ByteArrayInputStream(data));
+            return b.toByteArray();
         } catch (Throwable e) { return null; }
     }
 
-    /** 离线打开时, 一次载入全部站点快照映射(子页面在任何目录都能命中) */
-    private final java.util.Map<String, File> offlineIndex = new java.util.concurrent.ConcurrentHashMap<>();
+    /** css里的 url(...) 引用转 data URI */
+    private String inlineCssUrls(String css, String cssUrl) {
+        java.util.regex.Matcher m = java.util.regex.Pattern
+            .compile("url\\((['\"]?)([^)'\";]+)\\1\\)", java.util.regex.Pattern.CASE_INSENSITIVE).matcher(css);
+        StringBuilder out = new StringBuilder();
+        int last = 0;
+        while (m.find()) {
+            String ref = m.group(2);
+            String rep = m.group();
+            String abs = absUrl(ref, cssUrl);
+            if (abs != null) {
+                String data = fetchDataUri(abs, cssUrl);
+                if (data != null) rep = "url(" + data + ")";
+            }
+            out.append(css, last, m.start()).append(rep);
+            last = m.end();
+        }
+        out.append(css.substring(last));
+        return out.toString();
+    }
+
+    private String guessType(String u, byte[] d) {
+        String lu = u.toLowerCase();
+        if (lu.endsWith(".png")) return "image/png";
+        if (lu.endsWith(".gif")) return "image/gif";
+        if (lu.endsWith(".webp")) return "image/webp";
+        if (lu.endsWith(".svg")) return "image/svg+xml";
+        if (lu.endsWith(".js")) return "application/javascript";
+        if (lu.endsWith(".css")) return "text/css";
+        if (d != null && d.length > 4) {
+            if (d[0] == (byte) 0x89 && d[1] == 'P') return "image/png";
+            if (d[0] == (byte) 0xFF && d[1] == (byte) 0xD8) return "image/jpeg";
+        }
+        if (lu.endsWith(".jpg") || lu.endsWith(".jpeg")) return "image/jpeg";
+        return "image/jpeg";
+    }
+
+    // ---------------- 离线回放 + 链接套页面 ----------------
+
+    private boolean offlineMode = false;
+    private final Map<String, File> offlineIndex = new ConcurrentHashMap<>();
+    private final Map<String, File> zipDirs = new ConcurrentHashMap<>();
 
     private void buildOfflineIndex() {
         offlineIndex.clear();
-        File base = snapDir();
-        File[] dirs = base.listFiles();
-        if (dirs == null) return;
-        for (File d : dirs) {
+        File[] dirs = snapDir().listFiles();
+        if (dirs != null) for (File d : dirs) {
             if (!d.isDirectory()) continue;
             File mf = new File(d, "map.json");
             if (!mf.exists()) continue;
@@ -436,7 +602,8 @@ public class OfflineActivity extends Activity {
                 java.util.Iterator<?> it = m.keys();
                 while (it.hasNext()) {
                     String u = (String) it.next();
-                    offlineIndex.put(u, new File(d, m.optString(u)));
+                    File f = new File(d, m.optString(u));
+                    if (f.exists()) offlineIndex.put(u, f);
                 }
             } catch (Throwable ignored) {}
         }
@@ -451,194 +618,94 @@ public class OfflineActivity extends Activity {
     }
 
     private android.webkit.WebResourceResponse serveOffline(String u) {
-        // 变体匹配: 原样 / www增删 / 尾斜杠增删 / 去query
         File f = offlineIndex.get(u);
         if (f == null || !f.exists()) f = offlineIndex.get(normKey(u));
         if (f == null || !f.exists()) {
-            for (java.util.Map.Entry<String, File> e : offlineIndex.entrySet()) {
+            for (Map.Entry<String, File> e : offlineIndex.entrySet()) {
                 if (normKey(e.getKey()).equals(normKey(u))) { f = e.getValue(); break; }
             }
         }
-        // 主文档兜底: 嗅探内容, 只选真正的HTML(排除图片等二进制)
-        if ((f == null || !f.exists()) && u.equals(pendingSnapFor)) {
-            long best = 0;
-            for (java.util.Map.Entry<String, File> e : offlineIndex.entrySet()) {
-                File v = e.getValue();
-                if (!v.exists()) continue;
-                if (!"text/html".equals(sniffType(v))) continue;
-                if (v.length() > best) { best = v.length(); f = v; }
-            }
+        if (f == null || !f.exists()) {
+            toastOnce("该页面未离线保存");
+            return new WebResourceResponse("text/plain", "utf-8", new java.io.ByteArrayInputStream(new byte[0]));
         }
-        if (f == null || !f.exists()) return new android.webkit.WebResourceResponse("text/plain", "utf-8", new java.io.ByteArrayInputStream(new byte[0]));
-        String t = guessType(f.getName());
-        if (t.equals("text/html")) t = sniffType(f); // 无扩展名资源按内容嗅探
-        return serveRes(f, t);
+        return serveRes(f);
     }
 
-    private android.webkit.WebResourceResponse serveRes(File f, String type) {
-        try { return new android.webkit.WebResourceResponse(type, null, new java.io.FileInputStream(f)); }
+    private boolean zipToastShown = false;
+    private void toastOnce(String s) { if (!zipToastShown) { zipToastShown = true; toast(s); } }
+
+    private android.webkit.WebResourceResponse serveZip(String u) {
+        try {
+            // http://ziplocal.z123/rel/path
+            int dot = u.indexOf('.', "http://ziplocal.".length());
+            String site = u.substring("http://ziplocal.".length(), dot);
+            String rel = u.substring(("http://ziplocal." + site + ".").length());
+            if (rel.contains("?")) rel = rel.substring(0, rel.indexOf('?'));
+            rel = java.net.URLDecoder.decode(rel, "UTF-8");
+            File base = zipDirs.get(site);
+            if (base == null) {
+                // 重启后恢复zip目录
+                JSONArray a = load();
+                for (int i = 0; i < a.length(); i++) {
+                    JSONObject o = a.optJSONObject(i);
+                    if (o != null && o.optString("url", "").contains(site)) {
+                        base = new File(o.optString("zipdir"));
+                        zipDirs.put(site, base);
+                        break;
+                    }
+                }
+            }
+            if (base == null) return empty();
+            File f = new File(base, rel);
+            if (!f.exists() || f.isDirectory()) return empty();
+            return serveRes(f);
+        } catch (Throwable e) { return null; }
+    }
+
+    private android.webkit.WebResourceResponse empty() {
+        return new WebResourceResponse("text/plain", "utf-8", new java.io.ByteArrayInputStream(new byte[0]));
+    }
+
+    private android.webkit.WebResourceResponse serveRes(File f) {
+        try { return new WebResourceResponse(sniffType(f), null, new FileInputStream(f)); }
         catch (Throwable e) { return null; }
     }
 
-    /** 文件头魔数嗅探真实类型(快照文件无扩展名) */
     private String sniffType(File f) {
         try {
-            java.io.FileInputStream is = new java.io.FileInputStream(f);
+            FileInputStream is = new FileInputStream(f);
             byte[] h = new byte[400];
             int n = is.read(h); is.close();
             if (n < 4) return "text/html";
-            if (h[0]==(byte)0x89 && h[1]=='P'&&h[2]=='N'&&h[3]=='G') return "image/png";
-            if (h[0]==(byte)0xFF && h[1]==(byte)0xD8) return "image/jpeg";
-            if (h[0]=='G'&&h[1]=='I'&&h[2]=='F') return "image/gif";
-            if (h[0]=='R'&&h[1]=='I'&&h[2]=='F'&&h[3]=='F') return "image/webp";
-            String head = new String(h, 0, Math.max(0,n), StandardCharsets.UTF_8).trim().toLowerCase();
+            if (h[0] == (byte) 0x89 && h[1] == 'P' && h[2] == 'N' && h[3] == 'G') return "image/png";
+            if (h[0] == (byte) 0xFF && h[1] == (byte) 0xD8) return "image/jpeg";
+            if (h[0] == 'G' && h[1] == 'I' && h[2] == 'F') return "image/gif";
+            if (h[0] == 'R' && h[1] == 'I' && h[2] == 'F' && h[3] == 'F') return "image/webp";
+            if (h[0] == '%' && h[1] == 'P' && h[2] == 'D' && h[3] == 'F') return "application/pdf";
+            String head = new String(h, 0, n, StandardCharsets.UTF_8).trim().toLowerCase();
             if (head.startsWith("<!doctype") || head.startsWith("<html") || head.startsWith("<head") || head.contains("<body")) return "text/html";
-            if (head.startsWith("@charset") || head.startsWith("@media") || head.startsWith("body") || head.startsWith(".") || head.startsWith("#") || head.contains("{") && head.contains(":") && head.contains(";") && !head.contains("(")) return "text/css";
+            if (head.startsWith("@charset") || head.startsWith("@media") || head.startsWith("body") || head.startsWith(".") || head.startsWith("#")) return "text/css";
             if (head.startsWith("function") || head.startsWith("var ") || head.startsWith("let ") || head.startsWith("const ") || head.startsWith("(function") || head.startsWith("import") || head.startsWith("!function")) return "application/javascript";
-            if (head.startsWith("%pdf")) return "application/pdf";
             if (head.startsWith("{") || head.startsWith("[")) return "application/json";
             return "text/html";
         } catch (Throwable e) { return "text/html"; }
     }
 
-    private String guessType(String u) {
-        String lu = u.toLowerCase();
-        if (lu.endsWith(".css")) return "text/css";
-        if (lu.endsWith(".js")) return "application/javascript";
-        if (lu.endsWith(".png")) return "image/png";
-        if (lu.endsWith(".gif")) return "image/gif";
-        if (lu.endsWith(".webp")) return "image/webp";
-        if (lu.endsWith(".svg")) return "image/svg+xml";
-        if (lu.endsWith(".woff2")) return "font/woff2";
-        if (lu.endsWith(".woff")) return "font/woff";
-        if (lu.endsWith(".mp4")) return "video/mp4";
-        return "text/html";
-    }
+    // ---------------- 站点菜单 ----------------
 
-    /** 离线整站回放: 先建全量索引, 子页面跨目录命中 */
-    private void openOffline(String url) {
-        showBrowser();
-        offlineMode = true; captureMode = false;
-        pendingSnapFor = url;
-        buildOfflineIndex();
-        web.loadUrl(url);
-        toast("离线模式(整站)");
-    }
-
-    @Override
-    public void onWindowFocusChanged(boolean hasFocus) {
-        super.onWindowFocusChanged(hasFocus);
-        if (hasFocus) Immersive.hide(this);
-    }
-
-    @Override
-    public void onBackPressed() {
-        if (web != null && web.getParent() != null && web.canGoBack()) web.goBack();
-        else if (web != null && web.getParent() != null) buildHome();
-        else super.onBackPressed();
-    }
-
-    private boolean netOk(final String url) {
-        final java.util.concurrent.atomic.AtomicBoolean ok = new java.util.concurrent.atomic.AtomicBoolean(false);
-        Thread t = new Thread(new Runnable() { public void run() {
-            try {
-                HttpURLConnection c = (HttpURLConnection) new URL(url).openConnection();
-                c.setConnectTimeout(4000); c.setReadTimeout(4000);
-                c.setRequestMethod("GET");
-                c.setRequestProperty("Range", "bytes=0-1023");
-                c.setRequestProperty("User-Agent", "Mozilla/5.0 (Linux; Android 13) Chrome/120 Mobile");
-                int code = c.getResponseCode();
-                ok.set(code >= 200 && code < 500 && code != 403);
-            } catch (Throwable e) { ok.set(false); }
-        }});
-        t.start();
-        try { t.join(6000); } catch (InterruptedException ignored) {}
-        return ok.get();
-    }
-
-    // ---------------- 数据 ----------------
-
-    private File snapDir() {
-        // 公共可访问目录: /storage/emulated/0/Android/data/com.wink.xgjhome/files/离线快照/
-        File d = new File(getExternalFilesDir(null), "离线快照");
-        if (!d.exists()) d.mkdirs();
-        return d;
-    }
-
-    private String readSnapshot(String path) {
-        try {
-            java.io.FileInputStream fis = new java.io.FileInputStream(path);
-            java.io.ByteArrayOutputStream b = new java.io.ByteArrayOutputStream();
-            byte[] buf = new byte[8192]; int n;
-            while ((n = fis.read(buf)) > 0) b.write(buf, 0, n);
-            fis.close();
-            return new String(b.toByteArray(), StandardCharsets.UTF_8);
-        } catch (Throwable e) { return ""; }
-    }
-
-    private String snapshotFor(String url) {
-        if (url == null || url.isEmpty()) return "";
-        JSONArray a = load();
-        for (int i = 0; i < a.length(); i++) {
-            JSONObject o = a.optJSONObject(i);
-            if (o != null && url.equals(o.optString("url"))) {
-                String s = o.optString("snap", "");
-                if (!s.isEmpty()) return new File(snapDir(), s).getAbsolutePath();
-            }
-        }
-        return "";
-    }
-
-    private void markSnap(String url, String file) {
-        JSONArray a = load();
-        for (int i = 0; i < a.length(); i++) {
-            JSONObject o = a.optJSONObject(i);
-            if (o != null && url.equals(o.optString("url"))) { try { o.put("snap", file); } catch (Throwable ignored) {} }
-        }
-        save(a);
-    }
-
-    private void addSite(String name, String url) {
-        JSONArray a = load();
-        for (int i = 0; i < a.length(); i++) {
-            JSONObject o = a.optJSONObject(i);
-            if (o != null && url.equals(o.optString("url"))) { toast("已存在"); return; }
-        }
-        try {
-            JSONObject o = new JSONObject();
-            o.put("name", name);
-            o.put("url", url);
-            o.put("color", COLORS[a.length() % COLORS.length]);
-            a.put(o);
-            save(a);
-            refreshCards();
-        } catch (Throwable ignored) {}
-    }
-
-    /** 卡片长按菜单: 在线/离线/抓快照/重命名/删除 各走各的 */
     private void siteMenu(final String name, final String url) {
-        final String[] items = {"🌐 在线打开", "📥 抓取快照(在线)", "📕 离线打开(整站)", "✏️ 重命名", "🗑️ 删除"};
+        final String[] items = {"🌐 在线打开", "📕 离线打开(已存页面)", "✏️ 重命名", "🗑️ 删除"};
         new AlertDialog.Builder(this)
             .setTitle(name)
             .setItems(items, new android.content.DialogInterface.OnClickListener() {
                 public void onClick(android.content.DialogInterface d, int w) {
-                    if (w == 0) { browse(url); }
-                    else if (w == 1) { captureBrowse(url); }
-                    else if (w == 2) { openOffline(url); }
-                    else if (w == 3) { renameSite(name, url); }
+                    if (w == 0) browse(url);
+                    else if (w == 1) { showBrowser(); offlineMode = true; buildOfflineIndex(); pendingSnapFor = url; web.loadUrl(url); toast("离线浏览(已存页面可跳)"); }
+                    else if (w == 2) renameSite(name, url);
                     else delSite(url);
                 }
             }).show();
-    }
-
-    /** 抓取快照模式: 在线浏览+全资源落地 */
-    private void captureBrowse(String url) {
-        showBrowser();
-        pendingSnapFor = url;
-        offlineMode = false; captureMode = true;
-        beginCapture(url);
-        web.loadUrl(url);
-        toast("快照抓取中…浏览要离线的页面");
     }
 
     private void renameSite(final String oldName, final String url) {
@@ -672,20 +739,49 @@ public class OfflineActivity extends Activity {
         }
         save(out);
         refreshCards();
-        toast("已删除(长按卡片)");
+        toast("已删除");
     }
 
-    private JSONArray load() {
-        try { return new JSONArray(getSharedPreferences(PREF, MODE_PRIVATE).getString("json", "[]")); }
-        catch (Throwable e) { return new JSONArray(); }
+    // ---------------- 存储 ----------------
+
+    private File snapDir() {
+        File d = new File(getExternalFilesDir(null), "离线快照");
+        if (!d.exists()) d.mkdirs();
+        return d;
     }
 
-    private void save(JSONArray a) {
-        getSharedPreferences(PREF, MODE_PRIVATE).edit().putString("json", a.toString()).apply();
+    private File siteDir(String url) {
+        String host;
+        try { host = new URL(url).getHost().replace("www.", ""); }
+        catch (Throwable e) { host = md5(url); }
+        host = host.replaceAll("[^a-zA-Z0-9.-]", "_");
+        File d = new File(snapDir(), host);
+        if (!d.exists()) d.mkdirs();
+        return d;
     }
 
-    private String hostOf(String u) {
-        try { return new URL(u).getHost().replace("www.", ""); } catch (Throwable e) { return "站"; }
+    private boolean hasSnap(String url) {
+        File mf = new File(siteDir(url), "map.json");
+        if (!mf.exists()) mf = new File(snapDir(), "map.json");
+        if (mf.exists()) {
+            try {
+                JSONObject m = new JSONObject(readSnapshot(mf.getAbsolutePath()));
+                java.util.Iterator<?> it = m.keys();
+                while (it.hasNext()) if (normKey((String) it.next()).equals(normKey(url))) return true;
+            } catch (Throwable ignored) {}
+        }
+        return false;
+    }
+
+    private String readSnapshot(String path) {
+        try {
+            FileInputStream is = new FileInputStream(path);
+            ByteArrayOutputStream b = new ByteArrayOutputStream();
+            byte[] buf = new byte[8192]; int n;
+            while ((n = is.read(buf)) > 0) b.write(buf, 0, n);
+            is.close();
+            return new String(b.toByteArray(), StandardCharsets.UTF_8);
+        } catch (Throwable e) { return ""; }
     }
 
     private String md5(String s) {
@@ -698,14 +794,47 @@ public class OfflineActivity extends Activity {
         } catch (Throwable e) { return String.valueOf(s.hashCode()); }
     }
 
-    private int dip(int v) { return Math.round(v * getResources().getDisplayMetrics().density); }
-
-    private void toast(String s) {
-        runOnUiThread(new Runnable() { public void run() {
-            Toast.makeText(this2(), s, Toast.LENGTH_SHORT).show();
-        }});
+    private JSONArray load() {
+        try { return new JSONArray(getSharedPreferences(PREF, MODE_PRIVATE).getString("json", "[]")); }
+        catch (Throwable e) { return new JSONArray(); }
     }
-    private OfflineActivity this2() { return this; }
+
+    private void save(JSONArray a) {
+        getSharedPreferences(PREF, MODE_PRIVATE).edit().putString("json", a.toString()).apply();
+    }
+
+    private boolean netOk(final String url) {
+        final java.util.concurrent.atomic.AtomicBoolean ok = new java.util.concurrent.atomic.AtomicBoolean(false);
+        Thread t = new Thread(new Runnable() { public void run() {
+            try {
+                HttpURLConnection c = (HttpURLConnection) new URL(url).openConnection();
+                c.setConnectTimeout(4000); c.setReadTimeout(4000);
+                c.setRequestMethod("GET");
+                c.setRequestProperty("Range", "bytes=0-1023");
+                c.setRequestProperty("User-Agent", "Mozilla/5.0 (Linux; Android 13) Chrome/120 Mobile");
+                int code = c.getResponseCode();
+                ok.set(code >= 200 && code < 500 && code != 403);
+            } catch (Throwable e) { ok.set(false); }
+        }});
+        t.start();
+        try { t.join(6000); } catch (InterruptedException ignored) {}
+        return ok.get();
+    }
+
+
+
+    @Override
+    public void onWindowFocusChanged(boolean hasFocus) {
+        super.onWindowFocusChanged(hasFocus);
+        if (hasFocus) Immersive.hide(this);
+    }
+
+    @Override
+    public void onBackPressed() {
+        if (web != null && web.getParent() != null && web.canGoBack()) web.goBack();
+        else if (web != null && web.getParent() != null) buildHome();
+        else super.onBackPressed();
+    }
 
     @Override
     protected void onDestroy() {
