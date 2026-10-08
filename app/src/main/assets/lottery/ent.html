@@ -31,6 +31,7 @@
   .cell{background:#1c1f26;border-radius:10px;font-size:34px;line-height:70px;height:70px;text-align:center}
   .cell.win{background:#f5c26b33;box-shadow:0 0 0 2px #f5c26b}
   .cell.spin{opacity:.6}
+  .stopbtn{flex:1;background:#e8501f;color:#fff;border:none;border-radius:10px;padding:8px 0;font-size:13px;font-weight:bold}
 </style>
 </head>
 <body>
@@ -46,6 +47,12 @@
 </div>
 <div class="page" id="pg1">
   <div id="slotGrid"></div>
+  <div style="display:flex;gap:8px;max-width:360px;margin:0 auto">
+    <button class="stopbtn" onclick="_stopCol(0)">⏹</button>
+    <button class="stopbtn" onclick="_stopCol(1)">⏹</button>
+    <button class="stopbtn" onclick="_stopCol(2)">⏹</button>
+    <button class="stopbtn" onclick="_stopCol(3)">⏹</button>
+  </div>
   <div id="slotRes" style="min-height:30px;text-align:center;font-size:16px;font-weight:bold;color:#f5c26b;padding:8px 0"></div>
   <button class="btn" onclick="slotSpin()">🎰 拉杆</button>
 </div>
@@ -59,6 +66,9 @@
   <div class="lbl">转盘单次消耗积分(10-500)</div>
   <input id="cfgCost" type="number" inputmode="numeric">
   <button onclick="saveCfg()">保存</button>
+  <div class="lbl">老虎机各符号权重(1-99, 越大越易停)</div>
+  <div id="wRow" style="display:flex;gap:4px;flex-wrap:wrap"></div>
+  <button onclick="saveWeights()">保存权重</button>
 </div>
 <button id="cfgBtn" onclick="toggleCfg()">⚙ 自定义</button>
 <script>
@@ -82,6 +92,7 @@ function toggleCfg(){
   if(c.style.display=='block'){c.style.display='none';return}
   document.getElementById('cfgList').value=getList().join('\n');
   document.getElementById('cfgCost').value=getCost();
+  refreshWeightsUI();
   c.style.display='block';
 }
 function saveCfg(){
@@ -150,13 +161,40 @@ function tab(i){
 }
 
 // ---- 水果老虎机 4x4 ----
+// ---- 水果老虎机 4x4 (权重可调+手动停列) ----
 var SYM=['🍒','🍋','🍊','🍇','🍉','⭐','7️⃣','💎'];
-var slotSpinning=false;
+var slotSpinning=false,slotFinal=[],slotStopped=[false,false,false,false];
+function getWeights(){
+  var def={};SYM.forEach(function(s){def[s]=1});
+  try{var w=JSON.parse(localStorage.ent_weights);for(var k in def)if(typeof w[k]=='number'&&w[k]>=1)def[k]=w[k]}catch(e){}
+  return def;
+}
+function randSym(w){
+  var pool=[];for(var s in w)for(var i=0;i<w[s];i++)pool.push(s);
+  return pool[Math.floor(Math.random()*pool.length)];
+}
 function buildGrid(){
   var g=document.getElementById('slotGrid');
   if(g.childElementCount==16)return;
   g.innerHTML='';
   for(var i=0;i<16;i++){var d=document.createElement('div');d.className='cell';d.textContent=SYM[Math.floor(Math.random()*SYM.length)];g.appendChild(d)}
+}
+function refreshWeightsUI(){
+  var w=getWeights(),box=document.getElementById('wRow');if(!box)return;
+  box.innerHTML='';
+  SYM.forEach(function(s){
+    var d=document.createElement('div');d.style.textAlign='center';
+    d.innerHTML='<div style="font-size:22px">'+s+'</div><input type="number" inputmode="numeric" value="'+w[s]+'" min="1" style="width:52px;background:#0c0e12;color:#eee;border:none;border-radius:8px;padding:6px;text-align:center;font-size:13px">';
+    box.appendChild(d);
+  });
+}
+function saveWeights(){
+  var inputs=document.getElementById('wRow').querySelectorAll('input');
+  var w={};
+  SYM.forEach(function(s,i){var v=parseInt(inputs[i].value);w[s]=(v>=1&&v<=99)?v:1});
+  localStorage.ent_weights=JSON.stringify(w);
+  refreshWeightsUI();
+  alert('权重已保存\n权重越大越容易停在该符号');
 }
 function slotSpin(){
   if(slotSpinning)return;
@@ -164,28 +202,41 @@ function slotSpin(){
   if(pts<cost){alert('积分不足(需要'+cost+'，当前'+pts+')\n用下方「增加积分」');return}
   slotSpinning=true;
   setPts(pts-cost);
-  document.getElementById('slotRes').textContent='转动中…';
-  var cells=document.querySelectorAll('#slotGrid .cell');
+  document.getElementById('slotRes').textContent='转动中…(可点各列STOP提前停)';
   buildGrid();
+  var cells=document.querySelectorAll('#slotGrid .cell');
+  slotStopped=[false,false,false,false];
+  var w=getWeights();
+  // 预定每列最终符号(加权随机)
+  slotFinal=[[0,1,2,3],[0,1,2,3],[0,1,2,3],[0,1,2,3]].map(function(col){return col.map(function(){return randSym(w)})});
   for(var i=0;i<16;i++){cells[i].className='cell spin';cells[i].textContent=SYM[Math.floor(Math.random()*SYM.length)]}
   var iv=setInterval(function(){
-    for(var i=0;i<16;i++)cells[i].textContent=SYM[Math.floor(Math.random()*SYM.length)];
-  },90);
-  // 列依次停: 每列停时该列固定
-  var stopCol=0;
-  var stopIv=setInterval(function(){
-    if(stopCol>=4){clearInterval(stopIv);clearInterval(iv);evalSlots(cells);slotSpinning=false;return}
-    for(var r=0;r<4;r++){
-      var idx=r*4+stopCol;
-      cells[idx].className='cell';
+    for(var c=0;c<4;c++){
+      if(slotStopped[c])continue;
+      for(var r=0;r<4;r++)cells[r*4+c].textContent=randSym(w);
     }
-    stopCol++;
-  },700);
+  },90);
+  // 手动停止函数
+  window._stopCol=function(c){
+    if(slotStopped[c])return;
+    slotStopped[c]=true;
+    for(var r=0;r<4;r++){cells[r*4+c].className='cell';cells[r*4+c].textContent=slotFinal[c][r]}
+    if(slotStopped.every(function(x){return x}))finishSlot(cells,iv);
+  };
+  // 自动依次停(可提前手动)
+  for(var c=0;c<4;c++)(function(c){
+    setTimeout(function(){window._stopCol(c)},900+700*c);
+  })(c);
+}
+function finishSlot(cells,iv){
+  clearInterval(iv);
+  evalSlots(cells);
+  slotSpinning=false;
 }
 function evalSlots(cells){
   var grid=[];
   for(var r=0;r<4;r++){grid.push([0,1,2,3].map(function(c){return cells[r*4+c].textContent}))}
-  var sym=function(i){return grid[Math.floor(i/4)][i%4]}; // 绝对索引→行列
+  var sym=function(i){return grid[Math.floor(i/4)][i%4]};
   var cost=getCost(),win=0,lines=[];
   var linesIdx=[[0,1,2,3],[4,5,6,7],[8,9,10,11],[12,13,14,15],[0,5,10,15],[3,6,9,12]];
   for(var li=0;li<linesIdx.length;li++){
@@ -200,11 +251,11 @@ function evalSlots(cells){
       for(var k2=0;k2<3;k2++)cells[L[k2]].className='cell win';
     }
   }
-  if(win>0){addPts(win);document.getElementById('slotRes').textContent='🎉 中奖 +'+win+' 分\n'+lines.join('  ')}
+  if(win>0){addPts(win);document.getElementById('slotRes').textContent='🎉 中奖 +'+win+' 分 '+lines.join('  ')}
   else document.getElementById('slotRes').textContent='未中奖，再试试';
 }
-function refreshCostLabel(){var b=document.querySelector('#pg1 .btn');if(b)b.textContent='🎰 拉杆(扣'+getCost()+'分)'}
-window.addEventListener('DOMContentLoaded',function(){setPts(getPts());drawWheel();buildGrid();refreshCostLabel()});
+
+window.addEventListener('DOMContentLoaded',function(){setPts(getPts());drawWheel();buildGrid();refreshCostLabel();refreshWeightsUI()});
 </script>
 </body>
 </html>
