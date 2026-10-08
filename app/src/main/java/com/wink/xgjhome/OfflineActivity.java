@@ -418,12 +418,53 @@ public class OfflineActivity extends Activity {
                 File mf = new File(d, "map.json");
                 if (mf.exists()) { try { m = new JSONObject(readSnapshot(mf.getAbsolutePath())); } catch (Throwable ignored) {} }
                 m.put(pageUrl, f.getName());
+                // HtmlDown2 多页机制: 同域文章链接一并抓取(单站一次)
+                File flag = new File(d, "crawled.flag");
+                if (!flag.exists()) {
+                    int added = crawlSubPages(html, pageUrl, d, m);
+                    if (added >= 0) { try { flag.createNewFile(); } catch (Throwable ignored) {} }
+                }
                 FileOutputStream fm = new FileOutputStream(mf);
                 fm.write(m.toString().getBytes(StandardCharsets.UTF_8));
                 fm.close();
             } catch (Throwable ignored) {}
             snapBusy = false;
         }}).start();
+    }
+
+    // 返回新增页数; -1=中途中断(已写入的部分仍有效)
+    private int crawlSubPages(String html, String pageUrl, File d, JSONObject m) {
+        int added = 0;
+        try {
+            String host0 = new URL(pageUrl).getHost();
+            java.util.ArrayList<String> urls = new java.util.ArrayList<>();
+            java.util.regex.Matcher mm = java.util.regex.Pattern
+                .compile("<a[^>]+href=[\"']?([^\\s>\"'#]+)", java.util.regex.Pattern.CASE_INSENSITIVE).matcher(html);
+            while (mm.find()) {
+                String abs = absUrl(mm.group(1), pageUrl);
+                if (abs == null || abs.equals(pageUrl)) continue;
+                try { if (!new URL(abs).getHost().equals(host0)) continue; } catch (Throwable e) { continue; }
+                String lp = abs.toLowerCase();
+                if (!(lp.endsWith("/") || lp.contains(".html") || lp.contains(".htm") || lp.contains("?p="))) continue;
+                if (!urls.contains(abs)) urls.add(abs);
+                if (urls.size() >= 30) break;
+            }
+            for (String u : urls) {
+                if (m.has(u)) continue;
+                try {
+                    String h = fetchText(u, pageUrl);
+                    if (h == null || h.length() < 200) continue;
+                    String out = processHtml(h, u);
+                    File f2 = new File(d, "page_" + md5(u).substring(0, 8) + ".html");
+                    FileOutputStream fo = new FileOutputStream(f2);
+                    fo.write(out.getBytes(StandardCharsets.UTF_8));
+                    fo.close();
+                    m.put(u, f2.getName());
+                    added++;
+                } catch (Throwable ignored) {}
+            }
+        } catch (Throwable e) { return -1; }
+        return added;
     }
 
     // HtmlDown2 机制: 资源落盘 images/js/css/videos 子目录, 属性改根相对路径
