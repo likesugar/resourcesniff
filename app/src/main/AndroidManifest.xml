@@ -34,6 +34,7 @@
         <activity android:name=".SpiderActivity" android:exported="false" android:configChanges="orientation|screenSize|keyboardHidden"/>
         <activity android:name=".ChatActivity" android:exported="false" android:windowSoftInputMode="adjustResize"/>
         <activity android:name=".OfflineActivity" android:exported="false" android:configChanges="orientation|screenSize|keyboardHidden"/>
+        <activity android:name=".EntertainmentActivity" android:exported="false"/>
         <receiver android:name=".MedPlanActivity$MedPlanReceiver" android:exported="false"/>
         <receiver android:name=".MedPlanActivity$MedConfirmReceiver" android:exported="false"/>
         <activity android:name=".SettingsActivity" android:exported="false" android:windowSoftInputMode="adjustResize"/>
