@@ -157,7 +157,7 @@ function newCard(silent){
   var wrap=document.getElementById('cardWrap');
   var list=getList();
   var prize=list[Math.floor(Math.random()*list.length)];
-  var under=document.getElementById('under');
+  var under=document.createElement('img');under.id='under';
   under.src=resultImg(prize);
   var cv=document.getElementById('js_lottery');
   cv.width=600;cv.height=340;
