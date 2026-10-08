@@ -346,8 +346,13 @@ public class OfflineActivity extends Activity {
     private File capDir = null;
     private final java.util.Map<String, File> capMap = new java.util.concurrent.ConcurrentHashMap<>();
 
+    /** 一个网站一个文件夹(按域名): 离线快照/tulpa.cn/ */
     private File fullDir(String siteUrl) {
-        File d = new File(snapDir(), "site_" + md5(siteUrl));
+        String host;
+        try { host = new URL(siteUrl).getHost().replace("www.", ""); }
+        catch (Throwable e) { host = md5(siteUrl); }
+        host = host.replaceAll("[^a-zA-Z0-9.-]", "_");
+        File d = new File(snapDir(), host);
         if (!d.exists()) d.mkdirs();
         return d;
     }
@@ -356,7 +361,19 @@ public class OfflineActivity extends Activity {
 
     private void beginCapture(String url) {
         capDir = fullDir(url);
-        capMap.clear();
+        // 载入该站已有映射, 资源与页面累积不重抓
+        try {
+            File mf = new File(capDir, "map.json");
+            if (mf.exists()) {
+                JSONObject m = new JSONObject(readSnapshot(mf.getAbsolutePath()));
+                java.util.Iterator<?> it = m.keys();
+                while (it.hasNext()) {
+                    String u = (String) it.next();
+                    File f = new File(capDir, m.optString(u));
+                    if (f.exists()) capMap.put(u, f);
+                }
+            }
+        } catch (Throwable ignored) {}
     }
 
     /** 落盘当前页的URL映射(不关抓取, 跳页继续) */
