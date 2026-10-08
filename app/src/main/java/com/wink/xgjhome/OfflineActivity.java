@@ -351,14 +351,23 @@ public class OfflineActivity extends Activity {
         return d;
     }
 
-    private boolean netOk(String url) {
-        try {
-            HttpURLConnection c = (HttpURLConnection) new URL(url).openConnection();
-            c.setConnectTimeout(3000); c.setReadTimeout(3000);
-            c.setRequestMethod("HEAD");
-            c.setRequestProperty("User-Agent", "Mozilla/5.0 (Linux; Android 13) Chrome/120 Mobile");
-            return c.getResponseCode() < 400;
-        } catch (Throwable e) { return false; }
+    private boolean netOk(final String url) {
+        // 网络探测必须在子线程(主线程会抛NetworkOnMainThreadException); GET+Range兼容拒HEAD的站
+        final java.util.concurrent.atomic.AtomicBoolean ok = new java.util.concurrent.atomic.AtomicBoolean(false);
+        Thread t = new Thread(new Runnable() { public void run() {
+            try {
+                HttpURLConnection c = (HttpURLConnection) new URL(url).openConnection();
+                c.setConnectTimeout(4000); c.setReadTimeout(4000);
+                c.setRequestMethod("GET");
+                c.setRequestProperty("Range", "bytes=0-1023");
+                c.setRequestProperty("User-Agent", "Mozilla/5.0 (Linux; Android 13) Chrome/120 Mobile");
+                int code = c.getResponseCode();
+                ok.set(code >= 200 && code < 500 && code != 403);
+            } catch (Throwable e) { ok.set(false); }
+        }});
+        t.start();
+        try { t.join(6000); } catch (InterruptedException ignored) {}
+        return ok.get();
     }
 
     private boolean hasFullSnap(String url) { return new File(fullDir(url), "map.json").exists(); }
