@@ -106,6 +106,7 @@ public class OfflineActivity extends Activity {
         pill.setOnClickListener(new View.OnClickListener() { public void onClick(View v) { showAddDialog(); } });
         homeRoot.addView(pill, plp);
 
+        dotBtn = null;
         setContentView(homeRoot);
         refreshCards();
     }
@@ -353,7 +354,7 @@ public class OfflineActivity extends Activity {
                 }
             }
             @Override public void onPageFinished(WebView v, String u) {
-                if (!u.startsWith("http") || snapBusy) return;
+                if (!u.startsWith("http") || snapBusy || offlineMode) return;
                 pendingSnapFor = u;
                 v.postDelayed(new Runnable() { public void run() { snapshotPage(u); } }, 2500);
             }
@@ -381,17 +382,21 @@ public class OfflineActivity extends Activity {
         root.addView(dot, dlp);
         dot.setOnClickListener(new View.OnClickListener() { public void onClick(View v) { dot.setVisibility(View.GONE); buildHome(); } });
         final Runnable hideDot = new Runnable() { public void run() { dot.setVisibility(View.GONE); } };
-        root.setOnTouchListener(new View.OnTouchListener() {
-            public boolean onTouch(View v, android.view.MotionEvent e) {
-                if (e.getAction() == android.view.MotionEvent.ACTION_DOWN) {
-                    dot.setVisibility(View.VISIBLE);
-                    dot.removeCallbacks(hideDot);
-                    dot.postDelayed(hideDot, 3000);
-                }
-                return false;
-            }
-        });
+        dot.setTag(hideDot);
+        dotBtn = dot;
         setContentView(root);
+    }
+
+    private View dotBtn;
+
+    @Override
+    public boolean dispatchTouchEvent(android.view.MotionEvent ev) {
+        if (ev.getAction() == android.view.MotionEvent.ACTION_DOWN && dotBtn != null && dotBtn.getParent() != null) {
+            dotBtn.setVisibility(View.VISIBLE);
+            Runnable h = (Runnable) dotBtn.getTag();
+            if (h != null) { dotBtn.removeCallbacks(h); dotBtn.postDelayed(h, 3000); }
+        }
+        return super.dispatchTouchEvent(ev);
     }
 
     /** 整页自包含快照: 抓outerHTML → 内联全部资源 → 存站目录 */
@@ -405,8 +410,11 @@ public class OfflineActivity extends Activity {
                     try {
                         String html = val == null ? "" : val;
                         if (html.length() > 1 && html.charAt(0) == '"') {
-                            html = html.substring(1, html.length() - 1)
-                                .replace("\\\"", "\"").replace("\\\\", "\\").replace("\\n", "\n").replace("\\r", "");
+                            try {
+                                html = (String) new org.json.JSONTokener(html).nextValue();
+                            } catch (Throwable e2) {
+                                html = html.substring(1, html.length() - 1);
+                            }
                         }
                         if (html.length() < 200) { snapBusy = false; return; }
                         String out = inlineHtml(html, pageUrl);
