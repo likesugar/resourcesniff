@@ -771,6 +771,25 @@ public class OfflineActivity extends Activity {
     }
 
     private String sniffType(File f) {
+        String nm = f.getName().toLowerCase();
+        if (nm.endsWith(".css")) return "text/css";
+        if (nm.endsWith(".js")) return "application/javascript";
+        if (nm.endsWith(".mjs")) return "application/javascript";
+        if (nm.endsWith(".png")) return "image/png";
+        if (nm.endsWith(".jpg") || nm.endsWith(".jpeg")) return "image/jpeg";
+        if (nm.endsWith(".gif")) return "image/gif";
+        if (nm.endsWith(".webp")) return "image/webp";
+        if (nm.endsWith(".svg")) return "image/svg+xml";
+        if (nm.endsWith(".html") || nm.endsWith(".htm")) return "text/html";
+        if (nm.endsWith(".json")) return "application/json";
+        if (nm.endsWith(".woff2")) return "font/woff2";
+        if (nm.endsWith(".woff")) return "font/woff";
+        if (nm.endsWith(".ttf")) return "font/ttf";
+        if (nm.endsWith(".otf")) return "font/otf";
+        if (nm.endsWith(".mp4")) return "video/mp4";
+        if (nm.endsWith(".webm")) return "video/webm";
+        if (nm.endsWith(".mp3")) return "audio/mpeg";
+        if (nm.endsWith(".pdf")) return "application/pdf";
         try {
             FileInputStream is = new FileInputStream(f);
             byte[] h = new byte[400];
