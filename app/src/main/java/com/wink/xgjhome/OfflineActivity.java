@@ -246,11 +246,18 @@ public class OfflineActivity extends Activity {
             web.setWebViewClient(new WebViewClient() {
                 @Override public void onReceivedSslError(WebView v, android.webkit.SslErrorHandler h, android.net.http.SslError e) { h.proceed(); }
                 @Override public boolean shouldOverrideUrlLoading(WebView v, String u) { return false; }
-                // 站内跳页: 每页独立快照集(已抓过跳过)
+                // 站内跳页: 每页独立快照集(已抓过跳过); 离线模式点未缓存链接→自动转在线补抓
                 @Override public void onPageStarted(WebView v, String u, android.graphics.Bitmap fav) {
-                    if (captureMode && u.startsWith("http") && !u.equals(pendingSnapFor)) {
-                        if (hasFullSnap(u)) { pendingSnapFor = u; return; }
+                    if (!u.startsWith("http") || u.equals(pendingSnapFor)) return;
+                    if (hasFullSnap(u)) {
+                        boolean wasOffline = offlineMode;
                         pendingSnapFor = u;
+                        if (wasOffline) { offlineMode = true; captureMode = false; }
+                        return;
+                    }
+                    if (captureMode || offlineMode) {
+                        pendingSnapFor = u;
+                        offlineMode = false; captureMode = true;
                         beginCapture(u);
                     }
                 }
@@ -384,13 +391,33 @@ public class OfflineActivity extends Activity {
         } catch (Throwable e) { return null; }
     }
 
+    /** 离线打开时, 一次载入全部站点快照映射(子页面在任何目录都能命中) */
+    private final java.util.Map<String, File> offlineIndex = new java.util.concurrent.ConcurrentHashMap<>();
+
+    private void buildOfflineIndex() {
+        offlineIndex.clear();
+        File base = snapDir();
+        File[] dirs = base.listFiles();
+        if (dirs == null) return;
+        for (File d : dirs) {
+            if (!d.isDirectory() || !d.getName().startsWith("site_")) continue;
+            File mf = new File(d, "map.json");
+            if (!mf.exists()) continue;
+            try {
+                JSONObject m = new JSONObject(readSnapshot(mf.getAbsolutePath()));
+                java.util.Iterator<?> it = m.keys();
+                while (it.hasNext()) {
+                    String u = (String) it.next();
+                    offlineIndex.put(u, new File(d, m.optString(u)));
+                }
+            } catch (Throwable ignored) {}
+        }
+    }
+
     private android.webkit.WebResourceResponse serveOffline(String u) {
-        try {
-            JSONObject m = new JSONObject(readSnapshot(new File(fullDir(pendingSnapFor), "map.json").getAbsolutePath()));
-            String f = m.optString(u, "");
-            if (f.isEmpty()) return new android.webkit.WebResourceResponse("text/plain", "utf-8", new java.io.ByteArrayInputStream(new byte[0]));
-            return serveRes(new File(fullDir(pendingSnapFor), f), guessType(u));
-        } catch (Throwable e) { return null; }
+        File f = offlineIndex.get(u);
+        if (f == null || !f.exists()) return new android.webkit.WebResourceResponse("text/plain", "utf-8", new java.io.ByteArrayInputStream(new byte[0]));
+        return serveRes(f, guessType(u));
     }
 
     private android.webkit.WebResourceResponse serveRes(File f, String type) {
@@ -412,10 +439,11 @@ public class OfflineActivity extends Activity {
         return "text/html";
     }
 
-    /** 离线整站回放 */
+    /** 离线整站回放: 先建全量索引, 子页面跨目录命中 */
     private void openOffline(String url) {
         offlineMode = true; captureMode = false;
         pendingSnapFor = url;
+        buildOfflineIndex();
         web.loadUrl(url);
         toast("离线模式(整站)");
     }
