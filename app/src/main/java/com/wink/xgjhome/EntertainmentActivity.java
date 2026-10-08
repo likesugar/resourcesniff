@@ -22,22 +22,8 @@ public class EntertainmentActivity extends Activity {
         ws.setDomStorageEnabled(true); // localStorage存自定义奖项
         ws.setUserAgentString("Mozilla/5.0 (Linux; Android 13) Chrome/120 Mobile");
         web.setWebViewClient(new WebViewClient());
-        android.widget.FrameLayout root = new android.widget.FrameLayout(this);
-        root.addView(web, new android.widget.FrameLayout.LayoutParams(-1, -1));
-        android.widget.TextView ai = new android.widget.TextView(this);
-        ai.setText("🤖 AI");
-        ai.setTextSize(13); ai.setTextColor(0xFFFFFFFF); ai.setTypeface(null, android.graphics.Typeface.BOLD);
-        ai.setGravity(android.view.Gravity.CENTER);
-        android.graphics.drawable.GradientDrawable ag = new android.graphics.drawable.GradientDrawable();
-        ag.setColor(0xCC315CDE); ag.setCornerRadius(dip2(18));
-        ai.setBackground(ag);
-        android.widget.FrameLayout.LayoutParams alp = new android.widget.FrameLayout.LayoutParams(-2, -2, android.view.Gravity.BOTTOM | android.view.Gravity.LEFT);
-        alp.setMargins(dip2(12), 0, 0, dip2(20));
-        root.addView(ai, alp);
-        ai.setOnClickListener(new View.OnClickListener() { public void onClick(View v) {
-            startActivity(new android.content.Intent(EntertainmentActivity.this, AiChatActivity.class));
-        }});
-        setContentView(root);
+        web.setWebChromeClient(new android.webkit.WebChromeClient()); // 没有它 alert() 会被静默吞掉(积分不足提示/错误提示全部看不到)
+        setContentView(web);
         web.loadUrl("file:///android_asset/lottery/ent.html");
     }
 
