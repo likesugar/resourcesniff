@@ -20,23 +20,14 @@ public class LanShareServer {
         return 10000 + new java.util.Random().nextInt(55536);
     }
 
-    private static volatile int preferredPort = -1;
-    public static void setPreferredPort(int p) { preferredPort = p; }
-
     public static synchronized void start() {
         if (running) return;
         // 同步绑定：调用返回时端口一定就绪（不再出现 -1）
         ServerSocket tmp = null;
         int p2 = -1;
-        // 优先尝试用户指定端口
-        if (preferredPort >= 1024) {
-            try { p2 = preferredPort; tmp = new ServerSocket(p2); } catch (Throwable e) { tmp = null; }
-        }
-        if (tmp == null) {
-            for (int i = 0; i < 20; i++) {
-                try { p2 = randomPort(); tmp = new ServerSocket(p2); break; }
-                catch (Throwable e) { tmp = null; }
-            }
+        for (int i = 0; i < 20; i++) {
+            try { p2 = randomPort(); tmp = new ServerSocket(p2); break; }
+            catch (Throwable e) { tmp = null; }
         }
         if (tmp == null) return;
         ss = tmp;
@@ -234,7 +225,10 @@ public class LanShareServer {
             + "function poll(){fetch('/chat/poll?since='+since).then(function(r){return r.json()}).then(function(a){"
             + "for(var i=0;i<a.length;i++){var o=a[i];if(o.ts>since)since=o.ts;"
             + "var d=document.createElement('div');d.className='m';"
-            + "d.innerHTML=\"<div class='n'>\"+o.nick+' · '+new Date(o.ts).toLocaleTimeString()+\"</div><div class='b'>\"+o.msg.replace(/</g,'&lt;')+\"</div>\";"
+            + "var body;"
+            + "if(o.fname){body=\"<a style='color:#7fb0ff' href='/chatfile?ts=\"+o.fts+\"'>📎 \"+o.fname.replace(/</g,'&lt;')+\" (点击下载)</a>\";}"
+            + "else{body=o.msg.replace(/</g,'&lt;');}"
+            + "d.innerHTML=\"<div class='n'>\"+o.nick+' · '+new Date(o.ts).toLocaleTimeString()+\"</div><div class='b'>\"+body+\"</div>\";"
             + "box.appendChild(d);}if(a.length)box.scrollTop=box.scrollHeight;"
             + "setTimeout(poll,1500);}).catch(function(){setTimeout(poll,3000);});}"
             + "function send(){var m=document.getElementById('msg').value.trim();if(!m)return;"

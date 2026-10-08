@@ -54,6 +54,7 @@ public class ChatHub {
                         if (!seenOnce(o)) continue; // 双广播/重发去重
                         append(o);
                         notifyUi(o);
+                        autoFetchFile(o); // 文件消息自动接收落地, 供本机/电脑下载
                     } catch (Throwable e) { if (!running) break; }
                 }
             }});
@@ -136,6 +137,32 @@ public class ChatHub {
     private static final java.util.Map<Long, java.io.File> serveFiles = java.util.Collections.synchronizedMap(new java.util.HashMap<Long, java.io.File>());
     public static void serveFile(long ts, java.io.File f) { serveFiles.put(ts, f); }
     public static java.io.File getServeFile(long ts) { return serveFiles.get(ts); }
+
+    /** 收到文件消息自动下载落地 → 注册到文件服务(本机/电脑可下载) */
+    private static void autoFetchFile(final JSONObject o) {
+        final String fname = o.optString("fname", "");
+        if (fname.isEmpty()) return;
+        final long fts = o.optLong("fts", 0);
+        if (serveFiles.containsKey(fts)) return;
+        final String fip = o.optString("fip", "");
+        final int fport = o.optInt("fport", 0);
+        if (fip.isEmpty() || fport <= 0) return;
+        new Thread(new Runnable() { public void run() {
+            try {
+                java.io.File dir = new java.io.File(ctx.getExternalFilesDir(null), "聊天文件");
+                if (!dir.exists()) dir.mkdirs();
+                java.io.File out = new java.io.File(dir, fts + "_" + fname);
+                java.net.HttpURLConnection c = (java.net.HttpURLConnection) new java.net.URL("http://" + fip + ":" + fport + "/chatfile?ts=" + fts).openConnection();
+                c.setConnectTimeout(8000); c.setReadTimeout(60000);
+                java.io.InputStream is = c.getInputStream();
+                java.io.FileOutputStream fos = new java.io.FileOutputStream(out);
+                byte[] b = new byte[8192]; int n;
+                while ((n = is.read(b)) > 0) fos.write(b, 0, n);
+                is.close(); fos.close();
+                serveFile(fts, out);
+            } catch (Throwable ignored) {}
+        }}).start();
+    }
 
     /** 自上次之后的全部消息(PC轮询) */
     public static JSONArray since(long ts) {

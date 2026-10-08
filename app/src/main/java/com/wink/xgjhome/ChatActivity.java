@@ -40,7 +40,6 @@ public class ChatActivity extends Activity {
         // 输入法弹起时压缩窗口, 不遮输入框
         getWindow().setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE);
         nick = getSharedPreferences("chat", MODE_PRIVATE).getString("nick", "");
-        LanShareServer.setPreferredPort(getSharedPreferences("chat", MODE_PRIVATE).getInt("lan_port", -1));
         ChatHub.init(getApplicationContext());
         ChatHub.start();
         buildUi();
@@ -224,13 +223,16 @@ public class ChatActivity extends Activity {
         title.setTextSize(18); title.setTextColor(main()); title.setTypeface(null, android.graphics.Typeface.BOLD);
         TextView ip = new TextView(this); ip.setText("  " + LanShareServer.localIp() + ":" + LanShareServer.getPort());
         ip.setTextSize(11); ip.setTextColor(sub());
-        TextView portBtn = new TextView(this);
-        portBtn.setText("  🔌端口");
-        portBtn.setTextSize(12);
-        portBtn.setTextColor(0xFF315CDE);
-        portBtn.setOnClickListener(new View.OnClickListener() { public void onClick(View v) { showPortDialog(); } });
-        top.addView(back); top.addView(title); top.addView(ip); top.addView(portBtn);
+        top.addView(back); top.addView(title); top.addView(ip);
         root.addView(top, new LinearLayout.LayoutParams(-1, -2));
+
+        // 电脑接入说明
+        TextView hint = new TextView(this);
+        hint.setText("💻 电脑浏览器打开 http://" + LanShareServer.localIp() + ":" + LanShareServer.getPort() + "/chat 进聊天室");
+        hint.setTextSize(10);
+        hint.setTextColor(0xFF888888);
+        hint.setPadding(dip(16), 0, dip(16), dip(4));
+        root.addView(hint, new LinearLayout.LayoutParams(-1, -2));
 
         msgList = new LinearLayout(this);
         msgList.setOrientation(LinearLayout.VERTICAL);
@@ -292,38 +294,6 @@ public class ChatActivity extends Activity {
         setupImeFix();
         applyImmersive();
         renderAll();
-    }
-
-    /** 端口设置: 与主页局域网共享同一端口, 自定义后自动重启服务 */
-    private void showPortDialog() {
-        LinearLayout box = new LinearLayout(this);
-        box.setOrientation(LinearLayout.VERTICAL);
-        box.setPadding(dip(24), dip(10), dip(24), 0);
-        TextView info = new TextView(this);
-        info.setText("当前端口: " + LanShareServer.getPort() + "\n电脑/其他设备访问:\nhttp://" + LanShareServer.localIp() + ":" + LanShareServer.getPort() + "/chat");
-        info.setTextSize(12);
-        info.setTextColor(0xFF888888);
-        box.addView(info);
-        final EditText et = new EditText(this);
-        et.setHint("新端口(1024-65535), 留空不改");
-        et.setInputType(EditorInfo.TYPE_CLASS_NUMBER);
-        et.setText(String.valueOf(LanShareServer.getPort()));
-        et.setSelection(et.getText().length());
-        box.addView(et);
-        new AlertDialog.Builder(this).setTitle("局域网端口").setView(box)
-            .setPositiveButton("应用", new android.content.DialogInterface.OnClickListener() {
-                public void onClick(android.content.DialogInterface dg, int w) {
-                    try {
-                        int p = Integer.parseInt(et.getText().toString().trim());
-                        if (p < 1024 || p > 65535) { toast("端口范围 1024-65535"); return; }
-                        getSharedPreferences("chat", MODE_PRIVATE).edit().putInt("lan_port", p).apply();
-                        LanShareServer.setPreferredPort(p);
-                        LanShareServer.stop();
-                        LanShareServer.start();
-                        toast("端口: " + LanShareServer.getPort());
-                    } catch (Throwable e) { toast("设置失败: " + e); }
-                }
-            }).setNegativeButton("取消", null).show();
     }
 
     private void doSend() {
