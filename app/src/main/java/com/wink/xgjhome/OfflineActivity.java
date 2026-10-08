@@ -418,22 +418,28 @@ public class OfflineActivity extends Activity {
                 File mf = new File(d, "map.json");
                 if (mf.exists()) { try { m = new JSONObject(readSnapshot(mf.getAbsolutePath())); } catch (Throwable ignored) {} }
                 m.put(pageUrl, f.getName());
+                writeMap(mf, m); // 主页先落盘, 爬子页期间离线也能开主页
                 // HtmlDown2 多页机制: 同域文章链接一并抓取(单站一次)
                 File flag = new File(d, "crawled.flag");
                 if (!flag.exists()) {
-                    int added = crawlSubPages(html, pageUrl, d, m);
+                    int added = crawlSubPages(html, pageUrl, d, m, mf);
                     if (added >= 0) { try { flag.createNewFile(); } catch (Throwable ignored) {} }
                 }
-                FileOutputStream fm = new FileOutputStream(mf);
-                fm.write(m.toString().getBytes(StandardCharsets.UTF_8));
-                fm.close();
             } catch (Throwable ignored) {}
             snapBusy = false;
         }}).start();
     }
 
+    private void writeMap(File mf, JSONObject m) {
+        try {
+            FileOutputStream fm = new FileOutputStream(mf);
+            fm.write(m.toString().getBytes(StandardCharsets.UTF_8));
+            fm.close();
+        } catch (Throwable ignored) {}
+    }
+
     // 返回新增页数; -1=中途中断(已写入的部分仍有效)
-    private int crawlSubPages(String html, String pageUrl, File d, JSONObject m) {
+    private int crawlSubPages(String html, String pageUrl, File d, JSONObject m, File mf) {
         int added = 0;
         try {
             String host0 = new URL(pageUrl).getHost();
@@ -460,6 +466,7 @@ public class OfflineActivity extends Activity {
                     fo.write(out.getBytes(StandardCharsets.UTF_8));
                     fo.close();
                     m.put(u, f2.getName());
+                    writeMap(mf, m); // 每存一篇立即落盘
                     added++;
                 } catch (Throwable ignored) {}
             }
@@ -756,7 +763,7 @@ public class OfflineActivity extends Activity {
                     if (rf.exists() && rf.isFile()) return serveRes(rf);
                 }
             } catch (Throwable ignored) {}
-            toastOnce("该页面未离线保存");
+            toastOnce(snapBusy ? "正在离线保存中,稍后再试" : "该页面未离线保存");
             return new WebResourceResponse("text/plain", "utf-8", new java.io.ByteArrayInputStream(new byte[0]));
         }
         if (f.getName().endsWith(".mht")) {
