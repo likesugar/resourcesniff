@@ -23,13 +23,31 @@
   .addbar{display:flex;gap:10px;justify-content:center;margin:16px 16px 0;padding:14px;background:#1c1f26;border-radius:14px}
   .addbar input{flex:1;background:#0c0e12;color:#eee;border:none;border-radius:18px;padding:10px 14px;font-size:14px;outline:none}
   .addbar button{background:#1FA855;color:#fff;border:none;border-radius:18px;padding:10px 18px;font-size:14px;font-weight:bold}
+  .tabs{display:flex;padding:14px 16px 0;gap:10px}
+  .tab{flex:1;text-align:center;padding:10px 0;border-radius:20px;background:#1c1f26;font-size:15px;cursor:pointer}
+  .tab.on{background:#315CDE;font-weight:bold}
+  #slotGrid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;max-width:360px;margin:16px auto}
+  .cell{background:#1c1f26;border-radius:10px;font-size:34px;line-height:70px;height:70px;text-align:center}
+  .cell.win{background:#f5c26b33;box-shadow:0 0 0 2px #f5c26b}
+  .cell.spin{opacity:.6}
 </style>
 </head>
 <body>
 <div id="pts">💰 积分: 100</div>
+<div class="tabs">
+  <div class="tab on" id="tab0" onclick="tab(0)">🎡 转盘</div>
+  <div class="tab" id="tab1" onclick="tab(1)">🎰 老虎机</div>
+</div>
+<div class="page on" id="pg0">
 <div id="dialWrap"><canvas id="wheel" width="640" height="640"></canvas><div id="go" onclick="spin()">GO</div></div>
 <div id="res"></div>
 <button class="btn" onclick="spin()">转起来</button>
+</div>
+<div class="page" id="pg1">
+  <div id="slotGrid"></div>
+  <div id="slotRes" style="min-height:30px;text-align:center;font-size:16px;font-weight:bold;color:#f5c26b;padding:8px 0"></div>
+  <button class="btn" onclick="slotSpin()">🎰 拉杆</button>
+</div>
 <div class="addbar">
   <input id="addN" type="number" inputmode="numeric" placeholder="输入积分">
   <button onclick="manualAdd()">➕ 增加积分</button>
@@ -122,7 +140,72 @@ function spin(){
     drawWheel();
   },4400);
 }
-window.addEventListener('DOMContentLoaded',function(){setPts(getPts());drawWheel()});
+function tab(i){
+  document.getElementById('tab0').className='tab'+(i==0?' on':'');
+  document.getElementById('tab1').className='tab'+(i==1?' on':'');
+  document.getElementById('pg0').className='page'+(i==0?' on':'');
+  document.getElementById('pg1').className='page'+(i==1?' on':'');
+}
+
+// ---- 水果老虎机 4x4 ----
+var SYM=['🍒','🍋','🍊','🍇','🍉','⭐','7️⃣','💎'];
+var slotSpinning=false;
+function buildGrid(){
+  var g=document.getElementById('slotGrid');
+  if(g.childElementCount==16)return;
+  g.innerHTML='';
+  for(var i=0;i<16;i++){var d=document.createElement('div');d.className='cell';d.textContent=SYM[Math.floor(Math.random()*SYM.length)];g.appendChild(d)}
+}
+function slotSpin(){
+  if(slotSpinning)return;
+  var cost=getCost(),pts=getPts();
+  if(pts<cost){alert('积分不足(需要'+cost+'，当前'+pts+')\n用下方「增加积分」');return}
+  slotSpinning=true;
+  setPts(pts-cost);
+  document.getElementById('slotRes').textContent='转动中…';
+  var cells=document.querySelectorAll('#slotGrid .cell');
+  buildGrid();
+  for(var i=0;i<16;i++){cells[i].className='cell spin';cells[i].textContent=SYM[Math.floor(Math.random()*SYM.length)]}
+  var iv=setInterval(function(){
+    for(var i=0;i<16;i++)cells[i].textContent=SYM[Math.floor(Math.random()*SYM.length)];
+  },90);
+  // 列依次停: 每列停时该列固定
+  var stopCol=0;
+  var stopIv=setInterval(function(){
+    if(stopCol>=4){clearInterval(stopIv);clearInterval(iv);evalSlots(cells);slotSpinning=false;return}
+    for(var r=0;r<4;r++){
+      var idx=r*4+stopCol;
+      cells[idx].className='cell';
+    }
+    stopCol++;
+  },700);
+}
+function evalSlots(cells){
+  var grid=[];
+  for(var r=0;r<4;r++){grid.push([0,1,2,3].map(function(c){return cells[r*4+c].textContent}))}
+  var cost=getCost(),win=0,lines=[];
+  var linesIdx=[[0,1,2,3],[4,5,6,7],[8,9,10,11],[12,13,14,15],[0,5,10,15],[3,6,9,12]];
+  for(var li=0;li<linesIdx.length;li++){
+    var L=linesIdx[li];
+    if(grid[0][L[0]]==grid[0][L[1]]&&grid[0][L[1]]==grid[0][L[2]]&&grid[0][L[2]]==grid[0][L[3]]){
+      // 4连
+      var m=20;lines.push('第'+(li+1)+'线 4连 '+grid[0][L[0]]+' ×'+m);
+      win+=cost*m;
+      for(var k=0;k<4;k++)cells[L[k]].className='cell win';
+    } else {
+      // 3连(前三格)
+      if(grid[0][L[0]]==grid[0][L[1]]&&grid[0][L[1]]==grid[0][L[2]]){
+        lines.push('第'+(li+1)+'线 3连 '+grid[0][L[0]]+' ×3');
+        win+=cost*3;
+        for(var k2=0;k2<3;k2++)cells[L[k2]].className='cell win';
+      }
+    }
+  }
+  if(win>0){addPts(win);document.getElementById('slotRes').textContent='🎉 中奖 +'+win+' 分\n'+lines.join('  ')}
+  else document.getElementById('slotRes').textContent='未中奖，再试试';
+}
+function refreshCostLabel(){var b=document.querySelector('#pg1 .btn');if(b)b.textContent='🎰 拉杆(扣'+getCost()+'分)'}
+window.addEventListener('DOMContentLoaded',function(){setPts(getPts());drawWheel();buildGrid();refreshCostLabel()});
 </script>
 </body>
 </html>
