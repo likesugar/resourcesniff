@@ -263,6 +263,15 @@ public class OfflineActivity extends Activity {
                 @Override public void onReceivedSslError(WebView v, android.webkit.SslErrorHandler h, android.net.http.SslError e) { h.proceed(); }
                 @Override public boolean shouldOverrideUrlLoading(WebView v, String u) { return false; }
 
+                // 站内跳页: 为新页面开新快照集(跳过已抓过的)
+                @Override public void onPageStarted(WebView v, String u, android.graphics.Bitmap fav) {
+                    if (captureMode && u.startsWith("http") && !u.equals(pendingSnapFor)) {
+                        if (hasFullSnap(u)) { pendingSnapFor = u; return; } // 已有快照, 不重抓
+                        pendingSnapFor = u;
+                        beginCapture(u);
+                    }
+                }
+
                 // 核心拦截: capture模式=边加载边落地整站资源; offline模式=全部从本地回放
                 @Override public android.webkit.WebResourceResponse shouldInterceptRequest(WebView v, android.webkit.WebResourceRequest req) {
                     String u = req.getUrl().toString();
@@ -378,17 +387,17 @@ public class OfflineActivity extends Activity {
     }
 
     private void finishCapture() {
-        if (!captureMode || capMap.isEmpty()) { captureMode = false; return; }
+        // 只落盘当前页快照, 保持captureMode继续抓后续页面 (回主页时才整体关闭)
+        if (!captureMode || capMap.isEmpty() || capDir == null) return;
         try {
             org.json.JSONObject m = new org.json.JSONObject();
             for (java.util.Map.Entry<String, File> e : capMap.entrySet()) m.put(e.getKey(), e.getValue().getName());
             FileOutputStream fos = new FileOutputStream(new File(capDir, "map.json"));
             fos.write(m.toString().getBytes(StandardCharsets.UTF_8));
             fos.close();
-            markSnap(pendingSnapFor, ""); // 更新时间戳
-            toast("整站快照完成: " + capMap.size() + " 个资源");
+            toast("快照完成: " + capMap.size() + " 资源");
         } catch (Throwable ignored) {}
-        captureMode = false;
+        capMap.clear();
     }
 
     /** 拦截下载: 自己拉资源 → 落盘 → 回流给WebView */
