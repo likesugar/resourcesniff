@@ -40,7 +40,55 @@ public class ChatActivity extends Activity {
         ChatHub.init(getApplicationContext());
         ChatHub.start();
         buildUi();
-        if (nick.isEmpty()) askNick();
+        askLogin();
+    }
+
+    /** 登录弹窗: 用户名+密码(多用户本地存放), 通过后进聊天页 */
+    private void askLogin() {
+        LinearLayout box = new LinearLayout(this);
+        box.setOrientation(LinearLayout.VERTICAL);
+        box.setPadding(dip(24), dip(10), dip(24), 0);
+        final EditText eu = new EditText(this);
+        eu.setHint("用户名");
+        eu.setText(nick);
+        eu.setInputType(EditorInfo.TYPE_CLASS_TEXT);
+        box.addView(eu);
+        final EditText ep = new EditText(this);
+        ep.setHint("密码(新用户即注册)");
+        ep.setInputType(EditorInfo.TYPE_CLASS_TEXT | EditorInfo.TYPE_TEXT_VARIATION_PASSWORD);
+        box.addView(ep);
+        new AlertDialog.Builder(this)
+            .setTitle("登录聊天室")
+            .setView(box)
+            .setCancelable(false)
+            .setPositiveButton("进入", new android.content.DialogInterface.OnClickListener() {
+                public void onClick(android.content.DialogInterface dg, int w) {
+                    String u = eu.getText().toString().trim();
+                    String p = ep.getText().toString().trim();
+                    if (u.isEmpty()) { toast("用户名不能为空"); askLogin(); return; }
+                    android.content.SharedPreferences sp = getSharedPreferences("chat", MODE_PRIVATE);
+                    try {
+                        org.json.JSONObject users = new org.json.JSONObject(sp.getString("users", "{}"));
+                        if (users.has(u)) {
+                            if (!users.optString(u, "").equals(p)) { toast("密码错误"); askLogin(); return; }
+                        } else {
+                            users.put(u, p);
+                            sp.edit().putString("users", users.toString()).apply();
+                        }
+                    } catch (Throwable e) { toast("本地存储失败"); return; }
+                    nick = u;
+                    sp.edit().putString("nick", u).apply();
+                    toast("欢迎, " + u);
+                }
+            })
+            .setNeutralButton("切换用户", new android.content.DialogInterface.OnClickListener() {
+                public void onClick(android.content.DialogInterface dg, int w) {
+                    nick = "";
+                    getSharedPreferences("chat", MODE_PRIVATE).edit().putString("nick", "").apply();
+                    askLogin();
+                }
+            })
+            .show();
     }
 
     private int bg()   { return dark ? 0xFF000000 : 0xFFFFFFFF; }
@@ -120,26 +168,8 @@ public class ChatActivity extends Activity {
         String m = input.getText().toString().trim();
         if (m.isEmpty()) return;
         input.setText("");
-        if (nick.isEmpty()) { askNick(); return; }
+        if (nick.isEmpty()) { askLogin(); return; }
         ChatHub.send(nick, m);
-    }
-
-    private void askNick() {
-        final EditText et = new EditText(this);
-        et.setHint("昵称");
-        et.setText(nick);
-        new AlertDialog.Builder(this)
-            .setTitle("进聊天室先起个昵称")
-            .setView(et)
-            .setCancelable(false)
-            .setPositiveButton("进入", new android.content.DialogInterface.OnClickListener() {
-                public void onClick(android.content.DialogInterface d, int w) {
-                    String n = et.getText().toString().trim();
-                    if (n.isEmpty()) n = "用户" + (int)(Math.random() * 900 + 100);
-                    nick = n;
-                    getSharedPreferences("chat", MODE_PRIVATE).edit().putString("nick", nick).apply();
-                }
-            }).show();
     }
 
     private void renderAll() {
@@ -196,6 +226,12 @@ public class ChatActivity extends Activity {
     };
 
     private int dip(int v) { return Math.round(v * getResources().getDisplayMetrics().density); }
+
+    private void toast(String s) {
+        runOnUiThread(new Runnable() { public void run() {
+            android.widget.Toast.makeText(ChatActivity.this, s, android.widget.Toast.LENGTH_SHORT).show();
+        }});
+    }
 
     @Override
     protected void onResume() { super.onResume(); ChatHub.addListener(listener); renderAll(); }

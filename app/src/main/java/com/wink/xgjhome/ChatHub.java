@@ -18,11 +18,22 @@ public class ChatHub {
 
     private static volatile boolean running = false;
     private static MulticastSocket rx;
+    private static String selfId = "";
     private static final java.util.List<Listener> listeners = new java.util.concurrent.CopyOnWriteArrayList<>();
     private static final java.util.List<JSONObject> log = java.util.Collections.synchronizedList(new java.util.ArrayList<JSONObject>());
     private static Context ctx;
 
-    public static void init(Context c) { ctx = c; loadLog(); }
+    public static void init(Context c) {
+        ctx = c;
+        // 每台设备唯一ID: 收到自己的广播直接丢弃, 防重复
+        android.content.SharedPreferences sp = c.getSharedPreferences("chat", Context.MODE_PRIVATE);
+        selfId = sp.getString("uuid", null);
+        if (selfId == null) {
+            selfId = java.util.UUID.randomUUID().toString();
+            sp.edit().putString("uuid", selfId).apply();
+        }
+        loadLog();
+    }
 
     public static synchronized void start() {
         if (running) return;
@@ -38,6 +49,7 @@ public class ChatHub {
                         rx.receive(p);
                         String s = new String(p.getData(), 0, p.getLength(), "UTF-8");
                         JSONObject o = new JSONObject(s);
+                        if (selfId.equals(o.optString("uid"))) continue; // 自己广播的, 丢弃
                         append(o);
                         notifyUi(o);
                     } catch (Throwable e) { if (!running) break; }
@@ -59,6 +71,7 @@ public class ChatHub {
             o.put("nick", nick == null ? "匿名" : nick);
             o.put("msg", msg);
             o.put("ts", System.currentTimeMillis());
+            o.put("uid", selfId);
             byte[] b = o.toString().getBytes("UTF-8");
             DatagramSocket out = new DatagramSocket();
             out.setBroadcast(true);
