@@ -43,8 +43,8 @@ import java.util.concurrent.Executors;
 public class SpiderActivity extends Activity {
 
     private static final String PREF = "spider_favs";
-    private static final String[] SITE_NAMES = {"秀人网"};
-    private static final String[] SITE_URLS = {"https://axiuren.com/"};
+    private static final String[] SITE_NAMES = {"秀人网", "ATG"};
+    private static final String[] SITE_URLS = {"https://axiuren.com/", "http://ok.atg678yes.live/"};
     private static final int[] SITE_COLORS = {0xFFd65db1, 0xFF315CDE, 0xFF9c8e7d, 0xFFa56bce, 0xFF1FA855, 0xFFe67e22};
 
     private WebView web;
@@ -281,6 +281,22 @@ public class SpiderActivity extends Activity {
     private void inject(WebView v, String u) {
         if (u == null) return;
         if (u.contains("axiuren.com") && u.matches(".*axiuren\\.com/\\d+\\.html.*")) injectAxiuren(v);
+        else if (u.contains("atg678yes") && u.contains("thread-")) injectAtg(v);
+    }
+
+    /** Discuz论坛(atg): 帖子内附件图全部收集, 下载带登录Cookie */
+    private void injectAtg(WebView v) {
+        String collect =
+            " var imgs=[];" +
+            " [].forEach.call(document.querySelectorAll('img'),function(i){" +
+            "  var s=i.getAttribute('src')||i.getAttribute('file')||''; if(!s)return;" +
+            "  if(s.indexOf('attach')<0&&s.indexOf('forum.php?mod=image')<0)return;" +
+            "  if(s.indexOf('//')<0){s=location.protocol+'//'+location.host+(s.charAt(0)=='/'?s:'/'+s);}" +
+            "  if(imgs.indexOf(s)<0)imgs.push(s);" +
+            " });" +
+            " var t=(document.title||'帖子').trim().substring(0,50);" +
+            " return JSON.stringify({name:t,imgs:imgs});";
+        v.evaluateJavascript(btnJs(collect, "1FA855"), null);
     }
 
     private String btnJs(String collectJs, String color) {
@@ -376,6 +392,7 @@ public class SpiderActivity extends Activity {
             String ck = CookieManager.getInstance().getCookie(url);
             if (ck != null) c.setRequestProperty("Cookie", ck);
             if (url.contains("ecmm.cc")) c.setRequestProperty("Referer", "https://axiuren.com/");
+            if (url.contains("atg678yes")) c.setRequestProperty("Referer", currentUrl == null ? "http://ok.atg678yes.live/" : currentUrl);
             if (c.getResponseCode() != 200) return false;
             is = c.getInputStream();
             java.io.File out = new java.io.File(dir, fileName);
