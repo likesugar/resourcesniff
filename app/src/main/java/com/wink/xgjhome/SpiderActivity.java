@@ -280,9 +280,24 @@ public class SpiderActivity extends Activity {
     // ---------------- 下载按钮注入 ----------------
 
     private void inject(WebView v, String u) {
-        if (u == null) return;
-        if (u.contains("axiuren.com") && u.matches(".*axiuren\\.com/\\d+\\.html.*")) injectAxiuren(v);
-        else if (u.contains("atg678yes") && u.contains("thread-")) injectAtg(v);
+        if (u == null || u.startsWith("file:")) return;
+        if (u.contains("axiuren.com") && u.matches(".*axiuren\\.com/\\d+\\.html.*")) { injectAxiuren(v); return; }
+        if (u.contains("atg678yes") && u.contains("thread-")) { injectAtg(v); return; }
+        // 通用: 所有页面注入, 收集页面内大图
+        String collect =
+            " var imgs=[];" +
+            " [].forEach.call(document.querySelectorAll('img'),function(i){" +
+            "  var s=i.getAttribute('data-src')||i.getAttribute('data-original')||i.src; if(!s)return;" +
+            "  if(s.indexOf('data:')==0)return;" +
+            "  if(s.indexOf('//')<0){s=location.protocol+'//'+location.host+(s.charAt(0)=='/'?s:'/'+s);}" +
+            "  var w=i.naturalWidth||800; if(w<150&&i.naturalWidth>0)return;" +
+            "  if(/logo|icon|avatar|btn|banner|ads?\\./i.test(s))return;" +
+            "  if(imgs.indexOf(s)<0)imgs.push(s);" +
+            " });" +
+            " [].forEach.call(document.querySelectorAll('video,source'),function(v){var s=v.src||v.getAttribute('src'); if(s)imgs.push(s);});" +
+            " var t=(document.title||'页面').trim().substring(0,50);" +
+            " return JSON.stringify({name:t,imgs:imgs});";
+        v.evaluateJavascript(btnJs(collect, "e67e22"), null);
     }
 
     /** Discuz论坛(atg): 帖子内附件图全部收集, 下载带登录Cookie */
