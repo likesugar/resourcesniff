@@ -271,9 +271,11 @@ public class OfflineActivity extends Activity {
                 }
                 @Override public void onReceivedError(WebView v, int code, String desc, String failing) {
                     // 加载失败 → 整站离线回放(Via式) → 兜底单页
-                    if (failing != null && failing.contains(pendingSnapFor) && hasFullSnap(pendingSnapFor)) {
-                        openOffline(pendingSnapFor);
-                    } else if (failing != null && failing.contains(pendingSnapFor)) {
+                    if (failing != null && failing.contains(pendingSnapFor)) {
+                        buildOfflineIndex(); // 全量索引兜底(新旧快照目录都接住)
+                        if (!offlineIndex.isEmpty()) { openOffline(pendingSnapFor); return; }
+                    }
+                    if (failing != null && failing.contains(pendingSnapFor)) {
                         String snap = snapshotFor(pendingSnapFor);
                         String html = snap.isEmpty() ? "" : readSnapshot(snap);
                         if (!html.isEmpty()) {
@@ -439,10 +441,35 @@ public class OfflineActivity extends Activity {
         }
     }
 
+    private String normKey(String u) {
+        u = u.replace("https://", "").replace("http://", "").replace("www.", "");
+        if (u.endsWith("/")) u = u.substring(0, u.length() - 1);
+        int q = u.indexOf('?');
+        if (q > 0) u = u.substring(0, q);
+        return u;
+    }
+
     private android.webkit.WebResourceResponse serveOffline(String u) {
+        // 变体匹配: 原样 / www增删 / 尾斜杠增删 / 去query
         File f = offlineIndex.get(u);
+        if (f == null || !f.exists()) f = offlineIndex.get(normKey(u));
+        if (f == null || !f.exists()) {
+            for (java.util.Map.Entry<String, File> e : offlineIndex.entrySet()) {
+                if (normKey(e.getKey()).equals(normKey(u))) { f = e.getValue(); break; }
+            }
+        }
+        // 主文档兜底: 该站任意一个 text/html 资源(通常是首页)
+        if ((f == null || !f.exists()) && u.equals(pendingSnapFor)) {
+            long best = 0;
+            for (java.util.Map.Entry<String, File> e : offlineIndex.entrySet()) {
+                File v = e.getValue();
+                if (v.exists() && "text/html".equals(guessType(v.getName())) && v.length() > best) {
+                    best = v.length(); f = v;
+                }
+            }
+        }
         if (f == null || !f.exists()) return new android.webkit.WebResourceResponse("text/plain", "utf-8", new java.io.ByteArrayInputStream(new byte[0]));
-        return serveRes(f, guessType(u));
+        return serveRes(f, guessType(f.getName()));
     }
 
     private android.webkit.WebResourceResponse serveRes(File f, String type) {
