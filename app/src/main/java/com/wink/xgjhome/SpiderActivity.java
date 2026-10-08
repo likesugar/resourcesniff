@@ -52,7 +52,7 @@ public class SpiderActivity extends Activity {
     private LinearLayout cardsRow;
     private boolean dark;
     private String currentUrl = "";
-    private final ExecutorService pool = Executors.newFixedThreadPool(3);
+    private final ExecutorService pool = Executors.newFixedThreadPool(6);
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -368,24 +368,33 @@ public class SpiderActivity extends Activity {
                         fos.write(txt.getBytes("UTF-8")); fos.close();
                     } catch (Throwable ignored) {}
                 }});
-                toast("开始下载 " + total + " 个 → 爬虫/" + fname);
-                pool.execute(new Runnable() { public void run() {
-                    int ok = 0;
-                    for (int i = 0; i < total; i++) {
+                toast("开始下载 " + total + " 个(6线程) → 爬虫/" + fname);
+                final java.util.concurrent.atomic.AtomicInteger okC = new java.util.concurrent.atomic.AtomicInteger();
+                final java.util.concurrent.atomic.AtomicInteger doneC = new java.util.concurrent.atomic.AtomicInteger();
+                final java.util.concurrent.CountDownLatch latch = new java.util.concurrent.CountDownLatch(total);
+                final JSONArray farr = arr;
+                for (int i = 0; i < total; i++) {
+                    final int idx = i;
+                    pool.execute(new Runnable() { public void run() {
                         String url;
-                        try { url = arr.getString(i); } catch (Throwable e) { continue; }
+                        try { url = farr.getString(idx); } catch (Throwable e) { latch.countDown(); return; }
                         String ext = "jpg";
                         int dot = url.lastIndexOf('.');
                         if (dot > 0 && dot > url.lastIndexOf('/')) {
                             String e2 = url.substring(dot + 1).toLowerCase();
                             if (e2.length() >= 2 && e2.length() <= 5) ext = e2;
                         }
-                        String fn = String.format(java.util.Locale.US, "%s_%03d.%s", fname, i + 1, ext);
-                        if (saveFile(url, dir, fn)) ok++;
-                        if (i % 5 == 4) toast("进度 " + ok + "/" + total);
-                    }
-                    toast("完成: 成功 " + ok + "/" + total + " (爬虫/" + fname + ")");
-                }});
+                        String fn = String.format(java.util.Locale.US, "%s_%03d.%s", fname, idx + 1, ext);
+                        if (saveFile(url, dir, fn)) okC.incrementAndGet();
+                        int d = doneC.incrementAndGet();
+                        latch.countDown();
+                        if (d % 5 == 0 || d == total) toast("进度 " + d + "/" + total);
+                    }});
+                }
+                new Thread(new Runnable() { public void run() {
+                    try { latch.await(); } catch (InterruptedException ignored) {}
+                    toast("完成: 成功 " + okC.get() + "/" + total + " (爬虫/" + fname + ")");
+                }}).start();
             } catch (Throwable e) { toast("解析失败: " + e); }
         }
     }
