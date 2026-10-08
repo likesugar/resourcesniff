@@ -56,11 +56,56 @@ public class LanShareServer {
         java.io.InputStream in = s.getInputStream();
         String req = readLine(in);
         String l;
-        while ((l = readLine(in)) != null && !l.isEmpty()) { }
+        int contentLen = 0;
+        while ((l = readLine(in)) != null && !l.isEmpty()) {
+            String ll = l.toLowerCase();
+            if (ll.startsWith("content-length:")) try { contentLen = Integer.parseInt(l.substring(15).trim()); } catch (Throwable ignored) {}
+        }
         String path = "/";
         if (req != null && req.startsWith("GET ")) {
             String[] parts = req.split(" ");
             if (parts.length >= 2) path = parts[1];
+        } else if (req != null && req.startsWith("POST ")) {
+            String[] parts = req.split(" ");
+            if (parts.length >= 2) path = parts[1];
+        }
+        // 聊天室: 电脑发消息(UDP广播给全屋手机)
+        if (path.startsWith("/chat/send") && "POST".equals(req.substring(0, 4))) {
+            byte[] body = new byte[Math.max(0, contentLen)];
+            int got = 0;
+            while (got < body.length) { int n = in.read(body, got, body.length - got); if (n < 0) break; got += n; }
+            try {
+                org.json.JSONObject o = new org.json.JSONObject(new String(body, "UTF-8"));
+                ChatHub.send(o.optString("nick", "PC"), o.optString("msg", ""));
+            } catch (Throwable ignored) {}
+            OutputStream os = s.getOutputStream();
+            os.write("HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: 2\r\nConnection: close\r\n\r\nok".getBytes());
+            os.flush();
+            return;
+        }
+        // 聊天室: 电脑拉取新消息
+        if (path.startsWith("/chat/poll")) {
+            long since = 0;
+            int q = path.indexOf("since=");
+            if (q > 0) try { since = Long.parseLong(path.substring(q + 6).replaceAll("[^0-9].*$", "")); } catch (Throwable ignored) {}
+            byte[] bb = ChatHub.since(since).toString().getBytes("UTF-8");
+            OutputStream os = s.getOutputStream();
+            os.write(("HTTP/1.1 200 OK\r\nContent-Type: application/json; charset=utf-8\r\nContent-Length: " + bb.length
+                + "\r\nConnection: close\r\n\r\n").getBytes());
+            os.write(bb);
+            os.flush();
+            return;
+        }
+        // 聊天室: 电脑网页
+        if (path.startsWith("/chat") || path.equals("/chat/")) {
+            String page = chatPage();
+            byte[] bb = page.getBytes("UTF-8");
+            OutputStream os = s.getOutputStream();
+            os.write(("HTTP/1.1 200 OK\r\nContent-Type: text/html; charset=utf-8\r\nContent-Length: " + bb.length
+                + "\r\nConnection: close\r\n\r\n").getBytes());
+            os.write(bb);
+            os.flush();
+            return;
         }
         // 打开链接：302 到手机中转（代拉流，带正确 Referer）
         if (path.startsWith("/open?u=")) {
@@ -136,6 +181,34 @@ public class LanShareServer {
         }
         if (b.size() == 0 && c < 0) return null;
         return b.toString();
+    }
+
+    /** 电脑端聊天网页 */
+    private static String chatPage() {
+        return "<!DOCTYPE html><html><head><meta charset='utf-8'><meta name='viewport' content='width=device-width'>"
+            + "<title>聊天室</title><style>"
+            + "body{background:#111;color:#eee;font-family:-apple-system,'PingFang SC',sans-serif;margin:0}"
+            + "#box{padding:12px;height:calc(100vh - 60px);overflow-y:auto}"
+            + ".m{margin:6px 0}.n{font-size:11px;color:#888}.b{display:inline-block;background:#1c2026;padding:8px 12px;border-radius:12px;margin-top:2px}"
+            + "#bar{position:fixed;bottom:0;left:0;right:0;display:flex;gap:8px;padding:10px;background:#16181d}"
+            + "input{flex:1;background:#0c0e12;border:none;color:#eee;padding:10px 14px;border-radius:20px;outline:none}"
+            + "button{background:#315CDE;color:#fff;border:none;border-radius:20px;padding:10px 18px}"
+            + "</style></head><body><div id='box'></div><div id='bar'>"
+            + "<input id='nick' placeholder='昵称' style='max-width:90px'><input id='msg' placeholder='说点什么…'>"
+            + "<button onclick='send()'>发送</button></div><script>"
+            + "var since=0;var box=document.getElementById('box');"
+            + "function poll(){fetch('/chat/poll?since='+since).then(function(r){return r.json()}).then(function(a){"
+            + "for(var i=0;i<a.length;i++){var o=a[i];if(o.ts>since)since=o.ts;"
+            + "var d=document.createElement('div');d.className='m';"
+            + "d.innerHTML=\"<div class='n'>\"+o.nick+' · '+new Date(o.ts).toLocaleTimeString()+\"</div><div class='b'>\"+o.msg.replace(/</g,'&lt;')+\"</div>\";"
+            + "box.appendChild(d);}if(a.length)box.scrollTop=box.scrollHeight;"
+            + "setTimeout(poll,1500);}).catch(function(){setTimeout(poll,3000);});}"
+            + "function send(){var m=document.getElementById('msg').value.trim();if(!m)return;"
+            + "var n=document.getElementById('nick').value.trim()||'PC';"
+            + "fetch('/chat/send',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({nick:n,msg:m})});"
+            + "document.getElementById('msg').value='';}"
+            + "document.getElementById('msg').addEventListener('keydown',function(e){if(e.key=='Enter')send()});"
+            + "poll();</script></body></html>";
     }
 
     public static String localIp() {

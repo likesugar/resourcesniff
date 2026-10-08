@@ -222,6 +222,9 @@ public class HomeActivity extends Activity {
         findViewById(R.id.cardSpider).setOnClickListener(new View.OnClickListener() {
             public void onClick(View v) { startActivity(new Intent(HomeActivity.this, SpiderActivity.class)); }
         });
+        findViewById(R.id.cardChat).setOnClickListener(new View.OnClickListener() {
+            public void onClick(View v) { startActivity(new Intent(HomeActivity.this, ChatActivity.class)); }
+        });
 
         findViewById(R.id.lanToggle).setOnClickListener(new View.OnClickListener() {
             public void onClick(View v) { showLanDialog(); }

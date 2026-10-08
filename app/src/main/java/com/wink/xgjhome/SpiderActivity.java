@@ -149,7 +149,8 @@ public class SpiderActivity extends Activity {
         cardsRow.removeAllViews();
         JSONArray favs = loadFavs();
         int n = favs.length();
-        for (int i = 0; i < n; i++) {
+        for (int i0 = 0; i0 < n; i0++) {
+            final int i = i0;
             JSONObject o = favs.optJSONObject(i);
             if (o == null) continue;
             final String name = o.optString("name", "站");
@@ -161,7 +162,7 @@ public class SpiderActivity extends Activity {
             card.setPadding(dip(2), 0, dip(24), 0);
             card.setOnClickListener(new View.OnClickListener() { public void onClick(View v) { browse(url); } });
             card.setOnLongClickListener(new View.OnLongClickListener() {
-                public boolean onLongClick(View v) { delFav(url); return true; }
+                public boolean onLongClick(View v) { editFav(i, name, url); return true; }
             });
             TextView av = new TextView(this);
             av.setText(name.length() > 2 ? name.substring(0, 2) : name);
@@ -170,7 +171,7 @@ public class SpiderActivity extends Activity {
             av.setGravity(Gravity.CENTER);
             GradientDrawable c = new GradientDrawable();
             c.setShape(GradientDrawable.OVAL);
-            c.setColor(SITE_COLORS[i % SITE_COLORS.length]);
+            c.setColor(o.has("color") ? o.optInt("color", SITE_COLORS[0]) : SITE_COLORS[i % SITE_COLORS.length]);
             av.setBackground(c);
             card.addView(av, new LinearLayout.LayoutParams(dip(74), dip(74)));
             TextView lb = new TextView(this);
@@ -183,6 +184,72 @@ public class SpiderActivity extends Activity {
             card.addView(lb, llp);
             cardsRow.addView(card, new LinearLayout.LayoutParams(-2, -2));
         }
+    }
+
+    /** 长按收藏卡: 编辑名称/图标色/删除 */
+    private void editFav(final int idx, final String name, final String url) {
+        LinearLayout box = new LinearLayout(this);
+        box.setOrientation(LinearLayout.VERTICAL);
+        box.setPadding(dip(24), dip(10), dip(24), 0);
+        final EditText et = new EditText(this);
+        et.setText(name);
+        et.setSelection(et.getText().length());
+        box.addView(et);
+        LinearLayout colorsRow = new LinearLayout(this);
+        colorsRow.setGravity(Gravity.CENTER);
+        colorsRow.setPadding(0, dip(10), 0, dip(6));
+        final String[] chosen = { null };
+        JSONArray favs0 = loadFavs();
+        JSONObject cur = favs0.optJSONObject(idx);
+        final int curColor = cur != null ? cur.optInt("color", 0) : 0;
+        for (int ci = 0; ci < SITE_COLORS.length; ci++) {
+            final int col = SITE_COLORS[ci];
+            TextView dot = new TextView(this);
+            GradientDrawable d = new GradientDrawable();
+            d.setShape(GradientDrawable.OVAL);
+            d.setColor(col);
+            if (curColor == col) d.setStroke(dip(3), dark ? 0xFFFFFFFF : 0xFF000000);
+            dot.setBackground(d);
+            dot.setPadding(dip(6), dip(6), dip(6), dip(6));
+            dot.setOnClickListener(new View.OnClickListener() { public void onClick(View v) {
+                chosen[0] = String.valueOf(col);
+                // 高亮选中
+                LinearLayout pr = (LinearLayout) v.getParent();
+                for (int j = 0; j < pr.getChildCount(); j++) {
+                    GradientDrawable gd = (GradientDrawable) pr.getChildAt(j).getBackground();
+                    gd.setStroke(0, 0);
+                }
+                GradientDrawable sel = (GradientDrawable) v.getBackground();
+                sel.setStroke(dip(3), dark ? 0xFFFFFFFF : 0xFF000000);
+            }});
+            colorsRow.addView(dot, new LinearLayout.LayoutParams(dip(38), dip(38)));
+        }
+        box.addView(colorsRow);
+        TextView tip = new TextView(this);
+        tip.setText("长按删除请点下方「删除」");
+        tip.setTextSize(11);
+        tip.setTextColor(0xFF888888);
+        box.addView(tip);
+        new AlertDialog.Builder(this)
+            .setTitle("编辑收藏")
+            .setView(box)
+            .setPositiveButton("保存", new android.content.DialogInterface.OnClickListener() {
+                public void onClick(android.content.DialogInterface dg, int w) {
+                    JSONArray favs = loadFavs();
+                    JSONObject o = favs.optJSONObject(idx);
+                    if (o == null) return;
+                    try { o.put("name", et.getText().toString().trim()); } catch (Throwable ignored) {}
+                    if (chosen[0] != null) try { o.put("color", Integer.parseInt(chosen[0])); } catch (Throwable ignored) {}
+                    saveFavs(favs);
+                    refreshCards();
+                    toast("已保存");
+                }
+            })
+            .setNeutralButton("删除", new android.content.DialogInterface.OnClickListener() {
+                public void onClick(android.content.DialogInterface dg, int w) { delFav(url); }
+            })
+            .setNegativeButton("取消", null)
+            .show();
     }
 
     private void showJumpDialog() {
@@ -237,6 +304,10 @@ public class SpiderActivity extends Activity {
             try { JSONObject o = new JSONObject(); o.put("name", SITE_NAMES[i]); o.put("url", SITE_URLS[i]); a.put(o); } catch (Throwable ignored) {}
         }
         return a;
+    }
+
+    private void saveFavs(JSONArray a) {
+        getSharedPreferences(PREF, MODE_PRIVATE).edit().putString("json", a.toString()).apply();
     }
 
     private void delFav(String url) {
@@ -332,19 +403,27 @@ public class SpiderActivity extends Activity {
     }
 
     private void injectAxiuren(WebView v) {
+        // 自动探测: 扫页面全部编号式图片URL, 按文件夹聚合, 选样本最多的文件夹推断编号规则(位数/扩展名), 不写死图床域名
         String collect =
             " var h=document.documentElement.innerHTML;" +
-            " var m=h.match(/https:\\/\\/img\\.ecmm\\.cc\\/new\\/[^\"']+\\//);" +
-            " if(!m)return JSON.stringify({name:'未找到图床',imgs:[]});" +
-            " var folder=m[0];" +
+            " var folders={}; var re=/https?:\\/\\/[^\"'\\s\\\\]+\\/([^\"'\\s\\\\]*)/gi; var mm;" +
+            " var re2=/^(https?:\\/\\/[^\"'\\s\\\\]+\\/)([^\"'\\s\\\\]*?)(\\d{2,6})\\.(webp|jpg|jpeg|png)$/i;" +
+            " var lines=h.split(/['\"\\s]/);" +
+            " for(var li=0;li<lines.length;li++){" +
+            "  var u=lines[li]; var mm2=u.match(re2);" +
+            "  if(mm2){var key=mm2[1]; if(!folders[key])folders[key]={n:0,pad:mm2[3].length,ext:mm2[4].toLowerCase()};" +
+            "  folders[key].n++;}}" +
+            " var cands=[];for(var k2 in folders)cands.push(k2);" +
+            " cands.sort(function(a,b){return folders[b].n-folders[a].n;});" +
+            " var folder=cands[0]||null; var urls=[];" +
             " var t=(document.querySelector('h1')||{textContent:document.title}).textContent;" +
             " var pm=t.match(/(\\d+)\\s*P/i); var n=pm?parseInt(pm[1]):0;" +
             " if(n<=0)n=120;" +
-            " var urls=[];" +
-            " for(var i=1;i<=n;i++){var s='0000'+i; s=s.substring(s.length-4); urls.push(folder+s+'.webp');}" +
+            " if(folder){var pad=folders[folder].pad; var ext=folders[folder].ext;" +
+            "  for(var i=1;i<=n;i++){var s='00000000'+i; s=s.substring(s.length-Math.max(pad,(''+i).length)); urls.push(folder+s+'.'+ext);}}" +
             " [].forEach.call(document.querySelectorAll('video,source'),function(v){var s=v.src||v.getAttribute('src'); if(s)urls.push(s);});" +
             " var vm=h.match(/https?:\\/\\/[^\"'\\s\\\\]+\\.mp4[^\"'\\s\\\\]*/g);" +
-            " if(vm)for(var k=0;k<vm.length;k++){if(urls.indexOf(vm[k])<0)urls.push(vm[k]);}" +
+            " if(vm)for(var k3=0;k3<vm.length;k3++){if(urls.indexOf(vm[k3])<0)urls.push(vm[k3]);}" +
             " return JSON.stringify({name:t.trim().substring(0,60),imgs:urls});";
         v.evaluateJavascript(btnJs(collect, "c0392b"), null);
     }
