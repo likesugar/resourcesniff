@@ -96,18 +96,7 @@ public class LanShareServer {
             os.flush();
             return;
         }
-        // 聊天室: 电脑网页
-        if (path.startsWith("/chat") || path.equals("/chat/")) {
-            String page = chatPage();
-            byte[] bb = page.getBytes("UTF-8");
-            OutputStream os = s.getOutputStream();
-            os.write(("HTTP/1.1 200 OK\r\nContent-Type: text/html; charset=utf-8\r\nContent-Length: " + bb.length
-                + "\r\nConnection: close\r\n\r\n").getBytes());
-            os.write(bb);
-            os.flush();
-            return;
-        }
-        // 聊天文件下载: /chatfile?ts=xxx
+        // 聊天文件下载: /chatfile?ts=xxx (必须在/chat页面路由之前, 否则startsWith会吃掉)
         if (path.startsWith("/chatfile")) {
             long ts = 0;
             int q = path.indexOf("ts=");
@@ -119,16 +108,28 @@ public class LanShareServer {
                 os.flush();
                 return;
             }
-            String nm = f.getName();
-            int us = nm.indexOf('_');
-            if (us > 0) nm = nm.substring(us + 1);
+            String lu = f.getName().toLowerCase();
+            boolean img = lu.endsWith(".jpg") || lu.endsWith(".jpeg") || lu.endsWith(".png") || lu.endsWith(".webp") || lu.endsWith(".gif");
+            String mime = img ? (lu.endsWith(".png") ? "image/png" : lu.endsWith(".gif") ? "image/gif" : lu.endsWith(".webp") ? "image/webp" : "image/jpeg")
+                              : "application/octet-stream";
             OutputStream os = s.getOutputStream();
-            os.write(("HTTP/1.1 200 OK\r\nContent-Type: application/octet-stream\r\nContent-Disposition: attachment; filename=\"chatfile\"\r\nContent-Length: "
-                + f.length() + "\r\nConnection: close\r\n\r\n").getBytes());
+            os.write(("HTTP/1.1 200 OK\r\nContent-Type: " + mime
+                + "\r\nContent-Length: " + f.length() + "\r\nConnection: close\r\n\r\n").getBytes());
             java.io.FileInputStream fis = new java.io.FileInputStream(f);
             byte[] bf = new byte[8192]; int nn;
             while ((nn = fis.read(bf)) > 0) os.write(bf, 0, nn);
             fis.close();
+            os.flush();
+            return;
+        }
+        // 聊天室: 电脑网页 (精确匹配, 放在/chatfile之后)
+        if (path.equals("/chat") || path.equals("/chat/") || path.startsWith("/chat?")) {
+            String page = chatPage();
+            byte[] bb = page.getBytes("UTF-8");
+            OutputStream os = s.getOutputStream();
+            os.write(("HTTP/1.1 200 OK\r\nContent-Type: text/html; charset=utf-8\r\nContent-Length: " + bb.length
+                + "\r\nConnection: close\r\n\r\n").getBytes());
+            os.write(bb);
             os.flush();
             return;
         }
@@ -226,7 +227,10 @@ public class LanShareServer {
             + "for(var i=0;i<a.length;i++){var o=a[i];if(o.ts>since)since=o.ts;"
             + "var d=document.createElement('div');d.className='m';"
             + "var body;"
-            + "if(o.fname){body=\"<a style='color:#7fb0ff' href='/chatfile?ts=\"+o.fts+\"'>📎 \"+o.fname.replace(/</g,'&lt;')+\" (点击下载)</a>\";}"
+            + "if(o.fname){var ext=o.fname.toLowerCase();"
+            + "if(ext.indexOf('.jpg')>=0||ext.indexOf('.jpeg')>=0||ext.indexOf('.png')>=0||ext.indexOf('.webp')>=0||ext.indexOf('.gif')>=0){"
+            + "body=\"<img src='/chatfile?ts=\"+o.fts+\"' style='max-width:220px;border-radius:8px;display:block'>\";}"
+            + "else{body=\"<a style='color:#7fb0ff' href='/chatfile?ts=\"+o.fts+\"'>📎 \"+o.fname.replace(/</g,'&lt;')+\" (点击下载)</a>\";}}"
             + "else{body=o.msg.replace(/</g,'&lt;');}"
             + "d.innerHTML=\"<div class='n'>\"+o.nick+' · '+new Date(o.ts).toLocaleTimeString()+\"</div><div class='b'>\"+body+\"</div>\";"
             + "box.appendChild(d);}if(a.length)box.scrollTop=box.scrollHeight;"
