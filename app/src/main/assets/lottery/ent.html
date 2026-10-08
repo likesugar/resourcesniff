@@ -54,7 +54,10 @@
     <button class="stopbtn" onclick="_stopCol(3)">⏹</button>
   </div>
   <div id="slotRes" style="min-height:30px;text-align:center;font-size:16px;font-weight:bold;color:#f5c26b;padding:8px 0"></div>
-  <button class="btn" onclick="slotSpin()">🎰 拉杆</button>
+  <div style="display:flex;gap:10px;justify-content:center;align-items:center">
+    <button id="autoBtn" class="btn" style="margin:6px 0;width:150px;background:#1FA855" onclick="toggleAuto()">自动停止:开</button>
+    <button class="btn" style="margin:6px 0;width:150px" onclick="slotSpin()">🎰 拉杆</button>
+  </div>
 </div>
 <div class="addbar">
   <input id="addN" type="number" inputmode="numeric" placeholder="输入积分">
@@ -164,6 +167,13 @@ function tab(i){
 // ---- 水果老虎机 4x4 (权重可调+手动停列) ----
 var SYM=['🍒','🍋','🍊','🍇','🍉','⭐','7️⃣','💎'];
 var slotSpinning=false,slotFinal=[],slotStopped=[false,false,false,false];
+var autoStopOn=true;
+function toggleAuto(){
+  autoStopOn=!autoStopOn;
+  var b=document.getElementById('autoBtn');
+  b.textContent='自动停止:'+(autoStopOn?'开':'关');
+  b.style.background=autoStopOn?'#1FA855':'#555';
+}
 function getWeights(){
   var def={};SYM.forEach(function(s){def[s]=1});
   try{var w=JSON.parse(localStorage.ent_weights);for(var k in def)if(typeof w[k]=='number'&&w[k]>=1)def[k]=w[k]}catch(e){}
@@ -223,10 +233,12 @@ function slotSpin(){
     for(var r=0;r<4;r++){cells[r*4+c].className='cell';cells[r*4+c].textContent=slotFinal[c][r]}
     if(slotStopped.every(function(x){return x}))finishSlot(cells,iv);
   };
-  // 自动依次停(可提前手动)
-  for(var c=0;c<4;c++)(function(c){
-    setTimeout(function(){window._stopCol(c)},900+700*c);
-  })(c);
+  // 自动依次停(仅开关为开时挂; 可提前手动)
+  if(autoStopOn){
+    for(var c=0;c<4;c++)(function(c){
+      setTimeout(function(){window._stopCol(c)},900+700*c);
+    })(c);
+  }
 }
 function finishSlot(cells,iv){
   clearInterval(iv);
