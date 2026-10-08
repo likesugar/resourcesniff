@@ -70,6 +70,12 @@
   <input id="cfgCost" type="number" inputmode="numeric">
   <button onclick="saveCfg()">保存</button>
   <div class="lbl">老虎机各符号权重(1-99, 越大越易停)</div>
+  <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:6px">
+    <button style="flex:1;padding:8px 4px;background:#1FA855;color:#fff;border:none;border-radius:10px;font-size:12px" onclick="presetW('easy')">😊 容易中(推荐)</button>
+    <button style="flex:1;padding:8px 4px;background:#315CDE;color:#fff;border:none;border-radius:10px;font-size:12px" onclick="presetW('normal')">🎲 普通</button>
+    <button style="flex:1;padding:8px 4px;background:#e67e22;color:#fff;border:none;border-radius:10px;font-size:12px" onclick="presetW('hard')">😈 困难</button>
+    <button style="flex:1;padding:8px 4px;background:#555;color:#fff;border:none;border-radius:10px;font-size:12px" onclick="presetW('custom')">✏️ 手动</button>
+  </div>
   <div id="wRow" style="display:flex;gap:4px;flex-wrap:wrap"></div>
   <button onclick="saveWeights()">保存权重</button>
 </div>
@@ -197,6 +203,20 @@ function refreshWeightsUI(){
     d.innerHTML='<div style="font-size:22px">'+s+'</div><input type="number" inputmode="numeric" value="'+w[s]+'" min="1" style="width:52px;background:#0c0e12;color:#eee;border:none;border-radius:8px;padding:6px;text-align:center;font-size:13px">';
     box.appendChild(d);
   });
+}
+// 推荐预设: easy=水果权重高大奖符号低(常中小奖); normal=全1均等; hard=大奖符号高(很难中)
+var PRESETS={
+  easy:{'🍒':12,'🍋':12,'🍊':12,'🍇':8,'🍉':6,'⭐':2,'7️⃣':1,'💎':1},
+  normal:{'🍒':1,'🍋':1,'🍊':1,'🍇':1,'🍉':1,'⭐':1,'7️⃣':1,'💎':1},
+  hard:{'🍒':1,'🍋':1,'🍊':1,'🍇':1,'🍉':1,'⭐':6,'7️⃣':9,'💎':12}
+};
+function presetW(name){
+  var w=PRESETS[name];if(!w)return;
+  localStorage.ent_weights=JSON.stringify(w);
+  refreshWeightsUI();
+  alert(name=='easy'?'容易中: 小奖为主, 3连常见':
+        name=='normal'?'普通: 8符号均等, 靠运气':
+        '困难: 大奖符号高频出现但难凑线');
 }
 function saveWeights(){
   var inputs=document.getElementById('wRow').querySelectorAll('input');
