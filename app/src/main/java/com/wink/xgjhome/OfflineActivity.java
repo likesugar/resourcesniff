@@ -313,9 +313,10 @@ public class OfflineActivity extends Activity {
             web.loadDataWithBaseURL(null, html, "text/html", "utf-8", null);
             return;
         }
-        // 纯在线模式: 不抓快照不拦截 (抓取/离线走长按菜单)
+        // 在线浏览 = 自动抓快照(Via式); 断网自动回放; 手动入口在长按菜单
         pendingSnapFor = url;
-        captureMode = false; offlineMode = false;
+        offlineMode = false; captureMode = true;
+        beginCapture(url);
         web.loadUrl(url);
     }
 
