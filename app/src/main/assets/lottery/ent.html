@@ -4,166 +4,186 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
 <title>娱乐</title>
-<link rel="stylesheet" href="./style.css">
 <style>
   body{background:#14161c;font-family:-apple-system,'PingFang SC',sans-serif;color:#eee;margin:0}
   .tabs{display:flex;padding:12px 16px 0;gap:10px}
   .tab{flex:1;text-align:center;padding:10px 0;border-radius:20px;background:#1c1f26;font-size:15px}
   .tab.on{background:#315CDE;font-weight:bold}
-  .wrap{padding:10px 16px 30px}
+  .wrap{padding:10px 16px 40px;text-align:center}
+  #pts{font-size:17px;font-weight:bold;color:#f5c26b;padding:6px 0}
+  .page{display:none}.page.on{display:block}
+  #cardWrap{position:relative;display:inline-block;margin-top:14px}
+  #js_lottery{width:300px;height:170px;border-radius:12px;background:#1c1f26}
+  .btn{display:block;margin:16px auto 0;padding:12px 0;width:220px;text-align:center;background:#f94804;color:#fff;font-size:15px;font-weight:bold;border:none;border-radius:24px}
+  #dialWrap{position:relative;width:320px;height:320px;margin:14px auto 0}
+  #wheel{width:100%;height:100%;transition:transform 4.2s cubic-bezier(.15,.85,.25,1)}
+  #go{position:absolute;top:50%;left:50%;width:90px;height:90px;margin:-45px 0 0 -45px;border-radius:50%;
+      background:radial-gradient(circle at 35% 30%,#ff9d5c,#f0512a);color:#fff;font-size:24px;font-weight:bold;
+      display:flex;align-items:center;justify-content:center;box-shadow:0 0 0 5px #fff3}
+  #res{min-height:30px;font-size:17px;font-weight:bold;color:#f5c26b;padding:8px 0}
   #cfgBtn{position:fixed;right:14px;bottom:24px;background:#e67e22;color:#fff;border:none;border-radius:24px;padding:10px 18px;font-size:14px;font-weight:bold;z-index:9}
-  .cfg{display:none;background:#1c1f26;border-radius:14px;padding:14px;margin-top:12px}
-  .cfg textarea{width:100%;height:110px;background:#0c0e12;color:#eee;border:none;border-radius:10px;padding:10px;font-size:13px;box-sizing:border-box;resize:vertical}
-  .cfg .row{margin-top:10px;text-align:right}
-  .cfg button{background:#1FA855;color:#fff;border:none;border-radius:14px;padding:8px 16px;font-size:13px}
-  .cfg .tip{font-size:11px;color:#888;margin-top:8px;line-height:1.5}
-  .result{display:block;width:300px;height:172px;margin:20px auto;border-radius:10px}
-  #dialWrap{width:320px;height:320px;margin:24px auto;position:relative}
-  #wheel{width:320px;height:320px;transition:transform 4.2s cubic-bezier(.17,.67,.12,.99)}
-  #dialGo{position:absolute;top:50%;left:50%;width:74px;height:74px;margin:-37px 0 0 -37px;border-radius:50%;
-    background:radial-gradient(circle at 30% 30%,#ff9a56,#e6450a);color:#fff;border:4px solid #fff;
-    font-size:17px;font-weight:bold;display:flex;align-items:center;justify-content:center;z-index:2}
-  .dresult{text-align:center;font-size:15px;color:#ffd28a;margin-top:8px;min-height:22px}
+  .cfg{display:none;background:#1c1f26;border-radius:14px;padding:14px;margin-top:12px;text-align:left}
+  .cfg textarea{width:100%;height:100px;background:#0c0e12;color:#eee;border:none;border-radius:10px;padding:10px;font-size:13px;box-sizing:border-box;resize:vertical;font-family:monospace}
+  .cfg input{width:100%;background:#0c0e12;color:#eee;border:none;border-radius:10px;padding:10px;font-size:14px;box-sizing:border-box}
+  .cfg .lbl{font-size:12px;color:#888;margin:8px 0 4px}
+  .cfg button{margin-top:10px;width:100%;padding:10px;background:#315CDE;color:#fff;border:none;border-radius:18px;font-size:14px;font-weight:bold}
 </style>
 </head>
 <body>
 <div class="tabs">
-  <div class="tab on" id="tabCard" onclick="switchTab('card')">🎫 刮刮卡</div>
-  <div class="tab" id="tabDial" onclick="switchTab('dial')">🎡 大转盘</div>
+  <div class="tab" id="tab0" onclick="tab(0)">🎫 刮刮卡</div>
+  <div class="tab" id="tab1" onclick="tab(1)">🎡 大转盘</div>
 </div>
 <div class="wrap">
-  <!-- 刮刮卡 -->
-  <div id="paneCard">
-    <canvas class="m-ui-scratch" id="js_lottery"></canvas>
-    <button class="m-ui-button" onclick="resetCard()">再来一次</button>
+  <div id="pts">💰 积分: 100</div>
+
+  <div class="page on" id="pg0">
+    <div id="cardWrap"><canvas id="js_lottery"></canvas></div>
+    <div id="res0"></div>
+    <button class="btn" onclick="newCard()">再刮一张</button>
   </div>
-  <!-- 大转盘 -->
-  <div id="paneDial" style="display:none">
-    <div id="dialWrap">
-      <canvas id="wheel" width="640" height="640"></canvas>
-      <div id="dialGo" onclick="spin()">GO</div>
-    </div>
-    <div class="dresult" id="dialResult"></div>
-    <button class="m-ui-button" onclick="drawDial()">转起来</button>
+
+  <div class="page" id="pg1">
+    <div id="dialWrap"><canvas id="wheel" width="640" height="640"></canvas><div id="go" onclick="spin()">GO</div></div>
+    <div id="res"></div>
+    <button class="btn" onclick="spin()">转起来</button>
   </div>
-  <!-- 自定义 -->
-  <button id="cfgBtn" onclick="toggleCfg()">⚙ 自定义</button>
-  <div class="cfg" id="cfgPane">
-    <div class="tip">刮刮卡奖项（每行一个，第一行为"谢谢惠顾"类结果）：</div>
-    <textarea id="cfgCard">谢谢惠顾
-再来一次
- +10 积分
-奖品 · 小锦囊
-大奖 · 心愿达成</textarea>
-    <div class="tip" style="margin-top:10px">大转盘奖项（每行一个扇区，2-12个）：</div>
-    <textarea id="cfgDial">谢谢参与
-再来一次
- +5 积分
- +20 积分
-神秘礼物
-双倍奖励
-幸运大奖
-谢谢参与</textarea>
-    <div class="row"><button onclick="saveCfg()">保存</button></div>
+
+  <div class="cfg" id="cfg">
+    <div class="lbl">奖池(每行一个, +数字=积分奖)</div>
+    <textarea id="cfgList"></textarea>
+    <div class="lbl">刮刮卡单次消耗积分(10-500)</div>
+    <input id="cfgCost" type="number" inputmode="numeric">
+    <button onclick="saveCfg()">保存</button>
   </div>
 </div>
+<button id="cfgBtn" onclick="toggleCfg()">⚙ 自定义</button>
+
 <script src="./card.js"></script>
 <script>
-function lsGet(k,d){try{var v=localStorage.getItem(k);return v===null?d:v}catch(e){return d}}
-function lsSet(k,v){try{localStorage.setItem(k,v)}catch(e){}}
-var cardPrizes=lsGet('cardPrizes',null)||document.getElementById('cfgCard').value;
-var dialPrizes=lsGet('dialPrizes',null)||document.getElementById('cfgDial').value;
-document.getElementById('cfgCard').value=cardPrizes;
-document.getElementById('cfgDial').value=dialPrizes;
+var DEF='谢谢参与\n+5\n再来一次\n+10\n谢谢参与\n+20\n谢谢参与\n+50';
+function getList(){try{var v=JSON.parse(localStorage.ent_list||'null');if(v&&v.length)return v}catch(e){}return DEF.split('\n')}
+function getCost(){var c=parseInt(localStorage.ent_cost||'50');if(!(c>=10&&c<=500))c=50;return c}
+function getPts(){var p=parseInt(localStorage.ent_pts||'100');if(isNaN(p))p=100;return p}
+function setPts(p){localStorage.ent_pts=p;document.getElementById('pts').textContent='💰 积分: '+p}
+function addPts(d){setPts(getPts()+d)}
 
-function switchTab(t){
-  document.getElementById('tabCard').className='tab'+(t==='card'?' on':'');
-  document.getElementById('tabDial').className='tab'+(t==='dial'?' on':'');
-  document.getElementById('paneCard').style.display=t==='card'?'block':'none';
-  document.getElementById('paneDial').style.display=t==='dial'?'block':'none';
-  if(t==='dial')drawWheel();
+function tab(i){
+  document.getElementById('tab0').className='tab'+(i==0?' on':'');
+  document.getElementById('tab1').className='tab'+(i==1?' on':'');
+  document.getElementById('pg0').className='page'+(i==0?' on':'');
+  document.getElementById('pg1').className='page'+(i==1?' on':'');
 }
 function toggleCfg(){
-  var p=document.getElementById('cfgPane');
-  p.style.display=p.style.display==='block'?'none':'block';
+  var c=document.getElementById('cfg');
+  if(c.style.display=='block'){c.style.display='none';return}
+  document.getElementById('cfgList').value=getList().join('\n');
+  document.getElementById('cfgCost').value=getCost();
+  c.style.display='block';
 }
 function saveCfg(){
-  cardPrizes=document.getElementById('cfgCard').value;
-  dialPrizes=document.getElementById('cfgDial').value;
-  lsSet('cardPrizes',cardPrizes);lsSet('dialPrizes',dialPrizes);
-  document.getElementById('cfgPane').style.display='none';
-  resetCard();drawWheel();
+  var lines=document.getElementById('cfgList').value.split('\n').map(function(s){return s.trim()}).filter(Boolean);
+  if(lines.length<2){alert('至少2个奖项');return}
+  var c=parseInt(document.getElementById('cfgCost').value)||50;
+  if(c<10)c=10;if(c>500)c=500;
+  localStorage.ent_list=JSON.stringify(lines);
+  localStorage.ent_cost=c;
+  document.getElementById('cfg').style.display='none';
+  document.getElementById('cfgCost').value=c;
+  drawWheel();newCard();
+  alert('已保存');
 }
 
-// ---------- 刮刮卡: 结果层用canvas渲染自定义文字 ----------
-function cardList(){return cardPrizes.split('\n').map(function(s){return s.trim()}).filter(Boolean)}
-function pickCard(){var l=cardList();return l[Math.floor(Math.random()*l.length)]||'谢谢惠顾'}
-function resultCanvas(text){
-  var c=document.createElement('canvas');c.width=300;c.height=172;
+// ---- 积分结算: "+10"加10, "-5"减5, 其他文字按加0 ----
+function settle(txt){
+  var m=(txt||'').match(/([+-]\d+)/);
+  if(m)addPts(parseInt(m[1]));
+  return txt;
+}
+
+// ---- 刮刮卡 ----
+var card=null;
+function resultImg(txt){
+  var c=document.createElement('canvas');c.width=600;c.height=340;
   var x=c.getContext('2d');
-  var g=x.createLinearGradient(0,0,300,172);
-  g.addColorStop(0,'#ffd28a');g.addColorStop(1,'#ff9a56');
-  x.fillStyle=g;x.fillRect(0,0,300,172);
-  x.fillStyle='#7a2c00';x.font='bold 26px sans-serif';x.textAlign='center';x.textBaseline='middle';
-  x.fillText(text.substring(0,12),150,86);
+  var g=x.createLinearGradient(0,0,600,340);g.addColorStop(0,'#315CDE');g.addColorStop(1,'#7B4FD8');
+  x.fillStyle=g;x.fillRect(0,0,600,340);
+  x.fillStyle='#fff';x.font='bold 44px sans-serif';x.textAlign='center';x.textBaseline='middle';
+  x.fillText(txt,300,150);
+  x.font='22px sans-serif';x.fillStyle='#ffffffaa';x.fillText('恭喜中奖',300,220);
   return c.toDataURL();
 }
-var card=null;
-function resetCard(){
-  var prize=pickCard();
-  var img=new Image();
-  img.onload=function(){
-    if(card)card.reset&&card.reset();
-    card=new LotteryCard(document.getElementById('js_lottery'),{cover:img,percent:55});
-    card.on('start',function(){card.setResult(resultCanvas(prize));
-      setTimeout(function(){try{document.querySelector('.m-ui-scratch').style.background='center/100% url('+resultCanvas(prize)+') no-repeat'}catch(e){}},50);
-    }).on('end',function(){});
-  };
-  img.src='images/placeholder.jpg';
+function newCard(){
+  document.getElementById('res0').textContent='';
+  var wrap=document.getElementById('cardWrap');
+  var old=document.getElementById('js_lottery');
+  var cv=document.createElement('canvas');cv.id='js_lottery';cv.className='m-ui-scratch';
+  wrap.replaceChild(cv,old);
+  var list=getList();
+  var prize=list[Math.floor(Math.random()*list.length)];
+  card=new LotteryCard(cv,{size:24,percent:55,cover:'#b8bdc9'});
+  card.on('start',function(){
+    var cost=getCost(),pts=getPts();
+    if(pts<cost){alert('积分不足(需要'+cost+'，当前'+pts+')\n去大转盘赚积分吧');setTimeout(function(){card.reset()},50);return}
+    setPts(pts-cost);
+    card.setResult(resultImg(prize));
+    card._prize=prize;
+  }).on('end',function(){
+    if(card._prize){document.getElementById('res0').textContent='🎉 '+settle(card._prize);card._prize=null}
+  });
 }
-resetCard();
+// 首次触发start需要手势: canvas touchstart由card.js处理, 但需先初始化result. 用包装: 在touchstart前预生成
+window.addEventListener('DOMContentLoaded',function(){setPts(getPts());newCard();drawWheel()});
+window.addEventListener('load',function(){setPts(getPts());newCard();drawWheel()});
 
-// ---------- 大转盘: canvas自绘扇区 ----------
-var dialList=function(){return dialPrizes.split('\n').map(function(s){return s.trim()}).filter(Boolean)};
+// ---- 大转盘 ----
 var angle=0,spinning=false;
+function dialList(){return getList()}
 function drawWheel(){
-  var l=dialList();if(l.length<2)l=['谢谢参与','再来一次'];
-  var c=document.getElementById('wheel'),x=c.getContext('2d');
-  var cx=320,r=300,n=l.length,step=2*Math.PI/n;
-  var colors=['#e6450a','#f5a623','#2e8b57','#315CDE','#8e44ad','#d65db1','#16a085','#c0392b','#2980b9','#f39c12','#27ae60','#7f8c8d'];
+  var cv=document.getElementById('wheel'),x=cv.getContext('2d');
+  var l=dialList().length;if(l<2)l=2;
+  var cx=320,r=310,step=2*Math.PI/l;
+  var cols=['#e74c3c','#3498db','#2ecc71','#f39c12','#9b59b6','#1abc9c','#e91e8c','#f1c40f','#2980b9','#27ae60'];
   x.clearRect(0,0,640,640);
-  for(var i=0;i<n;i++){
+  for(var i=0;i<l;i++){
     x.beginPath();x.moveTo(cx,cx);
-    x.arc(cx,cx,r,i*step-Math.PI/2,(i+1)*step-Math.PI/2);
-    x.fillStyle=colors[i%colors.length];x.fill();
-    x.strokeStyle='#14161c';x.lineWidth=4;x.stroke();
-    x.save();
-    x.translate(cx,cx);x.rotate(i*step+step/2);
-    x.fillStyle='#fff';x.font='bold 30px sans-serif';x.textAlign='center';
-    var txt=l[i].length>6?l[i].substring(0,6):l[i];
-    x.fillText(txt,r*0.62,10);
+    x.arc(cx,cx,r,i*step,(i+1)*step);x.closePath();
+    x.fillStyle=cols[i%cols.length];x.fill();
+    x.strokeStyle='#14161c';x.lineWidth=3;x.stroke();
+  }
+  for(var i2=0;i2<l;i2++){
+    x.save();x.translate(cx,cx);x.rotate(i2*step+step/2);
+    x.textAlign='right';x.textBaseline='middle';
+    x.fillStyle='#fff';x.font='bold 30px sans-serif';
+    var txt=dialList()[i2]||'';if(txt.length>7)txt=txt.substring(0,7);
+    x.fillText(txt,r-26,0);
     x.restore();
   }
-  x.beginPath();x.arc(cx,cx,60,0,2*Math.PI);x.fillStyle='#14161c';x.fill();
+  x.beginPath();x.arc(cx,cx,64,0,2*Math.PI);x.fillStyle='#14161c';x.fill();
+  x.beginPath();x.arc(cx,cx,60,0,2*Math.PI);x.fillStyle='#e8501f';x.fill();
+  x.fillStyle='#fff';x.font='bold 34px sans-serif';x.textAlign='center';x.textBaseline='middle';x.fillText('GO',cx,cx);
 }
-function pickDial(){var l=dialList();return Math.floor(Math.random()*l.length)}
 function spin(){
-  if(spinning)return;spinning=true;
-  var l=dialList();if(l.length<2)l=['谢谢参与','再来一次'];
-  var idx=pickDial(),n=l.length,step=360/n;
-  // 让指针(顶部)停在 idx 扇区中心
+  if(spinning)return;
+  var cost=getCost(),pts=getPts();
+  if(pts<cost){alert('积分不足(需要'+cost+'，当前'+pts+')');return}
+  setPts(pts-cost);
+  spinning=true;
+  var l=dialList().length;if(l<2)l=2;
+  var idx=Math.floor(Math.random()*l),step=360/l;
   var target=360*5+270-(idx*step+step/2);
-  angle=(angle%360);
+  angle=angle%360;
   target+=Math.ceil(angle/360)*360;
-  document.getElementById('wheel').style.transform='rotate('+target+'deg)';
-  document.getElementById('dialResult').textContent='';
+  var wheel=document.getElementById('wheel');
+  wheel.style.transform='rotate('+target+'deg)';
+  document.getElementById('res').textContent='';
   setTimeout(function(){
     spinning=false;
-    document.getElementById('dialResult').textContent='🎉 '+(l[idx]||'谢谢参与');
+    var prize=dialList()[idx]||'谢谢参与';
+    document.getElementById('res').textContent='🎉 '+settle(prize);
+    drawWheel();
   },4400);
 }
-function drawDial(){spin()}
-drawWheel();
 </script>
 </body>
 </html>
