@@ -365,19 +365,32 @@ public class OfflineActivity extends Activity {
         FrameLayout root = new FrameLayout(this);
         if (web.getParent() instanceof android.view.ViewGroup) ((android.view.ViewGroup) web.getParent()).removeView(web);
         root.addView(web, new FrameLayout.LayoutParams(-1, -1));
-        TextView back = new TextView(this);
-        back.setText("🏠 离线主页");
-        back.setTextColor(0xFFFFFFFF);
-        back.setTextSize(13);
-        GradientDrawable bg = new GradientDrawable();
-        bg.setColor(0x66000000);
-        bg.setCornerRadius(dip(18));
-        back.setBackground(bg);
-        back.setPadding(dip(14), dip(8), dip(14), dip(8));
-        back.setOnClickListener(new View.OnClickListener() { public void onClick(View v) { buildHome(); } });
-        FrameLayout.LayoutParams blp = new FrameLayout.LayoutParams(-2, -2, Gravity.TOP | Gravity.LEFT);
-        blp.setMargins(dip(10), dip(50), 0, 0);
-        root.addView(back, blp);
+        // 右下角半透明"•"回主页: 触屏出现3秒后消失
+        final TextView dot = new TextView(this);
+        dot.setText("•");
+        dot.setTextSize(30);
+        dot.setTextColor(0x88FFFFFF);
+        dot.setGravity(Gravity.CENTER);
+        GradientDrawable dbg = new GradientDrawable();
+        dbg.setShape(GradientDrawable.OVAL);
+        dbg.setColor(0x33000000);
+        dot.setBackground(dbg);
+        FrameLayout.LayoutParams dlp = new FrameLayout.LayoutParams(dip(44), dip(44), Gravity.BOTTOM | Gravity.RIGHT);
+        dlp.setMargins(0, 0, dip(14), dip(24));
+        dot.setVisibility(View.GONE);
+        root.addView(dot, dlp);
+        dot.setOnClickListener(new View.OnClickListener() { public void onClick(View v) { dot.setVisibility(View.GONE); buildHome(); } });
+        final Runnable hideDot = new Runnable() { public void run() { dot.setVisibility(View.GONE); } };
+        root.setOnTouchListener(new View.OnTouchListener() {
+            public boolean onTouch(View v, android.view.MotionEvent e) {
+                if (e.getAction() == android.view.MotionEvent.ACTION_DOWN) {
+                    dot.setVisibility(View.VISIBLE);
+                    dot.removeCallbacks(hideDot);
+                    dot.postDelayed(hideDot, 3000);
+                }
+                return false;
+            }
+        });
         setContentView(root);
     }
 
@@ -410,7 +423,6 @@ public class OfflineActivity extends Activity {
                         FileOutputStream fm = new FileOutputStream(mf);
                         fm.write(m.toString().getBytes(StandardCharsets.UTF_8));
                         fm.close();
-                        runOnUiThread(new Runnable() { public void run() { toast("✓ 已离线保存本页"); } });
                     } catch (Throwable ignored) {}
                     snapBusy = false;
                 }}).start();
@@ -633,7 +645,11 @@ public class OfflineActivity extends Activity {
     }
 
     private boolean zipToastShown = false;
-    private void toastOnce(String s) { if (!zipToastShown) { zipToastShown = true; toast(s); } }
+    private void toastOnce(final String s) {
+        if (zipToastShown) return;
+        zipToastShown = true;
+        runOnUiThread(new Runnable() { public void run() { toast(s); } });
+    }
 
     private android.webkit.WebResourceResponse serveZip(String u) {
         try {
