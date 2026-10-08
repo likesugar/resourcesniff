@@ -43,52 +43,126 @@ public class ChatActivity extends Activity {
         askLogin();
     }
 
-    /** 登录弹窗: 用户名+密码(多用户本地存放), 通过后进聊天页 */
+    /** 登录弹窗(美化卡片版): 用户名+密码(多用户本地存放), 取消登录=退出聊天室 */
     private void askLogin() {
-        LinearLayout box = new LinearLayout(this);
-        box.setOrientation(LinearLayout.VERTICAL);
-        box.setPadding(dip(24), dip(10), dip(24), 0);
+        // 卡片容器
+        LinearLayout card = new LinearLayout(this);
+        card.setOrientation(LinearLayout.VERTICAL);
+        GradientDrawable cbg = new GradientDrawable();
+        cbg.setColor(dark ? 0xFF16181D : 0xFFFFFFFF);
+        cbg.setCornerRadius(dip(22));
+        card.setBackground(cbg);
+        card.setPadding(dip(28), dip(28), dip(28), dip(24));
+
+        // 图标 + 标题
+        TextView icon = new TextView(this);
+        icon.setText("💬");
+        icon.setTextSize(30);
+        icon.setGravity(Gravity.CENTER);
+        card.addView(icon, new LinearLayout.LayoutParams(-1, -2));
+        TextView title = new TextView(this);
+        title.setText("登录聊天室");
+        title.setTextSize(18);
+        title.setTypeface(null, android.graphics.Typeface.BOLD);
+        title.setTextColor(dark ? 0xFFEEEEEE : 0xFF1F2329);
+        title.setGravity(Gravity.CENTER);
+        title.setPadding(0, dip(6), 0, dip(2));
+        card.addView(title, new LinearLayout.LayoutParams(-1, -2));
+        TextView sub = new TextView(this);
+        sub.setText("局域网互联 · 新用户输入即注册");
+        sub.setTextSize(12);
+        sub.setTextColor(0xFF888888);
+        sub.setGravity(Gravity.CENTER);
+        sub.setPadding(0, 0, 0, dip(14));
+        card.addView(sub, new LinearLayout.LayoutParams(-1, -2));
+
+        // 输入框(圆角胶囊)
         final EditText eu = new EditText(this);
         eu.setHint("用户名");
         eu.setText(nick);
+        eu.setSelection(eu.getText().length());
+        eu.setTextSize(15);
+        eu.setTextColor(dark ? 0xFFEEEEEE : 0xFF1F2329);
+        eu.setHintTextColor(0xFF999999);
         eu.setInputType(EditorInfo.TYPE_CLASS_TEXT);
-        box.addView(eu);
+        eu.setBackground(fieldBg());
+        eu.setPadding(dip(16), dip(12), dip(16), dip(12));
+        card.addView(eu, new LinearLayout.LayoutParams(-1, -2));
         final EditText ep = new EditText(this);
-        ep.setHint("密码(新用户即注册)");
+        ep.setHint("密码（可为空）");
+        ep.setTextSize(15);
+        ep.setTextColor(dark ? 0xFFEEEEEE : 0xFF1F2329);
+        ep.setHintTextColor(0xFF999999);
         ep.setInputType(EditorInfo.TYPE_CLASS_TEXT | EditorInfo.TYPE_TEXT_VARIATION_PASSWORD);
-        box.addView(ep);
-        new AlertDialog.Builder(this)
-            .setTitle("登录聊天室")
-            .setView(box)
+        ep.setBackground(fieldBg());
+        LinearLayout.LayoutParams pp = new LinearLayout.LayoutParams(-1, -2);
+        pp.topMargin = dip(12);
+        ep.setPadding(dip(16), dip(12), dip(16), dip(12));
+        card.addView(ep, pp);
+
+        // 进入按钮(渐变胶囊)
+        TextView enter = new TextView(this);
+        enter.setText("进  入");
+        enter.setTextSize(15);
+        enter.setTypeface(null, android.graphics.Typeface.BOLD);
+        enter.setTextColor(0xFFFFFFFF);
+        enter.setGravity(Gravity.CENTER);
+        GradientDrawable ebg = new GradientDrawable();
+        ebg.setOrientation(GradientDrawable.Orientation.LEFT_RIGHT);
+        ebg.setColors(new int[]{0xFF315CDE, 0xFF7B4FD8});
+        ebg.setCornerRadius(dip(22));
+        enter.setBackground(ebg);
+        LinearLayout.LayoutParams elp = new LinearLayout.LayoutParams(-1, dip(44));
+        elp.topMargin = dip(20);
+        card.addView(enter, elp);
+
+        // 取消登录
+        TextView cancel = new TextView(this);
+        cancel.setText("取消登录");
+        cancel.setTextSize(13);
+        cancel.setTextColor(0xFF888888);
+        cancel.setGravity(Gravity.CENTER);
+        cancel.setPadding(0, dip(14), 0, 0);
+        card.addView(cancel, new LinearLayout.LayoutParams(-1, -2));
+
+        final AlertDialog dlg = new AlertDialog.Builder(this)
+            .setView(card)
             .setCancelable(false)
-            .setPositiveButton("进入", new android.content.DialogInterface.OnClickListener() {
-                public void onClick(android.content.DialogInterface dg, int w) {
-                    String u = eu.getText().toString().trim();
-                    String p = ep.getText().toString().trim();
-                    if (u.isEmpty()) { toast("用户名不能为空"); askLogin(); return; }
-                    android.content.SharedPreferences sp = getSharedPreferences("chat", MODE_PRIVATE);
-                    try {
-                        org.json.JSONObject users = new org.json.JSONObject(sp.getString("users", "{}"));
-                        if (users.has(u)) {
-                            if (!users.optString(u, "").equals(p)) { toast("密码错误"); askLogin(); return; }
-                        } else {
-                            users.put(u, p);
-                            sp.edit().putString("users", users.toString()).apply();
-                        }
-                    } catch (Throwable e) { toast("本地存储失败"); return; }
-                    nick = u;
-                    sp.edit().putString("nick", u).apply();
-                    toast("欢迎, " + u);
+            .create();
+        dlg.show();
+        dlg.getWindow().setLayout(dip(320), -2);
+        dlg.getWindow().setBackgroundDrawableResource(android.R.color.transparent);
+
+        enter.setOnClickListener(new View.OnClickListener() { public void onClick(View v) {
+            String u = eu.getText().toString().trim();
+            String p = ep.getText().toString().trim();
+            if (u.isEmpty()) { toast("用户名不能为空"); return; }
+            android.content.SharedPreferences sp = getSharedPreferences("chat", MODE_PRIVATE);
+            try {
+                org.json.JSONObject users = new org.json.JSONObject(sp.getString("users", "{}"));
+                if (users.has(u)) {
+                    if (!users.optString(u, "").equals(p)) { toast("密码错误"); return; }
+                } else {
+                    users.put(u, p);
+                    sp.edit().putString("users", users.toString()).apply();
                 }
-            })
-            .setNeutralButton("切换用户", new android.content.DialogInterface.OnClickListener() {
-                public void onClick(android.content.DialogInterface dg, int w) {
-                    nick = "";
-                    getSharedPreferences("chat", MODE_PRIVATE).edit().putString("nick", "").apply();
-                    askLogin();
-                }
-            })
-            .show();
+            } catch (Throwable e) { toast("本地存储失败"); return; }
+            nick = u;
+            sp.edit().putString("nick", u).apply();
+            dlg.dismiss();
+            toast("欢迎, " + u);
+        }});
+        cancel.setOnClickListener(new View.OnClickListener() { public void onClick(View v) {
+            dlg.dismiss();
+            finish(); // 回到工具箱首页
+        }});
+    }
+
+    private GradientDrawable fieldBg() {
+        GradientDrawable g = new GradientDrawable();
+        g.setColor(dark ? 0xFF1C1F26 : 0xFFF2F3F5);
+        g.setCornerRadius(dip(24));
+        return g;
     }
 
     private int bg()   { return dark ? 0xFF000000 : 0xFFFFFFFF; }

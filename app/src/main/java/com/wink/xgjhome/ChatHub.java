@@ -50,6 +50,7 @@ public class ChatHub {
                         String s = new String(p.getData(), 0, p.getLength(), "UTF-8");
                         JSONObject o = new JSONObject(s);
                         if (selfId.equals(o.optString("uid"))) continue; // 自己广播的, 丢弃
+                        if (!seenOnce(o)) continue; // 双广播/重发去重
                         append(o);
                         notifyUi(o);
                     } catch (Throwable e) { if (!running) break; }
@@ -96,8 +97,24 @@ public class ChatHub {
         for (Listener l : listeners) try { l.onMessage(o); } catch (Throwable ignored) {}
     }
 
+    private static final java.util.Set<String> seen = java.util.Collections.synchronizedSet(new java.util.LinkedHashSet<String>() {
+        protected boolean removeEldest(java.util.Map.Entry<String, Boolean> e) { return size() > 400; }
+    });
+
+    /** 同 nick+ts+msg 只收一次 */
+    private static boolean seenOnce(JSONObject o) {
+        String key = o.optString("nick") + "|" + o.optLong("ts", 0) + "|" + o.optString("msg");
+        synchronized (seen) { if (seen.contains(key)) return false; seen.add(key); }
+        return true;
+    }
+
     private static void append(JSONObject o) {
         synchronized (log) {
+            String key = o.optString("nick") + "|" + o.optLong("ts", 0) + "|" + o.optString("msg");
+            for (JSONObject p : log) {
+                String k2 = p.optString("nick") + "|" + p.optLong("ts", 0) + "|" + p.optString("msg");
+                if (k2.equals(key)) return; // 日志里已有, 不重复
+            }
             log.add(o);
             while (log.size() > 500) log.remove(0);
         }
@@ -123,7 +140,18 @@ public class ChatHub {
             java.io.FileInputStream fis = new java.io.FileInputStream(f);
             fis.read(b); fis.close();
             JSONArray a = new JSONArray(new String(b, "UTF-8"));
-            synchronized (log) { for (int i = 0; i < a.length(); i++) log.add(a.getJSONObject(i)); }
+            synchronized (log) {
+                for (int i = 0; i < a.length(); i++) {
+                    JSONObject o = a.getJSONObject(i);
+                    String key = o.optString("nick") + "|" + o.optLong("ts", 0) + "|" + o.optString("msg");
+                    boolean dup = false;
+                    for (JSONObject p : log) {
+                        String k2 = p.optString("nick") + "|" + p.optLong("ts", 0) + "|" + p.optString("msg");
+                        if (k2.equals(key)) { dup = true; break; }
+                    }
+                    if (!dup) log.add(o);
+                }
+            }
         } catch (Throwable ignored) {}
     }
 
