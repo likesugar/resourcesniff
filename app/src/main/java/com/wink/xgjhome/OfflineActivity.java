@@ -458,23 +458,46 @@ public class OfflineActivity extends Activity {
                 if (normKey(e.getKey()).equals(normKey(u))) { f = e.getValue(); break; }
             }
         }
-        // 主文档兜底: 该站任意一个 text/html 资源(通常是首页)
+        // 主文档兜底: 嗅探内容, 只选真正的HTML(排除图片等二进制)
         if ((f == null || !f.exists()) && u.equals(pendingSnapFor)) {
             long best = 0;
             for (java.util.Map.Entry<String, File> e : offlineIndex.entrySet()) {
                 File v = e.getValue();
-                if (v.exists() && "text/html".equals(guessType(v.getName())) && v.length() > best) {
-                    best = v.length(); f = v;
-                }
+                if (!v.exists()) continue;
+                if (!"text/html".equals(sniffType(v))) continue;
+                if (v.length() > best) { best = v.length(); f = v; }
             }
         }
         if (f == null || !f.exists()) return new android.webkit.WebResourceResponse("text/plain", "utf-8", new java.io.ByteArrayInputStream(new byte[0]));
-        return serveRes(f, guessType(f.getName()));
+        String t = guessType(f.getName());
+        if (t.equals("text/html")) t = sniffType(f); // 无扩展名资源按内容嗅探
+        return serveRes(f, t);
     }
 
     private android.webkit.WebResourceResponse serveRes(File f, String type) {
         try { return new android.webkit.WebResourceResponse(type, null, new java.io.FileInputStream(f)); }
         catch (Throwable e) { return null; }
+    }
+
+    /** 文件头魔数嗅探真实类型(快照文件无扩展名) */
+    private String sniffType(File f) {
+        try {
+            java.io.FileInputStream is = new java.io.FileInputStream(f);
+            byte[] h = new byte[400];
+            int n = is.read(h); is.close();
+            if (n < 4) return "text/html";
+            if (h[0]==(byte)0x89 && h[1]=='P'&&h[2]=='N'&&h[3]=='G') return "image/png";
+            if (h[0]==(byte)0xFF && h[1]==(byte)0xD8) return "image/jpeg";
+            if (h[0]=='G'&&h[1]=='I'&&h[2]=='F') return "image/gif";
+            if (h[0]=='R'&&h[1]=='I'&&h[2]=='F'&&h[3]=='F') return "image/webp";
+            String head = new String(h, 0, Math.max(0,n), StandardCharsets.UTF_8).trim().toLowerCase();
+            if (head.startsWith("<!doctype") || head.startsWith("<html") || head.startsWith("<head") || head.contains("<body")) return "text/html";
+            if (head.startsWith("@charset") || head.startsWith("@media") || head.startsWith("body") || head.startsWith(".") || head.startsWith("#") || head.contains("{") && head.contains(":") && head.contains(";") && !head.contains("(")) return "text/css";
+            if (head.startsWith("function") || head.startsWith("var ") || head.startsWith("let ") || head.startsWith("const ") || head.startsWith("(function") || head.startsWith("import") || head.startsWith("!function")) return "application/javascript";
+            if (head.startsWith("%pdf")) return "application/pdf";
+            if (head.startsWith("{") || head.startsWith("[")) return "application/json";
+            return "text/html";
+        } catch (Throwable e) { return "text/html"; }
     }
 
     private String guessType(String u) {
