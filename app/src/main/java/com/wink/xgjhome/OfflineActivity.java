@@ -394,6 +394,7 @@ public class OfflineActivity extends Activity {
             FileOutputStream fos = new FileOutputStream(out);
             fos.write(data); fos.close();
             capMap.put(u, out);
+            flushCapture(); // 即时刷写, 中途退出不丢映射
             return isMain ? null : new android.webkit.WebResourceResponse(guessType(u), null, new java.io.ByteArrayInputStream(data));
         } catch (Throwable e) { return null; }
     }

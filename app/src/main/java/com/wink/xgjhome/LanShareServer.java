@@ -20,14 +20,23 @@ public class LanShareServer {
         return 10000 + new java.util.Random().nextInt(55536);
     }
 
+    private static volatile int preferredPort = -1;
+    public static void setPreferredPort(int p) { preferredPort = p; }
+
     public static synchronized void start() {
         if (running) return;
         // 同步绑定：调用返回时端口一定就绪（不再出现 -1）
         ServerSocket tmp = null;
         int p2 = -1;
-        for (int i = 0; i < 20; i++) {
-            try { p2 = randomPort(); tmp = new ServerSocket(p2); break; }
-            catch (Throwable e) { tmp = null; }
+        // 优先尝试用户指定端口
+        if (preferredPort >= 1024) {
+            try { p2 = preferredPort; tmp = new ServerSocket(p2); } catch (Throwable e) { tmp = null; }
+        }
+        if (tmp == null) {
+            for (int i = 0; i < 20; i++) {
+                try { p2 = randomPort(); tmp = new ServerSocket(p2); break; }
+                catch (Throwable e) { tmp = null; }
+            }
         }
         if (tmp == null) return;
         ss = tmp;
