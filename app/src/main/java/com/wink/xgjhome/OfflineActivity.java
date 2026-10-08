@@ -317,6 +317,7 @@ public class OfflineActivity extends Activity {
             return;
         }
         // 先探网络: 通=在线+抓取快照; 不通=离线整站回放
+        if (url.startsWith("http")) pendingSnapFor = url; // 关键: 否则错误回退会串站
         if (netOk(url)) {
             offlineMode = false; captureMode = true;
             beginCapture(url);
