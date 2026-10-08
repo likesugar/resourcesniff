@@ -438,13 +438,17 @@ public class OfflineActivity extends Activity {
         new Thread(new Runnable() { public void run() {
             try {
                 String html = fetchText(pageUrl, null);
-                if (html == null || html.length() < 200) { snapBusy = false; return; }
+                if (html == null || html.length() < 200) { dlog("MAIN_FAIL " + pageUrl + " len=" + (html == null ? -1 : html.length())); snapBusy = false; return; }
                 String out = processHtml(html, pageUrl);
+                dlog("MAIN_SAVE " + pageUrl + " raw=" + html.length() + " out=" + out.length());
+                if (out.length() < 2000 && !out.contains("<body")) {
+                    dlog("MAIN_SUSPECT_FULL>>>\n" + out + "\n<<<");
+                }
                 File d = siteDir(pageUrl);
                 File f = new File(d, "page_" + md5(pageUrl).substring(0, 8) + ".html");
-                FileOutputStream fos = new FileOutputStream(f);
-                fos.write(out.getBytes(StandardCharsets.UTF_8));
-                fos.close();
+                boolean bad = out.length() < 2000 && !out.contains("<body");
+                if (bad) { dlog("MAIN_BAD_SKIP " + pageUrl + " out=" + out.length() + " oldfile=" + f.length()); snapBusy = false; return; }
+                writeAtomic(f, out.getBytes(StandardCharsets.UTF_8));
                 final File mf = new File(d, "map.json");
                 final JSONObject m = new JSONObject();
                 try { m.put(pageUrl, f.getName()); } catch (Throwable ignored) {}
