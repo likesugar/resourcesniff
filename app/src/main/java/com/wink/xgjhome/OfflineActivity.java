@@ -430,6 +430,15 @@ public class OfflineActivity extends Activity {
         }}).start();
     }
 
+    private void writeAtomic(File f, byte[] b) {
+        try {
+            File t = new File(f.getAbsolutePath() + ".tmp." + Thread.currentThread().getId());
+            FileOutputStream fo = new FileOutputStream(t);
+            fo.write(b); fo.close();
+            t.renameTo(f);
+        } catch (Throwable e) { }
+    }
+
     private void writeMap(File mf, JSONObject m) {
         try {
             FileOutputStream fm = new FileOutputStream(mf);
@@ -455,21 +464,31 @@ public class OfflineActivity extends Activity {
                 if (!urls.contains(abs)) urls.add(abs);
                 if (urls.size() >= 30) break;
             }
-            for (String u : urls) {
-                if (m.has(u)) continue;
-                try {
-                    String h = fetchText(u, pageUrl);
-                    if (h == null || h.length() < 200) continue;
-                    String out = processHtml(h, u);
-                    File f2 = new File(d, "page_" + md5(u).substring(0, 8) + ".html");
-                    FileOutputStream fo = new FileOutputStream(f2);
-                    fo.write(out.getBytes(StandardCharsets.UTF_8));
-                    fo.close();
-                    m.put(u, f2.getName());
-                    writeMap(mf, m); // 每存一篇立即落盘
-                    added++;
-                } catch (Throwable ignored) {}
+            final java.util.concurrent.CountDownLatch latch = new java.util.concurrent.CountDownLatch(urls.size());
+            final java.util.concurrent.atomic.AtomicInteger cnt = new java.util.concurrent.atomic.AtomicInteger(0);
+            java.util.concurrent.ExecutorService ex = java.util.concurrent.Executors.newFixedThreadPool(4);
+            for (final String u : urls) {
+                if (m.has(u)) { latch.countDown(); continue; }
+                ex.execute(new Runnable() { public void run() {
+                    try {
+                        String h = fetchText(u, pageUrl);
+                        if (h != null && h.length() >= 200) {
+                            String out = processHtml(h, u);
+                            File f2 = new File(d, "page_" + md5(u).substring(0, 8) + ".html");
+                            writeAtomic(f2, out.getBytes(StandardCharsets.UTF_8));
+                            synchronized (m) {
+                                m.put(u, f2.getName());
+                                writeMap(mf, m); // 每存一篇立即落盘
+                            }
+                            cnt.incrementAndGet();
+                        }
+                    } catch (Throwable ignored) {}
+                    latch.countDown();
+                }});
             }
+            try { latch.await(); } catch (InterruptedException ignored) {}
+            ex.shutdown();
+            added = cnt.get();
         } catch (Throwable e) { return -1; }
         return added;
     }
@@ -546,8 +565,7 @@ public class OfflineActivity extends Activity {
                 txt = inlineCssUrls2(txt, abs, d);
                 b = txt.getBytes(StandardCharsets.UTF_8);
             }
-            FileOutputStream fo = new FileOutputStream(new File(dir, name));
-            fo.write(b); fo.close();
+            writeAtomic(new File(dir, name), b);
             return "/" + folder + "/" + name;
         } catch (Throwable e) { return null; }
     }
