@@ -110,10 +110,11 @@ function spin(){
   spinning=true;
   var l=dialList().length;if(l<2)l=2;
   var idx=Math.floor(Math.random()*l),step=360/l;
-  var target=360*5+270-(idx*step+step/2);
-  angle=angle%360;
-  target+=Math.ceil(angle/360)*360;
-  document.getElementById('wheel').style.transform='rotate('+target+'deg)';
+  // 累计角度: 每次都在当前角度上+5圈+对准差值, 保证transform一定变化(有动画)
+  var desired=270-(idx*step+step/2);
+  var delta=(desired-angle%360+360)%360;
+  angle+=360*5+delta;
+  document.getElementById('wheel').style.transform='rotate('+angle+'deg)';
   document.getElementById('res').textContent='';
   setTimeout(function(){
     spinning=false;
