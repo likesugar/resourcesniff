@@ -257,6 +257,7 @@ public class SpiderActivity extends Activity {
 
     private void browse(String url) {
         currentUrl = url;
+        if (web.getParent() instanceof android.view.ViewGroup) ((android.view.ViewGroup) web.getParent()).removeView(web);
         FrameLayout root = new FrameLayout(this);
         root.addView(web, new FrameLayout.LayoutParams(-1, -1));
         TextView back = new TextView(this);
@@ -299,6 +300,27 @@ public class SpiderActivity extends Activity {
             " var txt=(lk.innerText||'').substring(0,4000);" +
             " return JSON.stringify({name:t,imgs:imgs,txt:txt});";
         v.evaluateJavascript(btnJs(collect, "1FA855"), null);
+        // 回复可见帖: 追加"回复解锁"按钮
+        String reply =
+            "(function(){" +
+            "try{" +
+            "if(window.__rp)return; window.__rp=1;" +
+            "var h=document.documentElement.innerHTML;" +
+            "if(h.indexOf('回复')<0)return;" +
+            "var fm=h.match(/formhash[=\"'=]+([a-z0-9]+)/i); if(!fm)return;" +
+            "var tid=(location.href.match(/thread-(\\d+)/)||[])[1]; if(!tid)return;" +
+            "var b=document.createElement('div'); b.textContent='↩ 回复解锁';" +
+            "b.style.cssText='position:fixed;left:12px;bottom:110px;z-index:99999;background:#1FA855;color:#fff;padding:8px 14px;border-radius:20px;font-size:13px;font-weight:bold;opacity:.9';" +
+            "b.onclick=function(){" +
+            " b.textContent='回复中…';" +
+            " var p=new URLSearchParams(); p.append('formhash',fm[1]); p.append('message','感谢分享'); p.append('usesig','1'); p.append('subject','');" +
+            " fetch('forum.php?mod=post&action=reply&tid='+tid+'&inajax=1&mobile=2',{method:'POST',body:p,credentials:'same-origin'})" +
+            " .then(function(){location.reload();}).catch(function(){b.textContent='回复失败';});" +
+            "};" +
+            "document.body.appendChild(b);" +
+            "}catch(e){}}" +
+            ")();";
+        v.evaluateJavascript(reply, null);
     }
 
     private String btnJs(String collectJs, String color) {
