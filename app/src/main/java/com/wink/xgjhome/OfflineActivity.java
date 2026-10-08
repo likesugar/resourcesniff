@@ -213,16 +213,45 @@ public class OfflineActivity extends Activity {
     }
 
     private void uploadHtml() {
-        android.content.Intent i = new android.content.Intent(android.content.Intent.ACTION_GET_CONTENT);
-        i.setType("*/*");
-        i.addCategory(android.content.Intent.CATEGORY_OPENABLE);
-        startActivityForResult(android.content.Intent.createChooser(i, "选择HTML文件"), 9002);
+        LinearLayout box = new LinearLayout(this);
+        box.setOrientation(LinearLayout.VERTICAL);
+        TextView h = new TextView(this);
+        h.setText("📄 上传单个HTML文件");
+        h.setTextSize(15);
+        h.setTextColor(0xFF1F2329);
+        h.setPadding(dip(30), dip(14), dip(10), dip(14));
+        h.setOnClickListener(new View.OnClickListener() { public void onClick(View v) {
+            android.content.Intent i = new android.content.Intent(android.content.Intent.ACTION_GET_CONTENT);
+            i.setType("text/*");
+            i.addCategory(android.content.Intent.CATEGORY_OPENABLE);
+            startActivityForResult(android.content.Intent.createChooser(i, "选择HTML文件"), 9002);
+            dlgRef.dismiss();
+        }});
+        TextView z = new TextView(this);
+        z.setText("🗜️ 导入ZIP整站(html+图片, 可互相跳转)");
+        z.setTextSize(15);
+        z.setTextColor(0xFF315CDE);
+        z.setTypeface(null, android.graphics.Typeface.BOLD);
+        z.setPadding(dip(30), dip(14), dip(10), dip(14));
+        z.setOnClickListener(new View.OnClickListener() { public void onClick(View v) {
+            android.content.Intent i = new android.content.Intent(android.content.Intent.ACTION_GET_CONTENT);
+            i.setType("*/*");
+            i.addCategory(android.content.Intent.CATEGORY_OPENABLE);
+            startActivityForResult(android.content.Intent.createChooser(i, "选择ZIP包"), 9003);
+            dlgRef.dismiss();
+        }});
+        box.addView(h);
+        box.addView(z);
+        dlgRef = new AlertDialog.Builder(this).setTitle("导入离线内容").setView(box).show();
     }
+    private AlertDialog dlgRef;
 
     @Override
     protected void onActivityResult(int req, int res, android.content.Intent data) {
         super.onActivityResult(req, res, data);
-        if (req != 9002 || res != RESULT_OK || data == null || data.getData() == null) return;
+        if (res != RESULT_OK || data == null || data.getData() == null) return;
+        if (req == 9003) { importZip(data.getData()); return; }
+        if (req != 9002) return;
         try {
             String name = "page.html";
             android.database.Cursor c = getContentResolver().query(data.getData(), null, null, null, null);
@@ -245,6 +274,52 @@ public class OfflineActivity extends Activity {
             save(a);
             refreshCards();
             toast("已导入");
+        } catch (Throwable e) { toast("导入失败: " + e); }
+    }
+
+    /** ZIP整站导入: 解包 → 虚拟域名 http://ziplocal.{ts}/ 提供服务, 页面间相对链接随便跳 */
+    private void importZip(android.net.Uri uri) {
+        try {
+            String zipName = "site.zip";
+            android.database.Cursor c = getContentResolver().query(uri, null, null, null, null);
+            if (c != null) { try { int ni = c.getColumnIndex(android.provider.OpenableColumns.DISPLAY_NAME);
+                if (ni >= 0 && c.moveToFirst()) zipName = c.getString(ni); } finally { c.close(); } }
+            String site = "z" + System.currentTimeMillis();
+            File dir = new File(new File(getFilesDir(), "offline_zip"), site);
+            if (!dir.exists()) dir.mkdirs();
+            java.util.zip.ZipInputStream zis = new java.util.zip.ZipInputStream(getContentResolver().openInputStream(uri));
+            java.util.zip.ZipEntry e;
+            int count = 0;
+            File index = null;
+            while ((e = zis.getNextEntry()) != null) {
+                if (e.isDirectory()) continue;
+                String fn = e.getName();
+                if (fn.contains("..")) continue;
+                File out = new File(dir, fn);
+                File parent = out.getParentFile();
+                if (parent != null && !parent.exists()) parent.mkdirs();
+                FileOutputStream fos = new FileOutputStream(out);
+                byte[] b = new byte[8192]; int n;
+                while ((n = zis.read(b)) > 0) fos.write(b, 0, n);
+                fos.close();
+                count++;
+                if (index == null && (fn.endsWith("index.html") || fn.endsWith("index.htm"))) index = out;
+                if (index == null && fn.endsWith(".html") && !fn.contains("/")) index = out;
+            }
+            zis.close();
+            if (index == null) { toast("包里没找到html"); return; }
+            String rel = dir.toPath().relativize(index.toPath()).toString().replace('\\', '/');
+            String url = "http://ziplocal." + site + "/" + rel;
+            JSONArray a = load();
+            JSONObject o = new JSONObject();
+            o.put("name", zipName.replaceAll("(?i)\\.zip$", ""));
+            o.put("url", url);
+            o.put("zip", dir.getAbsolutePath());
+            o.put("color", COLORS[a.length() % COLORS.length]);
+            a.put(o);
+            save(a);
+            refreshCards();
+            toast("已导入 " + count + " 个文件");
         } catch (Throwable e) { toast("导入失败: " + e); }
     }
 
@@ -275,6 +350,7 @@ public class OfflineActivity extends Activity {
                 // 核心拦截: capture模式=边加载边落地整站资源; offline模式=全部从本地回放
                 @Override public android.webkit.WebResourceResponse shouldInterceptRequest(WebView v, android.webkit.WebResourceRequest req) {
                     String u = req.getUrl().toString();
+                    if (u.startsWith("http://ziplocal.")) return serveZip(u); // 本地zip站
                     if (!u.startsWith("http")) return null;
                     if (captureMode) return capture(u, pendingSnapFor);
                     if (offlineMode) return serveOffline(u);
@@ -344,6 +420,20 @@ public class OfflineActivity extends Activity {
                 toast("无网络且无快照");
             }
         }
+    }
+
+    /** ziplocal虚拟域 → 磁盘文件 */
+    private android.webkit.WebResourceResponse serveZip(String u) {
+        try {
+            // http://ziplocal.z123/rel/path.html
+            int dot = u.indexOf('.', "http://ziplocal.".length());
+            String site = u.substring("http://ziplocal.".length(), dot);
+            String rel = u.substring(("http://ziplocal." + site + ".").length());
+            if (rel.contains("?")) rel = rel.substring(0, rel.indexOf('?'));
+            File f = new File(new File(getFilesDir(), "offline_zip"), site + "/" + rel);
+            if (!f.exists()) return new android.webkit.WebResourceResponse("text/plain", "utf-8", new java.io.ByteArrayInputStream(new byte[0]));
+            return serve(u, f, guessType(rel));
+        } catch (Throwable e) { return null; }
     }
 
     // ---------------- 整站快照 ----------------
