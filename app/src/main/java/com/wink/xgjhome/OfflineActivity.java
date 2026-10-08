@@ -461,6 +461,33 @@ public class OfflineActivity extends Activity {
         }}).start();
     }
 
+    private byte[] fetchBytesUrl(String url, String referer, StringBuilder finalUrl) {
+        try {
+            java.net.HttpURLConnection c = (java.net.HttpURLConnection) new URL(url).openConnection();
+            c.setConnectTimeout(10000); c.setReadTimeout(15000);
+            c.setRequestProperty("User-Agent", "Mozilla/5.0 (Linux; Android 13) Chrome/120 Mobile");
+            if (referer != null) c.setRequestProperty("Referer", referer);
+            c.setInstanceFollowRedirects(true);
+            if (c.getResponseCode() != 200) { dlog("HTTP " + c.getResponseCode() + " " + url); return null; }
+            finalUrl.append(c.getURL().toString());
+            java.io.InputStream is = c.getInputStream();
+            ByteArrayOutputStream bo = new ByteArrayOutputStream();
+            byte[] buf = new byte[16384]; int n;
+            while ((n = is.read(buf)) > 0) bo.write(buf, 0, n);
+            is.close();
+            return bo.toByteArray();
+        } catch (Throwable e) { dlog("ERR " + url + " " + e); return null; }
+    }
+
+    private void dlog(String line) {
+        try {
+            File f = new File(getExternalFilesDir(null), "offline_debug.txt");
+            FileOutputStream fo = new FileOutputStream(f, true);
+            fo.write((new java.text.SimpleDateFormat("MM-dd HH:mm:ss ").format(new java.util.Date()) + line + "\n").getBytes(StandardCharsets.UTF_8));
+            fo.close();
+        } catch (Throwable ignored) {}
+    }
+
     private void writeAtomic(File f, byte[] b) {
         try {
             File t = new File(f.getAbsolutePath() + ".tmp." + Thread.currentThread().getId());
@@ -502,17 +529,22 @@ public class OfflineActivity extends Activity {
                 if (m.has(u)) { latch.countDown(); continue; }
                 ex.execute(new Runnable() { public void run() {
                     try {
-                        String h = fetchText(u, pageUrl);
-                        if (h != null && h.length() >= 200) {
+                        StringBuilder fin = new StringBuilder();
+                        byte[] raw = fetchBytesUrl(u, pageUrl, fin);
+                        if (raw != null && raw.length >= 200) {
+                            String h = new String(raw, StandardCharsets.UTF_8);
                             String out = processHtml(h, u);
                             File f2 = new File(d, "page_" + md5(u).substring(0, 8) + ".html");
                             writeAtomic(f2, out.getBytes(StandardCharsets.UTF_8));
                             synchronized (m) {
                                 m.put(u, f2.getName());
+                                String fu = fin.toString();
+                                if (!fu.equals(u) && fu.startsWith("http")) { m.put(fu, f2.getName()); dlog("REDIR " + u + " -> " + fu); }
                                 writeMap(mf, m); // 每存一篇立即落盘
                             }
                             cnt.incrementAndGet();
-                        }
+                            dlog("SAVED " + u);
+                        } else { dlog("SKIP " + u); }
                     } catch (Throwable ignored) {}
                     latch.countDown();
                 }});
@@ -795,13 +827,18 @@ public class OfflineActivity extends Activity {
 
     private android.webkit.WebResourceResponse serveOffline(String u) {
         File f = offlineIndex.get(u);
-        if (f == null || !f.exists()) f = offlineIndex.get(normKey(u));
+        String how = f != null ? "exact" : null;
+        if (f == null || !f.exists()) { f = offlineIndex.get(normKey(u)); if (f != null) how = "norm"; }
         if (f == null || !f.exists()) {
             for (Map.Entry<String, File> e : offlineIndex.entrySet()) {
-                if (normKey(e.getKey()).equals(normKey(u))) { f = e.getValue(); break; }
+                if (normKey(e.getKey()).equals(normKey(u))) { f = e.getValue(); how = "loop"; break; }
             }
         }
+        if (f != null) dlog("HIT[" + how + "] " + u + " -> " + f.getName() + " " + f.length());
         if (f == null || !f.exists()) {
+            dlog("MISS " + u + " index=" + offlineIndex.size());
+            int i = 0;
+            for (Map.Entry<String, File> e : offlineIndex.entrySet()) { dlog("  k" + (i++) + ": " + e.getKey()); if (i > 40) break; }
             // HtmlDown2 资源目录兜底: /images/.. /js/.. /css/.. /videos/.. 按站点目录找
             try {
                 URL pu = new URL(u);
