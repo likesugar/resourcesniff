@@ -118,7 +118,7 @@ function settle(txt){
 var card=null;
 var bgImg=new Image();
 var bgReady=false;
-bgImg.onload=function(){bgReady=true};
+bgImg.onload=function(){bgReady=true;newCard();drawWheel()}; // 等云图就绪再建卡
 bgImg.src='./bg.jpg';
 function manualAdd(){
   var n=parseInt(document.getElementById('addN').value);
@@ -130,10 +130,14 @@ function manualAdd(){
 function resultImg(txt){
   var cv=document.createElement('canvas');cv.width=600;cv.height=340;
   var x=cv.getContext('2d');
-  var img=bgImg;
-  // 云霞底图铺满 + 压暗保证文字可读
-  x.drawImage(img,0,0,600,340);
-  x.fillStyle='rgba(0,0,20,0.28)';x.fillRect(0,0,600,340);
+  if(bgReady){ // 云霞底图 + 压暗
+    x.drawImage(bgImg,0,0,600,340);
+    x.fillStyle='rgba(0,0,20,0.28)';x.fillRect(0,0,600,340);
+  } else { // 兜底渐变
+    var g=x.createLinearGradient(0,0,600,340);
+    g.addColorStop(0,'#315CDE');g.addColorStop(1,'#7B4FD8');
+    x.fillStyle=g;x.fillRect(0,0,600,340);
+  }
   // 中奖文字居中(自动缩放)
   var size=64;do{x.font='bold '+size+'px sans-serif';size-=4}
   while(x.measureText(txt).width>540&&size>22);
@@ -206,8 +210,8 @@ function scratchTen(){
     done++;
   },700);
 }
-window.addEventListener('DOMContentLoaded',function(){setPts(getPts());newCard();drawWheel()});
-window.addEventListener('load',function(){setPts(getPts());newCard();drawWheel()});
+window.addEventListener('DOMContentLoaded',function(){setPts(getPts());drawWheel()});
+window.addEventListener('DOMContentLoaded',function(){setPts(getPts());drawWheel()});
 
 // ---- 大转盘 ----
 var angle=0,spinning=false;
