@@ -295,7 +295,9 @@ public class SpiderActivity extends Activity {
             "  if(imgs.indexOf(s)<0)imgs.push(s);" +
             " });" +
             " var t=(document.title||'帖子').trim().substring(0,50);" +
-            " return JSON.stringify({name:t,imgs:imgs});";
+            " var lk=document.querySelector('.locked')||document.querySelector('[class*=hidden]')||document.body;" +
+            " var txt=(lk.innerText||'').substring(0,4000);" +
+            " return JSON.stringify({name:t,imgs:imgs,txt:txt});";
         v.evaluateJavascript(btnJs(collect, "1FA855"), null);
     }
 
@@ -340,10 +342,31 @@ public class SpiderActivity extends Activity {
                 JSONObject o = new JSONObject(payload);
                 String name = o.optString("name", "图集").replace('/', '_').replace(':', '_');
                 JSONArray arr = o.optJSONArray("imgs");
-                if (arr == null || arr.length() == 0) { toast("没抓到图片链接"); return; }
+                final String txt = o.optString("txt", "");
+                final java.io.File dir0 = dlDir(name);
+                if (arr == null || arr.length() == 0) {
+                    if (txt.length() > 20) {
+                        final String fname = name;
+                        pool.execute(new Runnable() { public void run() {
+                            try {
+                                java.io.File f = new java.io.File(dir0, "帖子信息.txt");
+                                java.io.FileOutputStream fos = new java.io.FileOutputStream(f);
+                                fos.write(txt.getBytes("UTF-8")); fos.close();
+                                toast("已保存: 爬虫/" + fname + "/帖子信息.txt");
+                            } catch (Throwable e) { toast("保存失败: " + e); }
+                        }});
+                    } else toast("没抓到图片链接");
+                    return;
+                }
                 final String fname = name;
                 final int total = arr.length();
-                final java.io.File dir = dlDir(fname);
+                final java.io.File dir = dir0;
+                if (txt.length() > 20) pool.execute(new Runnable() { public void run() {
+                    try {
+                        java.io.FileOutputStream fos = new java.io.FileOutputStream(new java.io.File(dir, "帖子信息.txt"));
+                        fos.write(txt.getBytes("UTF-8")); fos.close();
+                    } catch (Throwable ignored) {}
+                }});
                 toast("开始下载 " + total + " 个 → 爬虫/" + fname);
                 pool.execute(new Runnable() { public void run() {
                     int ok = 0;
