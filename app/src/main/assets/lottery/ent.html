@@ -13,6 +13,8 @@
   #pts{font-size:17px;font-weight:bold;color:#f5c26b;padding:6px 0}
   .page{display:none}.page.on{display:block}
   #cardWrap{position:relative;display:inline-block;margin-top:14px}
+  #under{position:absolute;top:0;left:0;width:100%;height:100%;border-radius:12px;z-index:0}
+  #js_lottery,#cardWrap canvas{position:relative;z-index:1;background:transparent !important}
   #js_lottery{width:300px;height:170px;border-radius:12px;background:#1c1f26}
   .btn{display:block;margin:16px auto 0;padding:12px 0;width:220px;text-align:center;background:#f94804;color:#fff;font-size:15px;font-weight:bold;border:none;border-radius:24px}
   #dialWrap{position:relative;width:320px;height:320px;margin:14px auto 0}
@@ -152,12 +154,13 @@ function newCard(silent){
   var wrap=document.getElementById('cardWrap');
   var old=document.getElementById('js_lottery');
   var cv=document.createElement('canvas');cv.id='js_lottery';cv.className='m-ui-scratch';
-  wrap.replaceChild(cv,old);
+  // 结果图放涂层底下的独立img层(不依赖canvas background-image)
   var list=getList();
   var prize=list[Math.floor(Math.random()*list.length)];
+  var under=document.createElement('img');under.id='under';under.src=resultImg(prize);
+  wrap.innerHTML='';wrap.appendChild(under);wrap.appendChild(cv);
   card=new LotteryCard(cv,{size:24,percent:33,cover:'#b8bdc9'}); // 刮1/3即全显
   card._prize=prize;card._paid=false;
-  card.setResult(resultImg(prize));
   card.on('start',function(){
     if(card._paid)return;
     var cost=getCost(),pts=getPts();
