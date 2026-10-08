@@ -74,7 +74,6 @@
 </div>
 <button id="cfgBtn" onclick="toggleCfg()">⚙ 自定义</button>
 
-<script src="./card.js"></script>
 <script>
 var DEF='谢谢参与\n+5\n再来一次\n+10\n谢谢参与\n+20\n谢谢参与\n+50';
 function getList(){try{var v=JSON.parse(localStorage.ent_list||'null');if(v&&v.length)return v}catch(e){}return DEF.split('\n')}
@@ -116,11 +115,10 @@ function settle(txt){
   return txt;
 }
 
-// ---- 刮刮卡 ----
-var card=null;
+// ---- 刮刮卡(自研引擎, 无第三方库) ----
 var bgImg=new Image();
 var bgReady=false;
-bgImg.onload=function(){bgReady=true;newCard();drawWheel()}; // 等云图就绪再建卡
+bgImg.onload=function(){bgReady=true;newCard();drawWheel()};
 bgImg.src='./bg.jpg';
 function manualAdd(){
   var n=parseInt(document.getElementById('addN').value);
@@ -132,15 +130,14 @@ function manualAdd(){
 function resultImg(txt){
   var cv=document.createElement('canvas');cv.width=600;cv.height=340;
   var x=cv.getContext('2d');
-  if(bgReady){ // 云霞底图 + 压暗
+  if(bgReady){
     x.drawImage(bgImg,0,0,600,340);
     x.fillStyle='rgba(0,0,20,0.28)';x.fillRect(0,0,600,340);
-  } else { // 兜底渐变
+  } else {
     var g=x.createLinearGradient(0,0,600,340);
     g.addColorStop(0,'#315CDE');g.addColorStop(1,'#7B4FD8');
     x.fillStyle=g;x.fillRect(0,0,600,340);
   }
-  // 中奖文字居中(自动缩放)
   var size=64;do{x.font='bold '+size+'px sans-serif';size-=4}
   while(x.measureText(txt).width>540&&size>22);
   x.textAlign='center';x.textBaseline='middle';
@@ -149,45 +146,89 @@ function resultImg(txt){
   x.fillText(txt,300,170);
   return cv.toDataURL('image/png');
 }
-function newCard(silent){
-  if(!silent)document.getElementById('res0').textContent='';
-  var wrap=document.getElementById('cardWrap');
-  var old=document.getElementById('js_lottery');
-  var cv=document.createElement('canvas');cv.id='js_lottery';cv.className='m-ui-scratch';
-  // 结果图放涂层底下的独立img层(不依赖canvas background-image)
-  var list=getList();
-  var prize=list[Math.floor(Math.random()*list.length)];
-  var under=document.createElement('img');under.id='under';under.src=resultImg(prize);
-  wrap.innerHTML='';wrap.appendChild(under);wrap.appendChild(cv);
-  card=new LotteryCard(cv,{size:24,percent:33,cover:'#b8bdc9'}); // 刮1/3即全显
-  card._prize=prize;card._paid=false;
-  card.on('start',function(){
-    if(card._paid)return;
-    var cost=getCost(),pts=getPts();
-    if(pts<cost){alert('积分不足(需要'+cost+'，当前'+pts+')\n用下方「增加积分」或去大转盘');setTimeout(function(){newCard(true)},50);return}
-    setPts(pts-cost);
-    card._paid=true;
-  }).on('end',function(){
-    if(card._prize){
-      document.getElementById('res0').textContent='🎉 '+settle(card._prize);
-      tenResults.push(card._prize);
-      card._prize=null;
-    }
-  });
-}
-// 扣费(十连/一键用), 成功true
 function payFor(n){
   var cost=getCost()*n,pts=getPts();
   if(pts<cost){alert('积分不足(需要'+cost+'，当前'+pts+')\n用下方「增加积分」或去大转盘');return false}
   setPts(pts-cost);return true;
 }
-// 一键刮开: 直接显示当前卡
-function revealOne(){
-  if(scratching)return;
-  if(!card._paid){if(!payFor(1))return;card._paid=true}
-  card.draw();
+var card=null;
+function newCard(silent){
+  if(!silent)document.getElementById('res0').textContent='';
+  var wrap=document.getElementById('cardWrap');
+  var list=getList();
+  var prize=list[Math.floor(Math.random()*list.length)];
+  var under=document.getElementById('under');
+  under.src=resultImg(prize);
+  var cv=document.getElementById('js_lottery');
+  cv.width=600;cv.height=340;
+  var x=cv.getContext('2d');
+  x.globalCompositeOperation='source-over';
+  x.clearRect(0,0,600,340);
+  x.fillStyle='#b8bdc9';x.fillRect(0,0,600,340);
+  x.fillStyle='#8a93a3';x.font='bold 34px sans-serif';x.textAlign='center';x.textBaseline='middle';
+  x.fillText('刮开有奖',300,170);
+  card={_prize:prize,_paid:false,_done:false};
+  bindScratch(cv);
 }
-// 十连刮: 连续10张自动刮开, 汇总结果
+function eraseAt(cv,x,y){
+  var ctx=cv.getContext('2d');
+  ctx.globalCompositeOperation='destination-out';
+  ctx.beginPath();ctx.arc(x,y,26,0,2*Math.PI);ctx.fill();
+}
+function scratchProgress(cv){
+  var x=cv.getContext('2d');
+  var d=x.getImageData(0,0,cv.width,cv.height).data;
+  var total=0,clear=0;
+  for(var i=3;i<d.length;i+=4*23){total++;if(d[i]<40)clear++;}
+  return clear/total;
+}
+function onScratchEnd(cv){
+  if(!card||card._done)return;
+  if(scratchProgress(cv)>=0.33){
+    card._done=true;
+    var ctx=cv.getContext('2d');
+    ctx.globalCompositeOperation='destination-out';
+    ctx.clearRect(0,0,cv.width,cv.height);
+    document.getElementById('res0').textContent='🎉 '+settle(card._prize);
+  }
+}
+function bindScratch(cv){
+  function pos(e){
+    var r=cv.getBoundingClientRect();
+    var t=e.touches?e.touches[0]:e;
+    return {x:(t.clientX-r.left)*cv.width/r.width, y:(t.clientY-r.top)*cv.height/r.height};
+  }
+  var down=false;
+  function start(e){ if(!card||card._done)return;
+    if(!card._paid){
+      if(!payFor(1))return;
+      card._paid=true;
+    }
+    down=true;
+    var p=pos(e);eraseAt(cv,p.x,p.y);e.preventDefault();
+  }
+  function move(e){ if(!down)return;
+    var p=pos(e);eraseAt(cv,p.x,p.y);onScratchEnd(cv);e.preventDefault();
+  }
+  function end(){ if(!down)return; down=false; onScratchEnd(cv); }
+  cv.addEventListener('touchstart',start,{passive:false});
+  cv.addEventListener('touchmove',move,{passive:false});
+  cv.addEventListener('touchend',end);
+  cv.addEventListener('mousedown',start);
+  cv.addEventListener('mousemove',function(e){ if(down){move(e)} });
+  cv.addEventListener('mouseup',end);
+  cv.addEventListener('mouseleave',end);
+}
+function revealOne(){
+  if(!card||card._done)return;
+  if(!card._paid){if(!payFor(1))return;card._paid=true}
+  var cv=document.getElementById('js_lottery');
+  var ctx=cv.getContext('2d');
+  ctx.globalCompositeOperation='destination-out';
+  ctx.clearRect(0,0,cv.width,cv.height);
+  card._done=true;
+  document.getElementById('res0').textContent='🎉 '+settle(card._prize);
+}
 var scratching=false,tenResults=[];
 function scratchTen(){
   if(scratching)return;
@@ -204,17 +245,19 @@ function scratchTen(){
         names.push(tenResults[i]);
         var m=tenResults[i].match(/([+-]?\d+)/);if(m)sum+=parseInt(m[1]);
       }
-      document.getElementById('res0').textContent='十连结果: '+names.join(' / ')+(sum?' (合计'+(sum>0?'+':'')+sum+'分)':'');
+      document.getElementById('res0').textContent='十连结果: '+names.join(' / ')+(sum?(sum>0?'+':'')+sum+'分':'');
       newCard(true);
       return;
     }
     if(done>0)newCard(true);
-    card.draw();
+    var cv=document.getElementById('js_lottery');
+    var ctx=cv.getContext('2d');
+    ctx.globalCompositeOperation='destination-out';
+    ctx.clearRect(0,0,cv.width,cv.height);
+    tenResults.push(card._prize);
     done++;
   },700);
 }
-window.addEventListener('DOMContentLoaded',function(){setPts(getPts());drawWheel()});
-window.addEventListener('DOMContentLoaded',function(){setPts(getPts());drawWheel()});
 
 // ---- 大转盘 ----
 var angle=0,spinning=false;
