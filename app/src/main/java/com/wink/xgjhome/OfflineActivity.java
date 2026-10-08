@@ -404,81 +404,153 @@ public class OfflineActivity extends Activity {
         if (snapBusy) return;
         snapBusy = true;
         final String pageUrl = url;
-        web.post(new Runnable() { public void run() {
-            final File mf = new File(snapDir(), md5(pageUrl) + ".mht");
-            try { web.saveWebArchive(mf.getAbsolutePath()); } catch (Throwable ignored) {}
-            if (!mf.exists() || mf.length() < 200) { snapBusy = false; return; }
-            new Thread(new Runnable() { public void run() {
-                try {
-                        // map: 站目录 map.json {url→file}
-                        File mdir = siteDir(pageUrl);
-                        JSONObject m = new JSONObject();
-                        File mf2 = new File(mdir, "map.json");
-                        if (mf.exists()) { try { m = new JSONObject(readSnapshot(mf.getAbsolutePath())); } catch (Throwable ignored) {} }
-                        m.put(pageUrl, mf.getName());
-                        FileOutputStream fm = new FileOutputStream(mf2);
-                        fm.write(m.toString().getBytes(StandardCharsets.UTF_8));
-                        fm.close();
-                    } catch (Throwable ignored) {}
-                    snapBusy = false;
-                }}).start();
-        }});
+        new Thread(new Runnable() { public void run() {
+            try {
+                String html = fetchText(pageUrl, null);
+                if (html == null || html.length() < 200) { snapBusy = false; return; }
+                String out = processHtml(html, pageUrl);
+                File d = siteDir(pageUrl);
+                File f = new File(d, "page_" + md5(pageUrl).substring(0, 8) + ".html");
+                FileOutputStream fos = new FileOutputStream(f);
+                fos.write(out.getBytes(StandardCharsets.UTF_8));
+                fos.close();
+                JSONObject m = new JSONObject();
+                File mf = new File(d, "map.json");
+                if (mf.exists()) { try { m = new JSONObject(readSnapshot(mf.getAbsolutePath())); } catch (Throwable ignored) {} }
+                m.put(pageUrl, f.getName());
+                FileOutputStream fm = new FileOutputStream(mf);
+                fm.write(m.toString().getBytes(StandardCharsets.UTF_8));
+                fm.close();
+            } catch (Throwable ignored) {}
+            snapBusy = false;
+        }}).start();
     }
 
-    /** 内联: css/js/img 全部抓取并转内联/data URI (浏览器"另存为单文件"同款) */
-    private String inlineHtml(String html, String pageUrl) {
-        // 1. stylesheet link
-        java.util.regex.Matcher lm = java.util.regex.Pattern
-            .compile("<link[^>]+rel=[\"']?stylesheet[\"']?[^>]*>", java.util.regex.Pattern.CASE_INSENSITIVE).matcher(html);
-        StringBuilder sb1 = new StringBuilder();
-        while (lm.find()) {
-            String tag = lm.group();
-            String href = attr(tag, "href");
-            if (href != null) {
-                String abs = absUrl(href, pageUrl);
-                if (abs != null) {
-                    String css = fetchText(abs, pageUrl);
-                    if (css != null) {
-                        css = inlineCssUrls(css, abs);
-                        tag = "<style>/*" + abs + "*/\n" + css + "\n</style>";
+    // HtmlDown2 机制: 资源落盘 images/js/css/videos 子目录, 属性改根相对路径
+    private String processHtml(String html, String pageUrl) {
+        final File d = siteDir(pageUrl);
+        String[] tagAttrs = {"img\u0001src", "img\u0001data-src", "video\u0001src", "source\u0001src", "script\u0001src", "link\u0001href"};
+        for (String ta : tagAttrs) {
+            final int ui = ta.indexOf('\u0001');
+            final String tag = ta.substring(0, ui), attr = ta.substring(ui + 1);
+            java.util.regex.Matcher mm = java.util.regex.Pattern
+                .compile("<" + tag + "[^>]+\\s" + attr + "=[\"']?[^\\s>\"']+", java.util.regex.Pattern.CASE_INSENSITIVE).matcher(html);
+            StringBuilder out = new StringBuilder();
+            int last = 0;
+            while (mm.find()) {
+                String seg = mm.group();
+                String val = seg.substring(seg.indexOf(attr + "=") + attr.length() + 1);
+                if (val.startsWith("\"") || val.startsWith("'")) val = val.substring(1);
+                String rep = seg;
+                if (!val.startsWith("data:") && !val.startsWith("about:")) {
+                    String abs = absUrl(val, pageUrl);
+                    if (abs != null) {
+                        String folder = attr.equals("href") ? "css" : (tag.equals("script") ? "js" : (tag.equals("img") ? "images" : "videos"));
+                        String local = fetchRes(abs, pageUrl, d, folder, tag.equals("link") ? "text/css" : null);
+                        if (local != null) rep = seg.substring(0, seg.indexOf(attr + "=")) + attr + "=\"" + local + "\"";
                     }
                 }
+                out.append(html, last, mm.start()).append(rep);
+                last = mm.end();
             }
-            sb1.append(java.util.regex.Matcher.quoteReplacement(tag));
+            out.append(html.substring(last));
+            html = out.toString();
         }
-        if (sb1.length() > 0) html = lm.reset().appendTail(new StringBuilder(html)).toString(); // noop guard
-        // 逐个link替换(重新扫描避免matcher复用问题)
-        java.util.regex.Matcher lm2 = java.util.regex.Pattern
-            .compile("<link[^>]+rel=[\"']?stylesheet[\"']?[^>]*>", java.util.regex.Pattern.CASE_INSENSITIVE).matcher(html);
-        StringBuilder out1 = new StringBuilder();
-        int last = 0;
-        while (lm2.find()) {
-            String tag = lm2.group();
-            String href = attr(tag, "href");
-            String rep = tag;
-            if (href != null) {
-                String abs = absUrl(href, pageUrl);
+        // link stylesheet 宽松兜底 (rel 可能在 href 之后)
+        java.util.regex.Matcher m2 = java.util.regex.Pattern
+            .compile("<link[^>]*href=[\"']([^\"']+)[\"'][^>]*>", java.util.regex.Pattern.CASE_INSENSITIVE).matcher(html);
+        StringBuilder o2 = new StringBuilder(); int l2 = 0;
+        while (m2.find()) {
+            String tg = m2.group(); String val = m2.group(1);
+            String rep = tg;
+            String rel = attr2(tg, "rel");
+            if (rep.equals(tg) && rel != null && rel.toLowerCase().contains("stylesheet") && !val.startsWith("data:")) {
+                String abs = absUrl(val, pageUrl);
                 if (abs != null) {
-                    String css = fetchText(abs, pageUrl);
-                    if (css != null) {
-                        css = inlineCssUrls(css, abs);
-                        rep = "<style>/*" + abs + "*/\n" + css + "\n</style>";
-                    }
+                    String local = fetchRes(abs, pageUrl, d, "css", "text/css");
+                    if (local != null) rep = tg.replace(val, local);
                 }
             }
-            out1.append(html, last, lm2.start()).append(rep);
-            last = lm2.end();
+            o2.append(html, l2, m2.start()).append(rep); l2 = m2.end();
         }
-        out1.append(html.substring(last));
-        html = out1.toString();
-        // 2. script src
-        html = replaceAttr(html, "script", "src", pageUrl, true);
-        // 3. img src / data-src
-        html = replaceAttr(html, "img", "src", pageUrl, false);
-        html = replaceAttr(html, "img", "data-src", pageUrl, false);
-        // 4. source src
-        html = replaceAttr(html, "source", "src", pageUrl, false);
-        return html;
+        o2.append(html.substring(l2));
+        return o2.toString();
+    }
+
+    private String attr2(String tag, String name) {
+        java.util.regex.Matcher m = java.util.regex.Pattern
+            .compile(name + "=[\"']?([^\\s>\"']+)", java.util.regex.Pattern.CASE_INSENSITIVE).matcher(tag);
+        return m.find() ? m.group(1) : null;
+    }
+
+    // 下载资源到 d/folder/, 返回根相对路径; css 内 url() 一并落盘改写
+    private String fetchRes(String abs, String referer, File d, String folder, String mimeHint) {
+        try {
+            byte[] b = fetchBytes2(abs, referer);
+            if (b == null || b.length == 0) return null;
+            String ext = extOf(abs);
+            if (mimeHint != null && mimeHint.equals("text/css") && !ext.equals("css")) ext = "css";
+            String name = md5(abs).substring(0, 16) + "." + ext;
+            File dir = new File(d, folder);
+            if (!dir.exists()) dir.mkdirs();
+            if (folder.equals("css")) {
+                String txt = new String(b, StandardCharsets.UTF_8);
+                txt = inlineCssUrls2(txt, abs, d);
+                b = txt.getBytes(StandardCharsets.UTF_8);
+            }
+            FileOutputStream fo = new FileOutputStream(new File(dir, name));
+            fo.write(b); fo.close();
+            return "/" + folder + "/" + name;
+        } catch (Throwable e) { return null; }
+    }
+
+    private String inlineCssUrls2(String css, String cssUrl, File d) {
+        java.util.regex.Matcher m = java.util.regex.Pattern
+            .compile("url\\([\"']?([^)\"']+)[\"']?\\)").matcher(css);
+        StringBuilder out = new StringBuilder(); int last = 0;
+        while (m.find()) {
+            String val = m.group(1);
+            String rep = m.group();
+            if (!val.startsWith("data:") && !val.startsWith("about:")) {
+                String abs = absUrl(val, cssUrl);
+                if (abs != null) {
+                    String local = fetchRes(abs, cssUrl, d, "images", null);
+                    if (local != null) rep = "url(\"" + local + "\")";
+                }
+            }
+            out.append(css, last, m.start()).append(rep); last = m.end();
+        }
+        out.append(css.substring(last));
+        return out.toString();
+    }
+
+    private String extOf(String url) {
+        try {
+            String p = new URL(url).getPath();
+            int q = p.lastIndexOf('.');
+            if (q > 0 && p.length() - q <= 6) {
+                String e = p.substring(q + 1).toLowerCase().replaceAll("[^a-z0-9]", "");
+                if (e.length() >= 2 && e.length() <= 5) return e;
+            }
+        } catch (Throwable ignored) {}
+        return "bin";
+    }
+
+    private byte[] fetchBytes(String url, String referer) {
+        try {
+            java.net.HttpURLConnection c = (java.net.HttpURLConnection) new URL(url).openConnection();
+            c.setConnectTimeout(10000); c.setReadTimeout(15000);
+            c.setRequestProperty("User-Agent", "Mozilla/5.0 (Linux; Android 13) Chrome/120 Mobile");
+            if (referer != null) c.setRequestProperty("Referer", referer);
+            c.setInstanceFollowRedirects(true);
+            if (c.getResponseCode() != 200) return null;
+            java.io.InputStream is = c.getInputStream();
+            ByteArrayOutputStream bo = new ByteArrayOutputStream();
+            byte[] buf = new byte[16384]; int n;
+            while ((n = is.read(buf)) > 0) bo.write(buf, 0, n);
+            is.close();
+            return bo.toByteArray();
+        } catch (Throwable e) { return null; }
     }
 
     private String replaceAttr(String html, String tag, String attr, String pageUrl, boolean inlineScript) {
@@ -537,7 +609,7 @@ public class OfflineActivity extends Activity {
         return "data:" + mime + ";base64," + android.util.Base64.encodeToString(d, android.util.Base64.NO_WRAP);
     }
 
-    private byte[] fetchBytes(String url, String referer) {
+    private byte[] fetchBytes2(String url, String referer) {
         try {
             HttpURLConnection c = (HttpURLConnection) new URL(url).openConnection();
             c.setConnectTimeout(8000); c.setReadTimeout(12000);
@@ -633,6 +705,16 @@ public class OfflineActivity extends Activity {
             }
         }
         if (f == null || !f.exists()) {
+            // HtmlDown2 资源目录兜底: /images/.. /js/.. /css/.. /videos/.. 按站点目录找
+            try {
+                URL pu = new URL(u);
+                File pd = siteDir(u);
+                String path = pu.getPath();
+                if (path != null && path.length() > 1) {
+                    File rf = new File(pd, path.substring(1));
+                    if (rf.exists() && rf.isFile()) return serveRes(rf);
+                }
+            } catch (Throwable ignored) {}
             toastOnce("该页面未离线保存");
             return new WebResourceResponse("text/plain", "utf-8", new java.io.ByteArrayInputStream(new byte[0]));
         }
