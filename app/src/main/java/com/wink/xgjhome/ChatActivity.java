@@ -207,6 +207,7 @@ public class ChatActivity extends Activity {
 
     private void buildUi() {
         LinearLayout root = new LinearLayout(this);
+        rootView = root;
         root.setOrientation(LinearLayout.VERTICAL);
         root.setBackgroundColor(bg());
 
@@ -281,6 +282,9 @@ public class ChatActivity extends Activity {
             }
         });
         setContentView(root);
+        rootBaseBottomPad = root.getPaddingBottom();
+        setupImeFix();
+        applyImmersive();
         renderAll();
     }
 
@@ -450,8 +454,53 @@ public class ChatActivity extends Activity {
         }});
     }
 
+    private LinearLayout rootView;
+    private int rootBaseBottomPad = 0;
+
+    /** 隐藏导航栏+状态栏(沉浸式), 每次焦点恢复时重申 */
+    private void applyImmersive() {
+        View d = getWindow().getDecorView();
+        d.setSystemUiVisibility(
+            View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY
+            | View.SYSTEM_UI_FLAG_HIDE_NAVIGATION
+            | View.SYSTEM_UI_FLAG_FULLSCREEN
+            | View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION
+            | View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN
+            | View.SYSTEM_UI_FLAG_LAYOUT_STABLE);
+    }
+
+    /** 键盘弹起检测: 给根布局加底部内边距, 输入框始终在键盘上方 */
+    private void setupImeFix() {
+        final View decor = getWindow().getDecorView();
+        final android.graphics.Rect r = new android.graphics.Rect();
+        decor.getViewTreeObserver().addOnGlobalLayoutListener(new android.view.ViewTreeObserver.OnGlobalLayoutListener() {
+            public void onGlobalLayout() {
+                if (rootView == null) return;
+                decor.getWindowVisibleDisplayFrame(r);
+                int visible = r.bottom;
+                int total = decor.getHeight();
+                int kb = total - visible;
+                if (kb > dip(100)) {
+                    rootView.setPadding(0, 0, 0, kb);
+                } else if (rootView.getPaddingBottom() != rootBaseBottomPad) {
+                    rootView.setPadding(0, 0, 0, rootBaseBottomPad);
+                }
+            }
+        });
+    }
+
     @Override
-    protected void onResume() { super.onResume(); ChatHub.addListener(listener); renderAll(); }
+    public void onWindowFocusChanged(boolean hasFocus) {
+        super.onWindowFocusChanged(hasFocus);
+        if (hasFocus) applyImmersive();
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        applyImmersive();
+        ChatHub.addListener(listener); renderAll();
+    }
     @Override
     protected void onPause() { super.onPause(); ChatHub.removeListener(listener); }
     @Override
