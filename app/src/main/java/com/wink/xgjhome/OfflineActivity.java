@@ -425,7 +425,7 @@ public class OfflineActivity extends Activity {
         File[] dirs = base.listFiles();
         if (dirs == null) return;
         for (File d : dirs) {
-            if (!d.isDirectory() || !d.getName().startsWith("site_")) continue;
+            if (!d.isDirectory()) continue;
             File mf = new File(d, "map.json");
             if (!mf.exists()) continue;
             try {
