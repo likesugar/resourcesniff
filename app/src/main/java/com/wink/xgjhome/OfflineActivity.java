@@ -107,6 +107,7 @@ public class OfflineActivity extends Activity {
         homeRoot.addView(pill, plp);
 
         dotBtn = null;
+        saveBtn = null;
         setContentView(homeRoot);
         refreshCards();
     }
@@ -384,8 +385,38 @@ public class OfflineActivity extends Activity {
         final Runnable hideDot = new Runnable() { public void run() { dot.setVisibility(View.GONE); } };
         dot.setTag(hideDot);
         dotBtn = dot;
+        // 左下角离线状态灯: 红=未离线/保存中, 绿=整站离线完成; 点击手动补存当前页
+        final TextView sb = new TextView(this);
+        sb.setText("存");
+        sb.setTextSize(13);
+        sb.setGravity(Gravity.CENTER);
+        GradientDrawable sbg = new GradientDrawable();
+        sbg.setShape(GradientDrawable.OVAL);
+        sbg.setColor(0x66E53935);
+        sb.setBackground(sbg);
+        FrameLayout.LayoutParams slp = new FrameLayout.LayoutParams(dip(40), dip(40), Gravity.BOTTOM | Gravity.LEFT);
+        slp.setMargins(dip(14), 0, 0, dip(24));
+        root.addView(sb, slp);
+        sb.setOnClickListener(new View.OnClickListener() { public void onClick(View v) {
+            String u = web.getUrl();
+            if (u != null && u.startsWith("http")) { snapshotPage(u); toast("开始保存本页(含本站链接)"); }
+        }});
+        saveBtn = sb;
+        sb.postDelayed(savePoll, 1200);
         setContentView(root);
     }
+
+    private TextView saveBtn;
+    private final Runnable savePoll = new Runnable() { public void run() {
+        if (saveBtn == null || saveBtn.getParent() == null || web == null) return;
+        String u = web.getUrl();
+        boolean green = false;
+        if (u != null && u.startsWith("http") && !snapBusy && hasSnap(u)
+            && new File(siteDir(u), "crawled.flag").exists()) green = true;
+        GradientDrawable bg = (GradientDrawable) saveBtn.getBackground();
+        bg.setColor(green ? 0x6600CC44 : 0x66E53935);
+        saveBtn.postDelayed(this, 2000);
+    }};
 
     private View dotBtn;
 
