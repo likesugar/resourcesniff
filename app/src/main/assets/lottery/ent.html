@@ -91,7 +91,8 @@ function saveCfg(){
   var c=parseInt(document.getElementById('cfgCost').value);
   if(c>=10&&c<=500)localStorage.ent_cost=c;
   c.style.display='none';drawWheel();
-  alert('已保存: '+lines.length+' 个奖项');
+  refreshCostLabel();
+  alert('已保存: '+lines.length+' 个奖项, 消耗'+getCost()+'分');
 }
 function payFor(){
   var cost=getCost(),pts=getPts();
@@ -184,22 +185,19 @@ function slotSpin(){
 function evalSlots(cells){
   var grid=[];
   for(var r=0;r<4;r++){grid.push([0,1,2,3].map(function(c){return cells[r*4+c].textContent}))}
+  var sym=function(i){return grid[Math.floor(i/4)][i%4]}; // 绝对索引→行列
   var cost=getCost(),win=0,lines=[];
   var linesIdx=[[0,1,2,3],[4,5,6,7],[8,9,10,11],[12,13,14,15],[0,5,10,15],[3,6,9,12]];
   for(var li=0;li<linesIdx.length;li++){
     var L=linesIdx[li];
-    if(grid[0][L[0]]==grid[0][L[1]]&&grid[0][L[1]]==grid[0][L[2]]&&grid[0][L[2]]==grid[0][L[3]]){
-      // 4连
-      var m=20;lines.push('第'+(li+1)+'线 4连 '+grid[0][L[0]]+' ×'+m);
-      win+=cost*m;
+    if(sym(L[0])==sym(L[1])&&sym(L[1])==sym(L[2])&&sym(L[2])==sym(L[3])){
+      lines.push('第'+(li+1)+'线 4连 '+sym(L[0])+' ×20');
+      win+=cost*20;
       for(var k=0;k<4;k++)cells[L[k]].className='cell win';
-    } else {
-      // 3连(前三格)
-      if(grid[0][L[0]]==grid[0][L[1]]&&grid[0][L[1]]==grid[0][L[2]]){
-        lines.push('第'+(li+1)+'线 3连 '+grid[0][L[0]]+' ×3');
-        win+=cost*3;
-        for(var k2=0;k2<3;k2++)cells[L[k2]].className='cell win';
-      }
+    } else if(sym(L[0])==sym(L[1])&&sym(L[1])==sym(L[2])){
+      lines.push('第'+(li+1)+'线 3连 '+sym(L[0])+' ×3');
+      win+=cost*3;
+      for(var k2=0;k2<3;k2++)cells[L[k2]].className='cell win';
     }
   }
   if(win>0){addPts(win);document.getElementById('slotRes').textContent='🎉 中奖 +'+win+' 分\n'+lines.join('  ')}
