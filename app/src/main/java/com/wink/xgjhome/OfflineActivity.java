@@ -366,13 +366,14 @@ public class OfflineActivity extends Activity {
         capMap.clear();
     }
 
-    /** 拦截下载: 自拉资源→落盘→回流 */
+    /** 拦截下载: 自拉资源→落盘→回流; 主文档保存但放行走网络(防整页白屏) */
     private android.webkit.WebResourceResponse captureRes(String u, String referer) {
+        boolean isMain = u.equals(referer);
         File out = new File(capDir, md5(u) + ".res");
-        if (out.exists()) { capMap.put(u, out); return serveRes(out, guessType(u)); }
+        if (out.exists()) { capMap.put(u, out); return isMain ? null : serveRes(out, guessType(u)); }
         try {
             HttpURLConnection c = (HttpURLConnection) new URL(u).openConnection();
-            c.setConnectTimeout(10000); c.setReadTimeout(15000);
+            c.setConnectTimeout(8000); c.setReadTimeout(10000);
             c.setInstanceFollowRedirects(true);
             c.setRequestProperty("User-Agent", "Mozilla/5.0 (Linux; Android 13) Chrome/120 Mobile");
             c.setRequestProperty("Referer", referer == null || referer.isEmpty() ? u : referer);
@@ -387,7 +388,7 @@ public class OfflineActivity extends Activity {
             FileOutputStream fos = new FileOutputStream(out);
             fos.write(data); fos.close();
             capMap.put(u, out);
-            return new android.webkit.WebResourceResponse(guessType(u), null, new java.io.ByteArrayInputStream(data));
+            return isMain ? null : new android.webkit.WebResourceResponse(guessType(u), null, new java.io.ByteArrayInputStream(data));
         } catch (Throwable e) { return null; }
     }
 
