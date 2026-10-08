@@ -127,7 +127,7 @@ public class OfflineActivity extends Activity {
             card.setGravity(Gravity.CENTER_HORIZONTAL);
             card.setPadding(dip(2), 0, dip(24), 0);
             card.setOnClickListener(new View.OnClickListener() { public void onClick(View v) { browse(url); } });
-            card.setOnLongClickListener(new View.OnLongClickListener() { public boolean onLongClick(View v) { delSite(url); return true; } });
+            card.setOnLongClickListener(new View.OnLongClickListener() { public boolean onLongClick(View v) { siteMenu(name, url); return true; } });
             TextView av = new TextView(this);
             av.setText(name.length() > 2 ? name.substring(0, 2) : name);
             av.setTextColor(0xFFFFFFFF);
@@ -311,26 +311,32 @@ public class OfflineActivity extends Activity {
             web.loadDataWithBaseURL(null, html, "text/html", "utf-8", null);
             return;
         }
+        // 纯在线模式: 不抓快照不拦截 (抓取/离线走长按菜单)
         pendingSnapFor = url;
-        if (netOk(url)) {
-            // 在线: Via式整站抓取
-            offlineMode = false; captureMode = true;
-            beginCapture(url);
-            web.loadUrl(url);
-            toast("在线加载, 快照抓取中…");
-        } else if (hasFullSnap(url)) {
-            openOffline(url);
-        } else {
-            offlineMode = false; captureMode = false;
-            String snap = snapshotFor(url);
-            String html = snap.isEmpty() ? "" : readSnapshot(snap);
-            if (!html.isEmpty()) {
-                web.loadDataWithBaseURL(url, html, "text/html", "utf-8", null);
-                toast("离线快照(单页)");
-            } else {
-                toast("无网络且无快照");
-            }
-        }
+        captureMode = false; offlineMode = false;
+        web.loadUrl(url);
+    }
+
+    /** 浏览器界面装配(供各模式复用) */
+    private void showBrowser() {
+        if (web == null) { browse("about:blank"); }
+        FrameLayout root = new FrameLayout(this);
+        if (web.getParent() instanceof android.view.ViewGroup) ((android.view.ViewGroup) web.getParent()).removeView(web);
+        root.addView(web, new FrameLayout.LayoutParams(-1, -1));
+        TextView back = new TextView(this);
+        back.setText("🏠 离线主页");
+        back.setTextColor(0xFFFFFFFF);
+        back.setTextSize(13);
+        GradientDrawable bg = new GradientDrawable();
+        bg.setColor(0x66000000);
+        bg.setCornerRadius(dip(18));
+        back.setBackground(bg);
+        back.setPadding(dip(14), dip(8), dip(14), dip(8));
+        back.setOnClickListener(new View.OnClickListener() { public void onClick(View v) { buildHome(); } });
+        FrameLayout.LayoutParams blp = new FrameLayout.LayoutParams(-2, -2, Gravity.TOP | Gravity.LEFT);
+        blp.setMargins(dip(10), dip(50), 0, 0);
+        root.addView(back, blp);
+        setContentView(root);
     }
 
     // ---------------- Via式整站快照 ----------------
@@ -442,6 +448,7 @@ public class OfflineActivity extends Activity {
 
     /** 离线整站回放: 先建全量索引, 子页面跨目录命中 */
     private void openOffline(String url) {
+        showBrowser();
         offlineMode = true; captureMode = false;
         pendingSnapFor = url;
         buildOfflineIndex();
@@ -531,6 +538,54 @@ public class OfflineActivity extends Activity {
             save(a);
             refreshCards();
         } catch (Throwable ignored) {}
+    }
+
+    /** 卡片长按菜单: 在线/离线/抓快照/重命名/删除 各走各的 */
+    private void siteMenu(final String name, final String url) {
+        final String[] items = {"🌐 在线打开", "📥 抓取快照(在线)", "📕 离线打开(整站)", "✏️ 重命名", "🗑️ 删除"};
+        new AlertDialog.Builder(this)
+            .setTitle(name)
+            .setItems(items, new android.content.DialogInterface.OnClickListener() {
+                public void onClick(android.content.DialogInterface d, int w) {
+                    if (w == 0) { browse(url); }
+                    else if (w == 1) { captureBrowse(url); }
+                    else if (w == 2) { openOffline(url); }
+                    else if (w == 3) { renameSite(name, url); }
+                    else delSite(url);
+                }
+            }).show();
+    }
+
+    /** 抓取快照模式: 在线浏览+全资源落地 */
+    private void captureBrowse(String url) {
+        showBrowser();
+        pendingSnapFor = url;
+        offlineMode = false; captureMode = true;
+        beginCapture(url);
+        web.loadUrl(url);
+        toast("快照抓取中…浏览要离线的页面");
+    }
+
+    private void renameSite(final String oldName, final String url) {
+        LinearLayout box = new LinearLayout(this);
+        box.setPadding(dip(24), dip(10), dip(24), 0);
+        final EditText et = new EditText(this);
+        et.setText(oldName);
+        box.addView(et);
+        new AlertDialog.Builder(this).setTitle("重命名").setView(box)
+            .setPositiveButton("保存", new android.content.DialogInterface.OnClickListener() {
+                public void onClick(android.content.DialogInterface dg, int w) {
+                    JSONArray a = load();
+                    for (int i = 0; i < a.length(); i++) {
+                        JSONObject o = a.optJSONObject(i);
+                        if (o != null && url.equals(o.optString("url"))) {
+                            try { o.put("name", et.getText().toString().trim()); } catch (Throwable ignored) {}
+                        }
+                    }
+                    save(a);
+                    refreshCards();
+                }
+            }).setNegativeButton("取消", null).show();
     }
 
     private void delSite(String url) {
