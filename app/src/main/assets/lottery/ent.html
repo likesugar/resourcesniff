@@ -23,6 +23,11 @@
   #res{min-height:30px;font-size:17px;font-weight:bold;color:#f5c26b;padding:8px 0}
   #cfgBtn{position:fixed;right:14px;bottom:24px;background:#e67e22;color:#fff;border:none;border-radius:24px;padding:10px 18px;font-size:14px;font-weight:bold;z-index:9}
   .cfg{display:none;background:#1c1f26;border-radius:14px;padding:14px;margin-top:12px;text-align:left}
+  .addbar{display:flex;gap:10px;justify-content:center;margin-top:22px;padding:14px;background:#1c1f26;border-radius:14px}
+  .addbar input{width:130px;background:#0c0e12;color:#eee;border:none;border-radius:18px;padding:10px 14px;font-size:14px;outline:none}
+  .addbar button{background:#1FA855;color:#fff;border:none;border-radius:18px;padding:10px 18px;font-size:14px;font-weight:bold}
+  .cardbtns{display:flex;gap:10px;justify-content:center;margin-top:14px}
+  .cardbtns button{flex:1;max-width:120px;padding:10px 0;background:#315CDE;color:#fff;border:none;border-radius:20px;font-size:13px;font-weight:bold}
   .cfg textarea{width:100%;height:100px;background:#0c0e12;color:#eee;border:none;border-radius:10px;padding:10px;font-size:13px;box-sizing:border-box;resize:vertical;font-family:monospace}
   .cfg input{width:100%;background:#0c0e12;color:#eee;border:none;border-radius:10px;padding:10px;font-size:14px;box-sizing:border-box}
   .cfg .lbl{font-size:12px;color:#888;margin:8px 0 4px}
@@ -39,8 +44,16 @@
 
   <div class="page on" id="pg0">
     <div id="cardWrap"><canvas id="js_lottery"></canvas></div>
-    <div id="res0"></div>
+    <div id="res0" style="min-height:20px"></div>
+    <div class="cardbtns">
+      <button onclick="revealOne()">一键刮开</button>
+      <button onclick="scratchTen()">十连刮</button>
+    </div>
     <button class="btn" onclick="newCard()">再刮一张</button>
+    <div class="addbar">
+      <input id="addN" type="number" inputmode="numeric" placeholder="输入积分">
+      <button onclick="manualAdd()">➕ 增加积分</button>
+    </div>
   </div>
 
   <div class="page" id="pg1">
@@ -103,36 +116,96 @@ function settle(txt){
 
 // ---- 刮刮卡 ----
 var card=null;
-function resultImg(txt){
-  var c=document.createElement('canvas');c.width=600;c.height=340;
-  var x=c.getContext('2d');
-  var g=x.createLinearGradient(0,0,600,340);g.addColorStop(0,'#315CDE');g.addColorStop(1,'#7B4FD8');
-  x.fillStyle=g;x.fillRect(0,0,600,340);
-  x.fillStyle='#fff';x.font='bold 44px sans-serif';x.textAlign='center';x.textBaseline='middle';
-  x.fillText(txt,300,150);
-  x.font='22px sans-serif';x.fillStyle='#ffffffaa';x.fillText('恭喜中奖',300,220);
-  return c.toDataURL();
+var bgImg=new Image();
+var bgReady=false;
+bgImg.onload=function(){bgReady=true};
+bgImg.src='./bg.jpg';
+function manualAdd(){
+  var n=parseInt(document.getElementById('addN').value);
+  if(!(n>0)){alert('请输入正数积分');return}
+  addPts(n);
+  document.getElementById('addN').value='';
+  alert('已增加 '+n+' 积分\n当前: '+getPts());
 }
-function newCard(){
-  document.getElementById('res0').textContent='';
+function resultImg(txt){
+  var cv=document.createElement('canvas');cv.width=600;cv.height=340;
+  var x=cv.getContext('2d');
+  var img=bgImg;
+  // 云霞底图铺满 + 压暗保证文字可读
+  x.drawImage(img,0,0,600,340);
+  x.fillStyle='rgba(0,0,20,0.28)';x.fillRect(0,0,600,340);
+  // 中奖文字居中(自动缩放)
+  var size=64;do{x.font='bold '+size+'px sans-serif';size-=4}
+  while(x.measureText(txt).width>540&&size>22);
+  x.textAlign='center';x.textBaseline='middle';
+  x.shadowColor='rgba(0,0,0,0.75)';x.shadowBlur=14;x.shadowOffsetY=3;
+  x.fillStyle='#fff';
+  x.fillText(txt,300,170);
+  return cv.toDataURL('image/png');
+}
+function newCard(silent){
+  if(!silent)document.getElementById('res0').textContent='';
   var wrap=document.getElementById('cardWrap');
   var old=document.getElementById('js_lottery');
   var cv=document.createElement('canvas');cv.id='js_lottery';cv.className='m-ui-scratch';
   wrap.replaceChild(cv,old);
   var list=getList();
   var prize=list[Math.floor(Math.random()*list.length)];
-  card=new LotteryCard(cv,{size:24,percent:55,cover:'#b8bdc9'});
+  card=new LotteryCard(cv,{size:24,percent:33,cover:'#b8bdc9'}); // 刮1/3即全显
+  card._prize=prize;card._paid=false;
+  card.setResult(resultImg(prize));
   card.on('start',function(){
+    if(card._paid)return;
     var cost=getCost(),pts=getPts();
-    if(pts<cost){alert('积分不足(需要'+cost+'，当前'+pts+')\n去大转盘赚积分吧');setTimeout(function(){card.reset()},50);return}
+    if(pts<cost){alert('积分不足(需要'+cost+'，当前'+pts+')\n用下方「增加积分」或去大转盘');setTimeout(function(){newCard(true)},50);return}
     setPts(pts-cost);
-    card.setResult(resultImg(prize));
-    card._prize=prize;
+    card._paid=true;
   }).on('end',function(){
-    if(card._prize){document.getElementById('res0').textContent='🎉 '+settle(card._prize);card._prize=null}
+    if(card._prize){
+      document.getElementById('res0').textContent='🎉 '+settle(card._prize);
+      tenResults.push(card._prize);
+      card._prize=null;
+    }
   });
 }
-// 首次触发start需要手势: canvas touchstart由card.js处理, 但需先初始化result. 用包装: 在touchstart前预生成
+// 扣费(十连/一键用), 成功true
+function payFor(n){
+  var cost=getCost()*n,pts=getPts();
+  if(pts<cost){alert('积分不足(需要'+cost+'，当前'+pts+')\n用下方「增加积分」或去大转盘');return false}
+  setPts(pts-cost);return true;
+}
+// 一键刮开: 直接显示当前卡
+function revealOne(){
+  if(scratching)return;
+  if(!card._paid){if(!payFor(1))return;card._paid=true}
+  card.draw();
+}
+// 十连刮: 连续10张自动刮开, 汇总结果
+var scratching=false,tenResults=[];
+function scratchTen(){
+  if(scratching)return;
+  if(!payFor(10))return;
+  scratching=true;
+  tenResults=[];
+  document.getElementById('res0').textContent='十连刮进行中…';
+  var done=0;
+  var t=setInterval(function(){
+    if(done>=10){
+      clearInterval(t);scratching=false;
+      var sum=0,names=[];
+      for(var i=0;i<tenResults.length;i++){
+        names.push(tenResults[i]);
+        var m=tenResults[i].match(/([+-]?\d+)/);if(m)sum+=parseInt(m[1]);
+      }
+      document.getElementById('res0').textContent='十连结果: '+names.join(' / ')+(sum?' (合计'+(sum>0?'+':'')+sum+'分)':'');
+      newCard(true);
+      return;
+    }
+    if(done>0)newCard(true);
+    card.draw();
+    done++;
+  },700);
+}
 window.addEventListener('DOMContentLoaded',function(){setPts(getPts());newCard();drawWheel()});
 window.addEventListener('load',function(){setPts(getPts());newCard();drawWheel()});
 
