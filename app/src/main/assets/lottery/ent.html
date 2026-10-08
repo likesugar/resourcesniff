@@ -66,7 +66,7 @@
 <div class="cfg" id="cfg">
   <div class="lbl">奖池(每行一个, +数字=积分奖)</div>
   <textarea id="cfgList"></textarea>
-  <div class="lbl">转盘单次消耗积分(10-500)</div>
+  <div class="lbl">转盘单次消耗积分(1-30000)</div>
   <input id="cfgCost" type="number" inputmode="numeric">
   <button onclick="saveCfg()">保存</button>
   <div class="lbl">老虎机各符号权重(1-99, 越大越易停)</div>
@@ -85,7 +85,7 @@ function getList(){
   try{var l=JSON.parse(localStorage.ent_list);if(l&&l.length>=2)return l}catch(e){}
   return ['+10','+50','+100','谢谢参与','+20','再来一次','+5','+888']
 }
-function getCost(){var c=parseInt(localStorage.ent_cost);return (c>=10&&c<=500)?c:50}
+function getCost(){var c=parseInt(localStorage.ent_cost);return (c>=1&&c<=30000)?c:50}
 function getPts(){return parseInt(localStorage.ent_pts)||100}
 function setPts(p){localStorage.ent_pts=p;document.getElementById('pts').textContent='💰 积分: '+p}
 function settle(txt){var m=txt.match(/([+-]?\d+)/);if(m)addPts(parseInt(m[1]));return txt}
@@ -109,7 +109,7 @@ function saveCfg(){
   if(lines.length<2){alert('至少2个奖项');return}
   localStorage.ent_list=JSON.stringify(lines);
   var c=parseInt(document.getElementById('cfgCost').value);
-  if(c>=10&&c<=500)localStorage.ent_cost=c;
+  if(c>=1&&c<=30000)localStorage.ent_cost=c;
   c.style.display='none';drawWheel();
   refreshCostLabel();
   alert('已保存: '+lines.length+' 个奖项, 消耗'+getCost()+'分');

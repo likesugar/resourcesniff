@@ -344,6 +344,17 @@ public class SpiderActivity extends Activity {
         FrameLayout.LayoutParams blp = new FrameLayout.LayoutParams(-2, -2, Gravity.TOP | Gravity.LEFT);
         blp.setMargins(dip(10), dip(50), 0, 0);
         root.addView(back, blp);
+        TextView ai = new TextView(this);
+        ai.setText("🤖 AI");
+        ai.setTextSize(13); ai.setTextColor(0xFFFFFFFF); ai.setTypeface(null, android.graphics.Typeface.BOLD);
+        ai.setGravity(Gravity.CENTER);
+        GradientDrawable ag = new GradientDrawable();
+        ag.setColor(0xCC315CDE); ag.setCornerRadius(dip(18));
+        ai.setBackground(ag);
+        FrameLayout.LayoutParams alp = new FrameLayout.LayoutParams(-2, -2, Gravity.BOTTOM | Gravity.LEFT);
+        alp.setMargins(dip(12), 0, 0, dip(20));
+        root.addView(ai, alp);
+        ai.setOnClickListener(new View.OnClickListener() { public void onClick(View v) { startActivity(new android.content.Intent(SpiderActivity.this, AiChatActivity.class)); } });
         setContentView(root);
         web.loadUrl(url);
     }
@@ -565,5 +576,11 @@ public class SpiderActivity extends Activity {
         try { pool.shutdownNow(); } catch (Throwable ignored) {}
         if (web != null) web.destroy();
         super.onDestroy();
+    }
+
+    @Override
+    public void onWindowFocusChanged(boolean hasFocus) {
+        super.onWindowFocusChanged(hasFocus);
+        if (hasFocus) Immersive.hide(this);
     }
 }

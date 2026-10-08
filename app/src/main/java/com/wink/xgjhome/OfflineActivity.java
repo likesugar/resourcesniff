@@ -475,6 +475,12 @@ public class OfflineActivity extends Activity {
     }
 
     @Override
+    public void onWindowFocusChanged(boolean hasFocus) {
+        super.onWindowFocusChanged(hasFocus);
+        if (hasFocus) Immersive.hide(this);
+    }
+
+    @Override
     public void onBackPressed() {
         if (web != null && web.getParent() != null && web.canGoBack()) web.goBack();
         else if (web != null && web.getParent() != null) buildHome();
