@@ -404,38 +404,25 @@ public class OfflineActivity extends Activity {
         if (snapBusy) return;
         snapBusy = true;
         final String pageUrl = url;
-        web.evaluateJavascript("document.documentElement.outerHTML", new android.webkit.ValueCallback<String>() {
-            public void onReceiveValue(String val) {
-                new Thread(new Runnable() { public void run() {
-                    try {
-                        String html = val == null ? "" : val;
-                        if (html.length() > 1 && html.charAt(0) == '"') {
-                            try {
-                                html = (String) new org.json.JSONTokener(html).nextValue();
-                            } catch (Throwable e2) {
-                                html = html.substring(1, html.length() - 1);
-                            }
-                        }
-                        if (html.length() < 200) { snapBusy = false; return; }
-                        String out = inlineHtml(html, pageUrl);
-                        File f = new File(snapDir(), md5(pageUrl) + ".html");
-                        FileOutputStream fos = new FileOutputStream(f);
-                        fos.write(out.getBytes(StandardCharsets.UTF_8));
-                        fos.close();
+        web.post(new Runnable() { public void run() {
+            final File mf = new File(snapDir(), md5(pageUrl) + ".mht");
+            try { web.saveWebArchive(mf.getAbsolutePath()); } catch (Throwable ignored) {}
+            if (!mf.exists() || mf.length() < 200) { snapBusy = false; return; }
+            new Thread(new Runnable() { public void run() {
+                try {
                         // map: 站目录 map.json {url→file}
                         File mdir = siteDir(pageUrl);
                         JSONObject m = new JSONObject();
-                        File mf = new File(mdir, "map.json");
+                        File mf2 = new File(mdir, "map.json");
                         if (mf.exists()) { try { m = new JSONObject(readSnapshot(mf.getAbsolutePath())); } catch (Throwable ignored) {} }
-                        m.put(pageUrl, f.getName());
-                        FileOutputStream fm = new FileOutputStream(mf);
+                        m.put(pageUrl, mf.getName());
+                        FileOutputStream fm = new FileOutputStream(mf2);
                         fm.write(m.toString().getBytes(StandardCharsets.UTF_8));
                         fm.close();
                     } catch (Throwable ignored) {}
                     snapBusy = false;
                 }}).start();
-            }
-        });
+        }});
     }
 
     /** 内联: css/js/img 全部抓取并转内联/data URI (浏览器"另存为单文件"同款) */
@@ -647,6 +634,11 @@ public class OfflineActivity extends Activity {
         }
         if (f == null || !f.exists()) {
             toastOnce("该页面未离线保存");
+            return new WebResourceResponse("text/plain", "utf-8", new java.io.ByteArrayInputStream(new byte[0]));
+        }
+        if (f.getName().endsWith(".mht")) {
+            final File ff = f;
+            runOnUiThread(new Runnable() { public void run() { web.loadUrl("file://" + ff.getAbsolutePath()); } });
             return new WebResourceResponse("text/plain", "utf-8", new java.io.ByteArrayInputStream(new byte[0]));
         }
         return serveRes(f);
