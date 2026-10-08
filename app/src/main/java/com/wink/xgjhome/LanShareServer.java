@@ -107,6 +107,31 @@ public class LanShareServer {
             os.flush();
             return;
         }
+        // 聊天文件下载: /chatfile?ts=xxx
+        if (path.startsWith("/chatfile")) {
+            long ts = 0;
+            int q = path.indexOf("ts=");
+            if (q > 0) try { ts = Long.parseLong(path.substring(q + 3).replaceAll("[^0-9].*$", "")); } catch (Throwable ignored) {}
+            java.io.File f = ChatHub.getServeFile(ts);
+            if (f == null || !f.exists()) {
+                OutputStream os = s.getOutputStream();
+                os.write("HTTP/1.1 404 Not Found\r\nContent-Length: 0\r\nConnection: close\r\n\r\n".getBytes());
+                os.flush();
+                return;
+            }
+            String nm = f.getName();
+            int us = nm.indexOf('_');
+            if (us > 0) nm = nm.substring(us + 1);
+            OutputStream os = s.getOutputStream();
+            os.write(("HTTP/1.1 200 OK\r\nContent-Type: application/octet-stream\r\nContent-Disposition: attachment; filename=\"chatfile\"\r\nContent-Length: "
+                + f.length() + "\r\nConnection: close\r\n\r\n").getBytes());
+            java.io.FileInputStream fis = new java.io.FileInputStream(f);
+            byte[] bf = new byte[8192]; int nn;
+            while ((nn = fis.read(bf)) > 0) os.write(bf, 0, nn);
+            fis.close();
+            os.flush();
+            return;
+        }
         // 打开链接：302 到手机中转（代拉流，带正确 Referer）
         if (path.startsWith("/open?u=")) {
             String u = java.net.URLDecoder.decode(path.substring(8), "UTF-8");

@@ -19,6 +19,7 @@ public class ChatHub {
     private static volatile boolean running = false;
     private static MulticastSocket rx;
     private static String selfId = "";
+    public static String selfId() { return selfId; }
     private static final java.util.List<Listener> listeners = new java.util.concurrent.CopyOnWriteArrayList<>();
     private static final java.util.List<JSONObject> log = java.util.Collections.synchronizedList(new java.util.ArrayList<JSONObject>());
     private static Context ctx;
@@ -66,13 +67,23 @@ public class ChatHub {
         try { if (rx != null) rx.close(); } catch (Throwable ignored) {}
     }
 
-    public static void send(String nick, String msg) {
+    public static void send(String nick, String msg) { sendObj(nick, msg, 0, null, 0); }
+
+    /** 带文件附件信息的广播 */
+    public static void sendObj(String nick, String msg, long fts, String fname, long fsize) {
         try {
             JSONObject o = new JSONObject();
             o.put("nick", nick == null ? "匿名" : nick);
             o.put("msg", msg);
             o.put("ts", System.currentTimeMillis());
             o.put("uid", selfId);
+            if (fname != null) {
+                o.put("fname", fname);
+                o.put("fts", fts);
+                o.put("fsize", fsize);
+                o.put("fip", LanShareServer.localIp());
+                o.put("fport", LanShareServer.getPort());
+            }
             byte[] b = o.toString().getBytes("UTF-8");
             DatagramSocket out = new DatagramSocket();
             out.setBroadcast(true);
@@ -120,6 +131,11 @@ public class ChatHub {
         }
         saveLog();
     }
+
+    /** 文件服务: ts → 本地文件 (接收方经HTTP拉取) */
+    private static final java.util.Map<Long, java.io.File> serveFiles = java.util.Collections.synchronizedMap(new java.util.HashMap<Long, java.io.File>());
+    public static void serveFile(long ts, java.io.File f) { serveFiles.put(ts, f); }
+    public static java.io.File getServeFile(long ts) { return serveFiles.get(ts); }
 
     /** 自上次之后的全部消息(PC轮询) */
     public static JSONArray since(long ts) {
