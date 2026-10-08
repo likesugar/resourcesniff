@@ -442,6 +442,7 @@ public class OfflineActivity extends Activity {
             if (!u.startsWith(prefix)) return null;
             String rel = u.substring(prefix.length());
             if (rel.contains("?")) rel = rel.substring(0, rel.indexOf('?'));
+            rel = java.net.URLDecoder.decode(rel, "UTF-8"); // 中文文件名解码
             File f = new File(projDir(), rel);
             if (!f.exists() || f.isDirectory()) return new WebResourceResponse("text/plain", "utf-8", new java.io.ByteArrayInputStream(new byte[0]));
             return new WebResourceResponse(guessType(rel), null, new FileInputStream(f));
@@ -525,7 +526,17 @@ public class OfflineActivity extends Activity {
                 String id = "p" + System.currentTimeMillis();
                 File dir = new File(new File(getFilesDir(), "webpages"), id);
                 if (!dir.exists()) dir.mkdirs();
+                // 中文文件名兼容: 先按UTF-8试, 出现乱码字符则换GBK重读(Windows打包常见)
                 java.util.zip.ZipInputStream zis = new java.util.zip.ZipInputStream(getContentResolver().openInputStream(data.getData()));
+                java.util.List<String> names = new java.util.ArrayList<>();
+                java.util.zip.ZipEntry e0;
+                while ((e0 = zis.getNextEntry()) != null) { names.add(e0.getName()); if (names.size() > 3 && zis.available() == 0) break; zis.closeEntry(); }
+                boolean gbk = false;
+                for (String nm : names) if (nm.contains("\uFFFD")) { gbk = true; break; }
+                zis.close();
+                if (gbk) {
+                    zis = new java.util.zip.ZipInputStream(getContentResolver().openInputStream(data.getData()), java.nio.charset.Charset.forName("GBK"));
+                }
                 java.util.zip.ZipEntry e;
                 int count = 0;
                 while ((e = zis.getNextEntry()) != null) {
