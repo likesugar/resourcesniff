@@ -484,6 +484,23 @@ public class HomeActivity extends Activity {
         d.show();
     }
 
+    private String toPinyinSlug(String s) {
+        StringBuilder out = new StringBuilder();
+        for (char ch : s.toCharArray()) {
+            String[] p = net.sourceforge.pinyin4j.PinyinHelper.toHanyuPinyinStringArray(ch);
+            if (p != null && p.length > 0) {
+                String t = p[0].replaceAll("[0-9]", "");
+                out.append(Character.toLowerCase(t.charAt(0))).append(t.substring(1));
+            } else if (Character.isLetterOrDigit(ch)) {
+                out.append(Character.toLowerCase(ch));
+            } else if (out.length() > 0 && out.charAt(out.length() - 1) != '-') {
+                out.append('-');
+            }
+        }
+        String r = out.toString().replaceAll("^-+|-+$", "");
+        return r.length() == 0 ? "" : r;
+    }
+
     private void showWeb2ApkDialog() {
         final android.widget.EditText nameI = new android.widget.EditText(this);
         nameI.setHint("应用名称");
@@ -501,6 +518,30 @@ public class HomeActivity extends Activity {
         ep.setMargins(0, p16 / 2, 0, p16 / 2);
         box.addView(nameI, ep);
         box.addView(pkgI, ep);
+        final boolean[] pkgAuto = {true};
+        pkgI.addTextChangedListener(new android.text.TextWatcher() {
+            public void beforeTextChanged(CharSequence c, int a, int b, int q) {}
+            public void onTextChanged(CharSequence c, int a, int b, int q) {}
+            public void afterTextChanged(android.text.Editable e) {
+                String t = e.toString();
+                if (t.length() > 0 && !t.startsWith("com.") && !t.equals("com.")) pkgAuto[0] = false;
+                if (t.length() == 0) pkgAuto[0] = true;
+            }
+        });
+        nameI.addTextChangedListener(new android.text.TextWatcher() {
+            public void beforeTextChanged(CharSequence c, int a, int b, int q) {}
+            public void onTextChanged(CharSequence c, int a, int b, int q) {}
+            public void afterTextChanged(android.text.Editable e) {
+                if (!pkgAuto[0]) return;
+                String slug = toPinyinSlug(e.toString());
+                if (slug.length() > 0) {
+                    pkgAuto[0] = false;
+                    pkgI.setText("com." + slug + ".wy");
+                    pkgI.setSelection(pkgI.getText().length());
+                    pkgAuto[0] = true;
+                }
+            }
+        });
 
         android.widget.LinearLayout tpl = new android.widget.LinearLayout(this);
         tpl.setOrientation(android.widget.LinearLayout.HORIZONTAL);

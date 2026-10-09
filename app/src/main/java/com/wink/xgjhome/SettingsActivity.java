@@ -91,6 +91,48 @@ public class SettingsActivity extends Activity {
 
         dark = getSharedPreferences("settings", MODE_PRIVATE).getBoolean("dark", false);
         platList = (LinearLayout) findViewById(R.id.platList);
+        findViewById(R.id.btnBack).setOnClickListener(new View.OnClickListener() {
+            public void onClick(View v) {
+                finish();
+                overridePendingTransition(R.anim.slide_in_left, R.anim.slide_out_right);
+            }
+        });
+        android.widget.Switch swC = (android.widget.Switch) findViewById(R.id.swClipboard);
+        swC.setChecked(getSharedPreferences("settings", MODE_PRIVATE).getBoolean("clipboard", true));
+        swC.setOnCheckedChangeListener(new android.widget.CompoundButton.OnCheckedChangeListener() {
+            public void onCheckedChanged(android.widget.CompoundButton b, boolean on) {
+                getSharedPreferences("settings", MODE_PRIVATE).edit().putBoolean("clipboard", on).apply();
+                Toast.makeText(SettingsActivity.this, on ? "已开启自动检测剪贴板" : "已关闭自动检测剪贴板", Toast.LENGTH_SHORT).show();
+            }
+        });
+        findViewById(R.id.cardOled).setOnClickListener(new View.OnClickListener() {
+            public void onClick(View v) {
+                boolean oled = getSharedPreferences("settings", MODE_PRIVATE).getBoolean("oled", false);
+                getSharedPreferences("settings", MODE_PRIVATE).edit().putBoolean("oled", !oled).apply();
+                dark = getSharedPreferences("settings", MODE_PRIVATE).getBoolean("dark", false);
+                applyTheme();
+            }
+        });
+        findViewById(R.id.cardNotify).setOnClickListener(new View.OnClickListener() {
+            public void onClick(View v) {
+                try {
+                    android.content.Intent it = new android.content.Intent(android.provider.Settings.ACTION_APP_NOTIFICATION_SETTINGS);
+                    it.putExtra(android.provider.Settings.EXTRA_APP_PACKAGE, getPackageName());
+                    startActivity(it);
+                } catch (Throwable t) {
+                    Toast.makeText(SettingsActivity.this, "无法打开通知设置", Toast.LENGTH_SHORT).show();
+                }
+            }
+        });
+        findViewById(R.id.cardAbout2).setOnClickListener(new View.OnClickListener() {
+            public void onClick(View v) {
+                new AlertDialog.Builder(SettingsActivity.this)
+                        .setTitle("关于")
+                        .setMessage("🏠 资源嗅探：打开网页嗅探视频/直播流，支持剪贴板链接直进（抖音/B站/YouTube），底部胶囊“播放”可播网络流和本地文件。\n\n⬇️ 下载/记录：管理下载与后台录制任务，结束后合并进记录，可播放/删除。\n\n📡 局域网共享：开启后电脑浏览器可访问手机上的记录与文件。\n\n🔗 快捷方式：为任意应用的活动创建桌面快捷方式，支持从已装应用选择。\n\n⚙️ 本页（设置）：平台账号登录（哔哩哔哩/抖音/YouTube）、自动检测剪贴板开关、下载通知、主题切换。\n\n🌍 主题：右上角 🌙/☀️ 切换纯黑/冰蓝两套主题。")
+                        .setPositiveButton("知道了", null)
+                        .show();
+            }
+        });
         findViewById(R.id.btnClearAll).setOnClickListener(new View.OnClickListener() {
             public void onClick(View v) { clearAll(); }
         });

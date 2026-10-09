@@ -83,6 +83,31 @@ public class Web2ApkActivity extends Activity {
         mid.addView(tvName);
         mid.addView(tvSub);
         top.addView(mid);
+        // 右上角: 抖音直播 开/关
+        final TextView dyT = new TextView(this);
+        boolean dyOn = "1".equals(getPref("抖音直播"));
+        dyT.setText("抖音直播 " + (dyOn ? "开" : "关"));
+        dyT.setTextColor(dyOn ? ACCENT : SUB);
+        dyT.setTextSize(14);
+        dyT.setTypeface(Typeface.DEFAULT_BOLD);
+        GradientDrawable dg = new GradientDrawable();
+        dg.setCornerRadius(dp(12));
+        dg.setColor(dyOn ? PILL : 0xFF2A2E33);
+        dyT.setBackground(dg);
+        dyT.setPadding(dp(12), dp(6), dp(12), dp(6));
+        dyT.setOnClickListener(new View.OnClickListener() {
+            public void onClick(View v) {
+                boolean on = !"1".equals(getPref("抖音直播"));
+                savePref("抖音直播", on ? "1" : "0");
+                dyT.setText("抖音直播 " + (on ? "开" : "关"));
+                dyT.setTextColor(on ? ACCENT : SUB);
+                GradientDrawable g2 = new GradientDrawable();
+                g2.setCornerRadius(dp(12));
+                g2.setColor(on ? PILL : 0xFF2A2E33);
+                dyT.setBackground(g2);
+            }
+        });
+        top.addView(dyT);
         root.addView(top, new LinearLayout.LayoutParams(-1, -2));
 
         // 单一分组头: 网站
@@ -114,18 +139,18 @@ public class Web2ApkActivity extends Activity {
         content = new LinearLayout(this);
         content.setOrientation(LinearLayout.VERTICAL);
         sc.addView(content, new ViewGroup.LayoutParams(-1, -2));
-        root.addView(sc, new LinearLayout.LayoutParams(-1, -1));
+        root.addView(sc, new LinearLayout.LayoutParams(-1, 0, 1f));
 
         // 底部打包按钮
         TextView build = new TextView(this);
         build.setText("打包成APK");
-        build.setTextColor(0xFF06281F);
+        build.setTextColor(0xFFFFFFFF);
         build.setTextSize(17);
         build.setTypeface(Typeface.DEFAULT_BOLD);
         build.setGravity(Gravity.CENTER);
         GradientDrawable bg = new GradientDrawable();
         bg.setCornerRadius(dp(14));
-        bg.setColor(ACCENT);
+        bg.setColor(0xFF1A73E8);
         build.setBackground(bg);
         LinearLayout.LayoutParams bp = new LinearLayout.LayoutParams(-1, dp(52));
         bp.setMargins(dp(16), dp(12), dp(16), dp(16));
@@ -306,6 +331,7 @@ public class Web2ApkActivity extends Activity {
                 .append(",\"js\":").append("1".equals(getPref("启用JavaScript")) ? 1 : 0)
                 .append(",\"hide_nav\":").append("1".equals(getPref("隐藏导航栏")) ? 1 : 0)
                 .append(",\"hide_status\":").append("1".equals(getPref("隐藏状态栏")) ? 1 : 0)
+                .append(",\"douyin_live\":").append("1".equals(getPref("抖音直播")) ? 1 : 0)
                 .append(",\"sites\":[");
         for (int i = 0; i < pages.size(); i++) {
             if (i > 0) json.append(",");
