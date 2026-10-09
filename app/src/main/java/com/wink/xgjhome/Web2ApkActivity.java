@@ -1,28 +1,28 @@
 package com.wink.xgjhome;
 
 import android.app.Activity;
-import android.app.AlertDialog;
-import android.content.DialogInterface;
 import android.content.Intent;
+import android.graphics.Typeface;
 import android.graphics.drawable.GradientDrawable;
 import android.os.Bundle;
 import android.view.Gravity;
 import android.view.View;
+import android.widget.CompoundButton;
 import android.widget.EditText;
 import android.widget.LinearLayout;
 import android.widget.ScrollView;
+import android.widget.Switch;
 import android.widget.TextView;
 import android.widget.Toast;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
-import java.io.FileInputStream;
 import java.io.FileOutputStream;
 
 public class Web2ApkActivity extends Activity {
     private static final int BG = 0xFF17191D, ROW = 0xFF212429, ACCENT = 0xFF25D0A5, TXT = 0xFFF2F3F5, SUB = 0xFF9AA0A6;
+    private static final String[] TOGGLES = {"隐藏导航栏", "隐藏状态栏", "暗黑模式", "用户滑动", "浏览器标识"};
     private EditText nameI, urlI;
     private byte[] iconBytes;
-    private TextView iconRow;
     private int dp(int v) { return (int) (v * getResources().getDisplayMetrics().density); }
 
     @Override protected void onCreate(Bundle b) {
@@ -44,7 +44,7 @@ public class Web2ApkActivity extends Activity {
         title.setText("网页转应用");
         title.setTextColor(TXT);
         title.setTextSize(22);
-        title.setTypeface(android.graphics.Typeface.DEFAULT_BOLD);
+        title.setTypeface(Typeface.DEFAULT_BOLD);
         title.setPadding(0, dp(12), 0, dp(16));
         root.addView(title);
 
@@ -60,7 +60,7 @@ public class Web2ApkActivity extends Activity {
         urlI.setHintTextColor(SUB);
         root.addView(urlI);
 
-        iconRow = new TextView(this);
+        TextView iconRow = new TextView(this);
         iconRow.setText("🖼 应用图标：默认（点此自定义）");
         iconRow.setTextColor(SUB);
         iconRow.setTextSize(15);
@@ -73,11 +73,35 @@ public class Web2ApkActivity extends Activity {
         }});
         root.addView(iconRow);
 
+        for (final String tg : TOGGLES) {
+            LinearLayout row = new LinearLayout(this);
+            row.setOrientation(LinearLayout.HORIZONTAL);
+            row.setGravity(Gravity.CENTER_VERTICAL);
+            row.setBackgroundColor(ROW);
+            row.setPadding(dp(16), dp(12), dp(16), dp(12));
+            TextView t = new TextView(this);
+            t.setText(tg);
+            t.setTextColor(TXT);
+            t.setTextSize(15);
+            LinearLayout.LayoutParams tp = new LinearLayout.LayoutParams(0, -2, 1f);
+            t.setLayoutParams(tp);
+            row.addView(t);
+            Switch sw = new Switch(this);
+            sw.setChecked("1".equals(getSharedPreferences("web2apk_cfg", MODE_PRIVATE).getString(tg, "0")));
+            sw.setOnCheckedChangeListener(new CompoundButton.OnCheckedChangeListener() {
+                public void onCheckedChanged(CompoundButton btn, boolean on) {
+                    getSharedPreferences("web2apk_cfg", MODE_PRIVATE).edit().putString(tg, on ? "1" : "0").apply();
+                }
+            });
+            row.addView(sw);
+            root.addView(row, new LinearLayout.LayoutParams(-1, -2));
+        }
+
         TextView buildBtn = new TextView(this);
         buildBtn.setText("打包成APK");
         buildBtn.setTextColor(0xFFFFFFFF);
         buildBtn.setTextSize(17);
-        buildBtn.setTypeface(android.graphics.Typeface.DEFAULT_BOLD);
+        buildBtn.setTypeface(Typeface.DEFAULT_BOLD);
         buildBtn.setGravity(Gravity.CENTER);
         GradientDrawable bg = new GradientDrawable();
         bg.setCornerRadius(dp(14));
@@ -94,14 +118,12 @@ public class Web2ApkActivity extends Activity {
     }
 
     private void doBuild() {
-        String name = nameI.getText().toString().trim();
-        String url = urlI.getText().toString().trim();
+        final String name = nameI.getText().toString().trim();
+        final String url = urlI.getText().toString().trim();
         if (name.length() == 0 || !url.startsWith("http")) {
             Toast.makeText(this, "请填名称和 http(s) 网址", Toast.LENGTH_SHORT).show();
             return;
         }
-        final String cfg = "{\"app_name\":\"" + name.replace("\"", "") + "\",\"url\":\"" + url.replace("\"", "") +
-                "\",\"night\":0,\"js\":1,\"hide_nav\":0,\"hide_status\":0}";
         Toast.makeText(this, "正在打包...", Toast.LENGTH_SHORT).show();
         final byte[] icon = iconBytes;
         new Thread(new Runnable() { public void run() {
@@ -109,7 +131,7 @@ public class Web2ApkActivity extends Activity {
                 File dir = new File(getExternalFilesDir(null), "web2apk");
                 if (!dir.exists()) dir.mkdirs();
                 final File out = new File(dir, name + ".apk");
-                RepackUtil.buildFromAssets(getApplicationContext(), url, false, true, name, icon, out);
+                RepackUtil.buildFromAssets(getApplicationContext(), url, name, icon, out);
                 runOnUiThread(new Runnable() { public void run() {
                     Toast.makeText(Web2ApkActivity.this, "打包完成: " + out.getAbsolutePath(), Toast.LENGTH_LONG).show();
                     try {
@@ -142,8 +164,7 @@ public class Web2ApkActivity extends Activity {
                 ByteArrayOutputStream bo = new ByteArrayOutputStream();
                 out.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, bo);
                 iconBytes = bo.toByteArray();
-                iconRow.setText("🖼 应用图标：已自定义 ✓");
-                iconRow.setTextColor(ACCENT);
+                Toast.makeText(this, "图标已设置", Toast.LENGTH_SHORT).show();
             } catch (Throwable t) {
                 Toast.makeText(this, "图标设置失败: " + t, Toast.LENGTH_SHORT).show();
             }

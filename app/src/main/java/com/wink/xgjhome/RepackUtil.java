@@ -225,15 +225,21 @@ public class RepackUtil {
         signer.sign();
     }
 
-    public static void buildFromAssets(Context ctx, String url, boolean night, boolean js, String label, byte[] icon, File outFile) throws Exception {
+    public static void buildFromAssets(Context ctx, String url, String label, byte[] icon, File outFile) throws Exception {
+        android.content.SharedPreferences cf = ctx.getSharedPreferences("web2apk_cfg", Context.MODE_PRIVATE);
+        String json = "{\"app_name\":\"" + label.replace("\"", "") + "\",\"url\":\"" + url.replace("\"", "") +
+                "\",\"night\":" + ("1".equals(cf.getString("暗黑模式", "0")) ? 1 : 0) +
+                ",\"js\":1" +
+                ",\"hide_nav\":" + ("1".equals(cf.getString("隐藏导航栏", "0")) ? 1 : 0) +
+                ",\"hide_status\":" + ("1".equals(cf.getString("隐藏状态栏", "0")) ? 1 : 0) +
+                ",\"user_slide\":" + ("1".equals(cf.getString("用户滑动", "0")) ? 1 : 0) +
+                ",\"ua_desktop\":" + ("1".equals(cf.getString("浏览器标识", "0")) ? 1 : 0) + "}";
         java.io.InputStream is = ctx.getAssets().open("web2apk_template.apk");
         File tpl = new File(ctx.getCacheDir(), "web2apk_template.apk");
         FileOutputStream to = new FileOutputStream(tpl);
         byte[] buf = new byte[8192]; int n;
         while ((n = is.read(buf)) > 0) to.write(buf, 0, n);
         is.close(); to.close();
-        String json = "{\"app_name\":\"" + label.replace("\"", "") + "\",\"url\":\"" + url.replace("\"", "") +
-                "\",\"night\":" + (night ? 1 : 0) + ",\"js\":" + (js ? 1 : 0) + ",\"hide_nav\":0,\"hide_status\":0}";
         File unsigned = new File(ctx.getCacheDir(), "web2apk_unsigned.apk");
         build(tpl, unsigned, label, json, icon);
         signWithApksig(unsigned, outFile);
