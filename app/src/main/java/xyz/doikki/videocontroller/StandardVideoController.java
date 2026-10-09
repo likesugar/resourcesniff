@@ -63,13 +63,19 @@ public class StandardVideoController extends GestureVideoController implements V
         mLockButton = findViewById(R.id.lock);
         mLockButton.setOnClickListener(this);
         mLoadingProgress = findViewById(R.id.loading);
-        View kernel = findViewById(R.id.kernel_switch);
-        if (kernel != null) kernel.setOnClickListener(this);
+        mKernelButton = findViewById(R.id.kernel_switch);
+        if (mKernelButton != null) mKernelButton.setOnClickListener(this);
     }
 
     public interface OnKernelSwitchListener { void onKernelSwitch(); }
     private OnKernelSwitchListener mKernelListener;
     public void setOnKernelSwitchListener(OnKernelSwitchListener l) { mKernelListener = l; }
+
+    private View mKernelButton;
+    /** 后台播放选中态：耳机白→蓝 */
+    public void setBackgroundPlaySelected(boolean sel) {
+        if (mKernelButton != null) mKernelButton.setSelected(sel);
+    }
 
     /**
      * 快速添加各个组件

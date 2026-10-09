@@ -105,7 +105,7 @@ public class NativePlayerActivity extends Activity {
     /** 耳机按钮：切后台播放模式。开启后退到桌面/切应用不停播 */
     void toggleBackgroundPlay() {
         backgroundPlay = !backgroundPlay;
-        Toast.makeText(this, backgroundPlay ? "后台播放：开" : "后台播放：关", Toast.LENGTH_SHORT).show();
+        if (controller != null) controller.setBackgroundPlaySelected(backgroundPlay);
     }
 
     void toggleKernel() {

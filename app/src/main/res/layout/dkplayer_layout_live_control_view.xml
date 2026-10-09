@@ -36,7 +36,7 @@
             android:layout_width="@dimen/dkplayer_controller_height"
             android:layout_height="@dimen/dkplayer_controller_height"
             android:padding="@dimen/dkplayer_controller_icon_padding"
-            android:src="@drawable/dkplayer_ic_headphone"
+            android:src="@drawable/dkplayer_selector_headphone"
             android:contentDescription="后台播放" />
 
         <ImageView
