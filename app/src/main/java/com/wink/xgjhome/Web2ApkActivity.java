@@ -380,6 +380,7 @@ public class Web2ApkActivity extends Activity {
                 .append(",\"js\":").append("1".equals(getPref("启用JavaScript")) ? 1 : 0)
                 .append(",\"hide_nav\":").append("1".equals(getPref("隐藏导航栏")) ? 1 : 0)
                 .append(",\"hide_status\":").append("1".equals(getPref("隐藏状态栏")) ? 1 : 0)
+                .append(",\"douyin_live\":").append(getSharedPreferences("settings", MODE_PRIVATE).getBoolean("douyin_live", false) ? 1 : 0)
                 .append(",\"sites\":[");
         for (int i = 0; i < pages.size(); i++) {
             if (i > 0) json.append(",");
