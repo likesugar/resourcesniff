@@ -2,6 +2,12 @@ package com.wink.xgjhome;
 
 import android.annotation.SuppressLint;
 import android.app.Activity;
+import android.app.Notification;
+import android.app.NotificationChannel;
+import android.app.NotificationManager;
+import android.app.PendingIntent;
+import android.content.Intent;
+import android.os.Build;
 import android.os.Bundle;
 import android.view.ViewGroup;
 import android.widget.FrameLayout;
@@ -91,6 +97,7 @@ public class NativePlayerActivity extends Activity {
         applyKernel();
         videoView.setUrl(url, douyinHeaders());
         videoView.start();
+        showPlayNote();
 
     }
 
@@ -100,6 +107,32 @@ public class NativePlayerActivity extends Activity {
         } else {
             videoView.setPlayerFactory(xyz.doikki.videoplayer.player.AndroidMediaPlayerFactory.create());
         }
+    }
+
+    // ---------- 播放通知 ----------
+    private void showPlayNote() {
+        try {
+            android.app.NotificationManager nm = (android.app.NotificationManager) getSystemService(NOTIFICATION_SERVICE);
+            if (Build.VERSION.SDK_INT >= 26) {
+                android.app.NotificationChannel ch = new android.app.NotificationChannel("xgj_player", "播放通知", android.app.NotificationManager.IMPORTANCE_LOW);
+                nm.createNotificationChannel(ch);
+            }
+            android.app.Notification.Builder b = Build.VERSION.SDK_INT >= 26
+                    ? new android.app.Notification.Builder(this, "xgj_player")
+                    : new android.app.Notification.Builder(this);
+            Intent back = new Intent(this, NativePlayerActivity.class)
+                    .putExtra("url", url).putExtra("title", title).putExtra("kernel", kernel);
+            b.setSmallIcon(android.R.drawable.ic_media_play)
+             .setContentTitle(title != null && !title.isEmpty() ? title : "正在播放")
+             .setOngoing(true).setOnlyAlertOnce(true).setShowWhen(false)
+             .setContentIntent(android.app.PendingIntent.getActivity(this, 5201, back,
+                     android.app.PendingIntent.FLAG_UPDATE_CURRENT | android.app.PendingIntent.FLAG_IMMUTABLE));
+            nm.notify(5200, b.build());
+        } catch (Throwable ignored) { }
+    }
+
+    private void cancelPlayNote() {
+        try { ((android.app.NotificationManager) getSystemService(NOTIFICATION_SERVICE)).cancel(5200); } catch (Throwable ignored) { }
     }
 
     /** 耳机按钮：切后台播放模式。开启后退到桌面/切应用不停播 */
@@ -114,6 +147,7 @@ public class NativePlayerActivity extends Activity {
         applyKernel();
         videoView.setUrl(url, douyinHeaders());
         videoView.start();
+        showPlayNote();
         Toast.makeText(this, kernel == KERNEL_IJK ? "已切换：IjkPlayer 内核" : "已切换：MediaPlayer 内核", Toast.LENGTH_SHORT).show();
     }
 
@@ -130,17 +164,18 @@ public class NativePlayerActivity extends Activity {
     @Override
     protected void onPause() {
         super.onPause();
-        if (!backgroundPlay) videoView.pause();
+        if (!backgroundPlay) { videoView.pause(); cancelPlayNote(); }
     }
 
     @Override
     protected void onResume() {
         super.onResume();
-        if (!backgroundPlay) videoView.resume();
+        if (!backgroundPlay) { videoView.resume(); showPlayNote(); }
     }
 
     @Override
     protected void onDestroy() {
+        cancelPlayNote();
         try { videoView.release(); } catch (Throwable e) { }
         super.onDestroy();
     }
