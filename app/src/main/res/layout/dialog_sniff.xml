@@ -6,14 +6,31 @@
     android:background="@drawable/bg_dialog_blue"
     android:padding="22dp">
 
-    <TextView
-        android:id="@+id/tv_dialog_title"
-        android:layout_width="wrap_content"
+    <LinearLayout
+        android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="资源嗅探"
-        android:textColor="#FFFFFF"
-        android:textSize="18sp"
-        android:textStyle="bold"/>
+        android:orientation="horizontal"
+        android:gravity="center_vertical">
+        <TextView
+            android:id="@+id/tv_dialog_title"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="资源嗅探"
+            android:textColor="#FFFFFF"
+            android:textSize="18sp"
+            android:textStyle="bold"/>
+        <TextView
+            android:id="@+id/tv_douyin_live"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="抖音直播 关"
+            android:textColor="#AAFFFFFF"
+            android:textSize="14sp"
+            android:textStyle="bold"
+            android:paddingLeft="10dp" android:paddingRight="10dp"
+            android:paddingTop="6dp" android:paddingBottom="6dp"/>
+    </LinearLayout>
 
     <!-- 输入框 + 粘贴按钮（扁平化） -->
     <LinearLayout

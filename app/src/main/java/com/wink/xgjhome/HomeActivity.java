@@ -418,6 +418,29 @@ public class HomeActivity extends Activity {
                     android.view.ViewGroup.LayoutParams.WRAP_CONTENT);
         }
         final EditText et = d.findViewById(R.id.et_dialog_url);
+        // 抖音直播开关(记忆)
+        final TextView dyT = d.findViewById(R.id.tv_douyin_live);
+        final android.content.SharedPreferences spf = getSharedPreferences("settings", MODE_PRIVATE);
+        final android.text.TextWatcher repaint = new android.text.TextWatcher() {
+            public void beforeTextChanged(CharSequence c, int a, int b, int q) {}
+            public void onTextChanged(CharSequence c, int a, int b, int q) {}
+            public void afterTextChanged(android.text.Editable e) {
+                boolean on = spf.getBoolean("douyin_live", false);
+                dyT.setText("抖音直播 " + (on ? "开" : "关"));
+                dyT.setTextColor(on ? 0xFF25D0A5 : 0xAAFFFFFF);
+            }
+        };
+        repaint.afterTextChanged(null);
+        dyT.setOnClickListener(new View.OnClickListener() {
+            public void onClick(View v) {
+                spf.edit().putBoolean("douyin_live", !spf.getBoolean("douyin_live", false)).apply();
+                repaint.afterTextChanged(null);
+                if (spf.getBoolean("douyin_live", false)) {
+                    String saved = spf.getString("dyid", "");
+                    if (saved.length() > 0) et.setHint("已记忆直播间 " + saved);
+                }
+            }
+        });
         d.findViewById(R.id.btn_paste).setOnClickListener(new View.OnClickListener() {
             public void onClick(View v) {
                 try {
@@ -435,8 +458,25 @@ public class HomeActivity extends Activity {
         });
         d.findViewById(R.id.btn_go).setOnClickListener(new View.OnClickListener() {
             public void onClick(View v) {
+                String input = et.getText().toString().trim();
+                boolean dyOn = spf.getBoolean("douyin_live", false);
+                if (dyOn) {
+                    // 抖音号识别: 纯数字6-20位 或 字母+数字混合
+                    String t = input;
+                    if (t.matches("[0-9]{6,20}") || (t.matches("[0-9A-Za-z]{6,24}") && t.matches(".*[A-Za-z].*") && t.matches(".*[0-9].*"))) {
+                        input = "https://live.douyin.com/" + t;
+                        spf.edit().putString("dyid", t).apply();
+                    } else {
+                        java.util.regex.Matcher m2 = java.util.regex.Pattern.compile("live\\.douyin\\.com/([0-9A-Za-z]{6,24})").matcher(t);
+                        if (m2.find()) { input = "https://live.douyin.com/" + m2.group(1); spf.edit().putString("dyid", m2.group(1)).apply(); }
+                        else if (t.length() == 0) {
+                            String saved = spf.getString("dyid", "");
+                            if (saved.length() > 0) input = "https://live.douyin.com/" + saved;
+                        }
+                    }
+                }
                 Intent i = new Intent(HomeActivity.this, SniffActivity.class);
-                i.putExtra("input", et.getText().toString().trim());
+                i.putExtra("input", input);
                 startActivity(i);
                 d.dismiss();
             }

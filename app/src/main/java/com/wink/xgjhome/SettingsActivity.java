@@ -46,10 +46,18 @@ public class SettingsActivity extends Activity {
                 case android.view.MotionEvent.ACTION_DOWN: swX = ev.getX(); swY = ev.getY(); break;
                 case android.view.MotionEvent.ACTION_UP: {
                     float dx = ev.getX() - swX, dy = ev.getY() - swY;
-                    if (swX < dp(28) && Math.abs(dy) < dp(40) && dx > dp(60) && dx > Math.abs(dy) * 2) {
+                    if (Math.abs(dx) > dp(80) && Math.abs(dx) > Math.abs(dy) * 2) {
                         swDone = true;
-                        finish();
-                        overridePendingTransition(R.anim.slide_in_left, R.anim.slide_out_right);
+                        if (dx > 0) {
+                            // 右滑: 回首页
+                            finish();
+                            overridePendingTransition(R.anim.slide_in_left, R.anim.slide_out_right);
+                        } else {
+                            // 左滑: 去播放器
+                            finish();
+                            overridePendingTransition(R.anim.slide_in_left, R.anim.slide_out_right);
+                            startActivity(new Intent(SettingsActivity.this, HomeActivity.class).putExtra("goto_play", true));
+                        }
                     }
                 }
                 break;
