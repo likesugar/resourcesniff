@@ -249,6 +249,7 @@ public class XhsActivity extends Activity implements XhsEngine.Listener {
         for (XhsStore.Task task : XhsEngine.tasks()) {
             if ("all".equals(key)) count++;
             else if ("failed".equals(key)) { if ("failed".equals(task.status)) count++; }
+            else if ("done".equals(key)) { if ("done".equals(task.status)) count++; }
             else { if ("pending".equals(task.status) || "running".equals(task.status) || "stopped".equals(task.status) || "selecting".equals(task.status)) count++; }
         }
         tv.setText(label + (count > 0 ? " (" + count + ")" : ""));
