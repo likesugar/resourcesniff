@@ -25,6 +25,7 @@ public class NativePlayerActivity extends Activity {
     private String url;
     private String title;
     private int kernel = KERNEL_MEDIA;
+    private boolean backgroundPlay = false;
 
     @SuppressLint("SetJavaScriptEnabled")
     @Override
@@ -72,7 +73,7 @@ public class NativePlayerActivity extends Activity {
         videoView.setVideoController(controller);
         controller.setOnKernelSwitchListener(new StandardVideoController.OnKernelSwitchListener() {
             @Override
-            public void onKernelSwitch() { toggleKernel(); }
+            public void onKernelSwitch() { toggleBackgroundPlay(); }
         });
         // 控制层左上角：width: height:（随控制条显隐）
         controller.addControlComponent(new SizeComponent(videoView));
@@ -101,6 +102,12 @@ public class NativePlayerActivity extends Activity {
         }
     }
 
+    /** 耳机按钮：切后台播放模式。开启后退到桌面/切应用不停播 */
+    void toggleBackgroundPlay() {
+        backgroundPlay = !backgroundPlay;
+        Toast.makeText(this, backgroundPlay ? "后台播放：开" : "后台播放：关", Toast.LENGTH_SHORT).show();
+    }
+
     void toggleKernel() {
         try { videoView.release(); } catch (Throwable e) { }
         kernel = (kernel == KERNEL_MEDIA) ? KERNEL_IJK : KERNEL_MEDIA;
@@ -123,13 +130,13 @@ public class NativePlayerActivity extends Activity {
     @Override
     protected void onPause() {
         super.onPause();
-        videoView.pause();
+        if (!backgroundPlay) videoView.pause();
     }
 
     @Override
     protected void onResume() {
         super.onResume();
-        videoView.resume();
+        if (!backgroundPlay) videoView.resume();
     }
 
     @Override

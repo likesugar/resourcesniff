@@ -54,14 +54,13 @@
             android:textSize="@dimen/dkplayer_controller_time_text_size"
             tools:text="00:00" />
 
-        <TextView
+        <ImageView
             android:id="@+id/kernel_switch"
             android:layout_width="@dimen/dkplayer_controller_height"
             android:layout_height="@dimen/dkplayer_controller_height"
-            android:gravity="center"
-            android:text="\u21b9"
-            android:textColor="@android:color/white"
-            android:textSize="18sp" />
+            android:padding="@dimen/dkplayer_controller_icon_padding"
+            android:src="@drawable/dkplayer_ic_headphone"
+            android:contentDescription="后台播放" />
 
         <ImageView
             android:id="@+id/fullscreen"
