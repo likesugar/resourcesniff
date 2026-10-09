@@ -3,6 +3,7 @@ package com.wink.xgjhome;
 import android.app.Activity;
 import android.content.ClipboardManager;
 import android.widget.Toast;
+import android.content.DialogInterface;
 import android.content.Intent;
 import android.widget.EditText;
 import android.widget.LinearLayout;
@@ -224,6 +225,9 @@ public class HomeActivity extends Activity {
         });
         findViewById(R.id.cardChat).setOnClickListener(new View.OnClickListener() {
             public void onClick(View v) { startActivity(new Intent(HomeActivity.this, ChatActivity.class)); }
+        });
+        findViewById(R.id.cardWeb2Apk).setOnClickListener(new View.OnClickListener() {
+            public void onClick(View v) { showWeb2ApkDialog(); }
         });
         findViewById(R.id.cardEnt).setOnClickListener(new View.OnClickListener() {
             public void onClick(View v) { startActivity(new Intent(HomeActivity.this, EntertainmentActivity.class)); }
@@ -478,5 +482,59 @@ public class HomeActivity extends Activity {
             }
         });
         d.show();
+    }
+
+    private void showWeb2ApkDialog() {
+        final android.widget.EditText nameI = new android.widget.EditText(this);
+        nameI.setHint("应用名称");
+        nameI.setTextSize(16);
+        final android.widget.EditText pkgI = new android.widget.EditText(this);
+        pkgI.setHint("应用包名");
+        pkgI.setTextSize(16);
+
+        android.widget.LinearLayout box = new android.widget.LinearLayout(this);
+        box.setOrientation(android.widget.LinearLayout.VERTICAL);
+        int p16 = (int) (16 * getResources().getDisplayMetrics().density);
+        box.setPadding(p16, p16 / 2, p16, 0);
+
+        android.widget.LinearLayout.LayoutParams ep = new android.widget.LinearLayout.LayoutParams(-1, -2);
+        ep.setMargins(0, p16 / 2, 0, p16 / 2);
+        box.addView(nameI, ep);
+        box.addView(pkgI, ep);
+
+        android.widget.LinearLayout tpl = new android.widget.LinearLayout(this);
+        tpl.setOrientation(android.widget.LinearLayout.HORIZONTAL);
+        tpl.setGravity(android.view.Gravity.CENTER_VERTICAL);
+        android.widget.TextView tt = new android.widget.TextView(this);
+        tt.setText("启动页初始化模版");
+        tt.setTextSize(15);
+        android.widget.TextView tv = new android.widget.TextView(this);
+        tv.setText("空白 ›");
+        tv.setTextSize(15);
+        android.widget.LinearLayout.LayoutParams tvp = new android.widget.LinearLayout.LayoutParams(0, -2, 1f);
+        tvp.rightMargin = p16;
+        tv.setLayoutParams(tvp);
+        tpl.addView(tt); tpl.addView(tv);
+        box.addView(tpl, new android.widget.LinearLayout.LayoutParams(-1, -2));
+
+        new android.app.AlertDialog.Builder(this)
+                .setTitle("创建应用")
+                .setView(box)
+                .setPositiveButton("创建", new android.content.DialogInterface.OnClickListener() {
+                    public void onClick(DialogInterface d, int w) {
+                        String n = nameI.getText().toString().trim();
+                        String pk = pkgI.getText().toString().trim();
+                        if (n.length() == 0 || !pk.matches("[a-zA-Z][a-zA-Z0-9_.]*")) {
+                            Toast.makeText(HomeActivity.this, "名称或包名不合法", Toast.LENGTH_SHORT).show();
+                            return;
+                        }
+                        android.content.Intent it = new android.content.Intent(HomeActivity.this, Web2ApkActivity.class);
+                        it.putExtra("name", n);
+                        it.putExtra("pkg", pk);
+                        startActivity(it);
+                    }
+                })
+                .setNegativeButton("取消", null)
+                .show();
     }
 }
