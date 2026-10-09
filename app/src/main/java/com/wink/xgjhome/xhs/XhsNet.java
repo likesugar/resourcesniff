@@ -10,6 +10,8 @@ import java.io.OutputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.ArrayList;
+import java.util.List;
 
 /** 网络层：短链解析 / 页面抓取 / 媒体下载。对齐原版 XhsNetwork + ResumableTransfer */
 public final class XhsNet {
@@ -140,6 +142,72 @@ public final class XhsNet {
     }
 
     /** HEAD 探测扩展名 */
+
+    /** 多线程分块下载：N 线程各下一段 Range 写入 part 文件对应偏移；不支持则退单线程 */
+    public static void downloadMT(String url, File dest, String referer, int threads, Progress cb, AtomicBoolean cancel) throws Exception {
+        long[] len = { -1 };
+        HttpURLConnection hc = open(url, referer);
+        hc.setRequestMethod("HEAD");
+        hc.setConnectTimeout(10000);
+        hc.setReadTimeout(10000);
+        try {
+            if (hc.getResponseCode() / 100 == 2) len[0] = hc.getContentLength();
+        } finally { hc.disconnect(); }
+        if (len[0] <= 0) { download(url, dest, referer, cb, cancel); return; }
+        File part = new File(dest.getParentFile(), dest.getName() + ".part");
+        java.io.RandomAccessFile raf = new java.io.RandomAccessFile(part, "rw");
+        raf.setLength(len[0]);
+        int n = Math.max(1, Math.min(threads, 6));
+        long seg = len[0] / n;
+        final java.util.concurrent.atomic.AtomicLong done = new java.util.concurrent.atomic.AtomicLong(0);
+        final long total = len[0];
+        List<Thread> ts = new ArrayList<Thread>();
+        final Exception[] err = { null };
+        for (int i = 0; i < n; i++) {
+            final long start = i * seg;
+            final long end = (i == n - 1) ? len[0] - 1 : (start + seg - 1);
+            Thread t = new Thread(new Runnable() { public void run() {
+                try {
+                    HttpURLConnection c = open(url, referer);
+                    c.setRequestProperty("Range", "bytes=" + start + "-" + end);
+                    c.setConnectTimeout(15000);
+                    c.setReadTimeout(30000);
+                    int code = c.getResponseCode();
+                    if (code != 206 && code != 200) throw new Exception("HTTP " + code);
+                    InputStream in = c.getInputStream();
+                    byte[] buf = new byte[32768];
+                    long pos = start;
+                    int k;
+                    synchronized (raf) { raf.seek(pos); }
+                    while ((k = in.read(buf)) > 0) {
+                        if (cancel != null && cancel.get()) { in.close(); throw new java.io.IOException("cancelled"); }
+                        synchronized (raf) { raf.seek(pos); raf.write(buf, 0, k); }
+                        pos += k;
+                        done.addAndGet(k);
+                        if (cb != null && total > 0) cb.onProgress(done.get(), total);
+                    }
+                    in.close();
+                } catch (Throwable e) { if (err[0] == null) err[0] = e instanceof Exception ? (Exception) e : new Exception(e); }
+            } }, "xhs-dl-" + i);
+            ts.add(t);
+            t.start();
+        }
+        for (Thread t : ts) t.join();
+        raf.close();
+        if (err[0] != null) throw err[0];
+        if (dest.exists()) dest.delete();
+        part.renameTo(dest);
+    }
+
+    private static HttpURLConnection open(String url, String referer) throws Exception {
+        HttpURLConnection c = (HttpURLConnection) new URL(url).openConnection();
+        c.setRequestProperty("User-Agent", UA);
+        if (referer != null && !referer.isEmpty()) c.setRequestProperty("Referer", referer);
+        String cookie = cookie();
+        if (cookie != null && !cookie.isEmpty()) c.setRequestProperty("Cookie", cookie);
+        return c;
+    }
+
     public static String probeExt(String url, String fallback) {
         HttpURLConnection conn = null;
         try {

@@ -58,7 +58,7 @@ public final class XhsSink {
         final Uri uri = c.getContentResolver().insert(coll, cv);
         if (uri == null) throw new Exception("MediaStore insert failed");
         try {
-            streamTo(c.getContentResolver().openOutputStream(uri), url, cb, cancel);
+            streamTo(c, c.getContentResolver().openOutputStream(uri), url, cb, cancel);
             if (Build.VERSION.SDK_INT >= 29) {
                 ContentValues done = new ContentValues();
                 done.put(MediaStore.MediaColumns.IS_PENDING, 0);
@@ -72,56 +72,13 @@ public final class XhsSink {
         return uri.toString();
     }
 
-    /** 直接 File 写盘（自定义目录模式，含 .part 续传） */
+    /** 直接 File 写盘（自定义目录模式，多线程分块 + 已有 part 续传退单线程） */
     public static void saveFile(File dest, String url, XhsNet.Progress cb, AtomicBoolean cancel) throws Exception {
         File part = new File(dest.getParentFile(), dest.getName() + ".part");
-        long existing = part.exists() ? part.length() : 0;
-        HttpURLConnection conn = (HttpURLConnection) new URL(url).openConnection();
-        try {
-            conn.setConnectTimeout(15000);
-            conn.setReadTimeout(30000);
-            conn.setRequestProperty("User-Agent", XhsNet.ua());
-            conn.setRequestProperty("Referer", "https://www.xiaohongshu.com/");
-            String cookie = XhsNet.cookie();
-            if (cookie != null && !cookie.isEmpty()) conn.setRequestProperty("Cookie", cookie);
-            if (existing > 0) conn.setRequestProperty("Range", "bytes=" + existing + "-");
-            int code = conn.getResponseCode();
-            long total;
-            InputStream in;
-            OutputStream out;
-            if (code == 206) {
-                total = existing + conn.getContentLength();
-                in = conn.getInputStream();
-                out = new java.io.FileOutputStream(part, true);
-            } else if (code == 200) {
-                total = conn.getContentLength();
-                existing = 0;
-                in = conn.getInputStream();
-                out = new java.io.FileOutputStream(part, false);
-            } else {
-                throw new Exception("HTTP " + code);
-            }
-            long done = existing;
-            byte[] buf = new byte[16384];
-            int n;
-            while ((n = in.read(buf)) > 0) {
-                if (cancel != null && cancel.get()) {
-                    out.close(); in.close();
-                    throw new java.io.IOException("cancelled");
-                }
-                out.write(buf, 0, n);
-                done += n;
-                if (cb != null && total > 0) cb.onProgress(done, total);
-            }
-            out.close();
-            in.close();
-            if (!part.renameTo(dest)) {
-                java.nio.file.Files.copy(part.toPath(), dest.toPath(),
-                        java.nio.file.StandardCopyOption.REPLACE_EXISTING);
-                part.delete();
-            }
-        } finally {
-            conn.disconnect();
+        if (part.exists() && part.length() > 0) {
+            XhsNet.download(url, dest, "https://www.xiaohongshu.com/", cb, cancel); // 续传走单线程
+        } else {
+            XhsNet.downloadMT(url, dest, "https://www.xiaohongshu.com/", 4, cb, cancel);
         }
     }
 
@@ -136,35 +93,22 @@ public final class XhsSink {
                         : android.os.Environment.DIRECTORY_PICTURES), "XHS下载");
     }
 
-    private static void streamTo(OutputStream out, String url, XhsNet.Progress cb, AtomicBoolean cancel) throws Exception {
-        HttpURLConnection conn = (HttpURLConnection) new URL(url).openConnection();
+    private static void streamTo(final Context c, OutputStream out, String url, XhsNet.Progress cb, AtomicBoolean cancel) throws Exception {
+        // 多线程下载到缓存临时文件，再拷贝进 MediaStore（MediaStore 不支持随机写）
+        java.io.File tmp = java.io.File.createTempFile("xhs", ".part", c.getCacheDir());
         try {
-            conn.setConnectTimeout(15000);
-            conn.setReadTimeout(30000);
-            conn.setRequestProperty("User-Agent", XhsNet.ua());
-            conn.setRequestProperty("Referer", "https://www.xiaohongshu.com/");
-            String cookie = XhsNet.cookie();
-            if (cookie != null && !cookie.isEmpty()) conn.setRequestProperty("Cookie", cookie);
-            int code = conn.getResponseCode();
-            if (code != 200 && code != 206) throw new Exception("HTTP " + code);
-            InputStream in = conn.getInputStream();
-            long total = conn.getContentLength();
-            long done = 0;
-            byte[] buf = new byte[16384];
-            int n;
-            while ((n = in.read(buf)) > 0) {
-                if (cancel != null && cancel.get()) {
-                    out.close(); in.close();
-                    throw new java.io.IOException("cancelled");
-                }
-                out.write(buf, 0, n);
-                done += n;
-                if (cb != null && total > 0) cb.onProgress(done, total);
+            XhsNet.downloadMT(url, tmp, "https://www.xiaohongshu.com/", 4, cb, cancel);
+            java.io.InputStream in = new java.io.FileInputStream(tmp);
+            byte[] buf = new byte[32768];
+            int k;
+            while ((k = in.read(buf)) > 0) {
+                if (cancel != null && cancel.get()) { in.close(); throw new java.io.IOException("cancelled"); }
+                out.write(buf, 0, k);
             }
-            out.close();
             in.close();
         } finally {
-            conn.disconnect();
+            tmp.delete();
+            try { out.close(); } catch (Throwable ignored) { }
         }
     }
 }

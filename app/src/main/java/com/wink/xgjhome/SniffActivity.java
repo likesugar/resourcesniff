@@ -90,6 +90,7 @@ public class SniffActivity extends Activity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        Immersive.hide(this);
         sDumpCtx = this;
         try { LiveProxy.start(); } catch (Throwable ignored) {}   // 本地中转必须常驻，FC2/B站记录才能播/录/下
         DlManager.init(this);

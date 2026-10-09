@@ -48,6 +48,7 @@ public class XhsActivity extends Activity implements XhsEngine.Listener {
     @Override
     protected void onCreate(Bundle b) {
         super.onCreate(b);
+        Immersive.hide(this);
         XhsEngine.init(this);
         dark = getSharedPreferences("settings", MODE_PRIVATE).getBoolean("dark", false);
         oled = getSharedPreferences("settings", MODE_PRIVATE).getBoolean("oled", false);

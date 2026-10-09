@@ -578,8 +578,8 @@ public class RecordActivity extends Activity {
         pm.getMenu().add("打开所在目录").setOnMenuItemClickListener(new android.view.MenuItem.OnMenuItemClickListener() {
             public boolean onMenuItemClick(android.view.MenuItem it) { openDir(); return true; }
         });
-        pm.getMenu().add("播放合并视频").setOnMenuItemClickListener(new android.view.MenuItem.OnMenuItemClickListener() {
-            public boolean onMenuItemClick(android.view.MenuItem it) { playMerged(); return true; }
+        pm.getMenu().add("播放视频").setOnMenuItemClickListener(new android.view.MenuItem.OnMenuItemClickListener() {
+            public boolean onMenuItemClick(android.view.MenuItem it) { playWithCopy(j); return true; }
         });
         pm.getMenu().add("取消").setOnMenuItemClickListener(new android.view.MenuItem.OnMenuItemClickListener() {
             public boolean onMenuItemClick(android.view.MenuItem it) { RecManager.recCancel(j.id); rebuild(); return true; }
@@ -587,8 +587,23 @@ public class RecordActivity extends Activity {
         pm.show();
     }
 
-    private void playMerged() {
-        // 内置播放器播放最新的合并成片（files/录制合并/ 下最新 .mp4）
+    /** 复制下载地址 + 内置播放器播放（优先流地址，无则播最新合并成片） */
+    private void playWithCopy(RecManager.RecJob j) {
+        String addr = (j != null && j.url != null && !j.url.isEmpty()) ? j.url : null;
+        if (addr == null) {
+            java.io.File f = latestMerged();
+            if (f != null) addr = f.getAbsolutePath();
+        }
+        if (addr == null) { Toast.makeText(this, "暂无视频", Toast.LENGTH_SHORT).show(); return; }
+        try {
+            android.content.ClipboardManager cm = (android.content.ClipboardManager) getSystemService(CLIPBOARD_SERVICE);
+            cm.setPrimaryClip(android.content.ClipData.newPlainText("dl", addr));
+            Toast.makeText(this, "下载地址已复制", Toast.LENGTH_SHORT).show();
+        } catch (Throwable ignored) {}
+        playInApp(addr, j != null && j.name != null ? j.name : "播放");
+    }
+
+    private java.io.File latestMerged() {
         try {
             java.io.File root = new java.io.File(getExternalFilesDir(null), "录制合并");
             java.io.File best = null;
@@ -604,9 +619,8 @@ public class RecordActivity extends Activity {
                             && (best == null || f.lastModified() > best.lastModified())) best = f;
                 }
             }
-            if (best != null) { playInApp(best.getAbsolutePath(), best.getName()); return; }
-            Toast.makeText(this, "暂无合并视频", Toast.LENGTH_SHORT).show();
-        } catch (Throwable e) { Toast.makeText(this, "打开失败", Toast.LENGTH_SHORT).show(); }
+            return best;
+        } catch (Throwable e) { return null; }
     }
 
     private void openDir() {

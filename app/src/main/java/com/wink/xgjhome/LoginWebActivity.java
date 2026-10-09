@@ -20,6 +20,7 @@ public class LoginWebActivity extends Activity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        Immersive.hide(this);
         setContentView(R.layout.activity_login_web);
         boolean dark = getSharedPreferences("settings", MODE_PRIVATE).getBoolean("dark", false);
         findViewById(R.id.webRoot).setBackgroundColor(dark ? 0xFF11151D : 0xFFEEF4FF);

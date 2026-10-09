@@ -36,6 +36,7 @@ public class ChatActivity extends Activity {
     @Override
     protected void onCreate(Bundle b) {
         super.onCreate(b);
+        Immersive.hide(this);
         dark = getSharedPreferences("settings", MODE_PRIVATE).getBoolean("dark", false);
         // 输入法弹起时压缩窗口, 不遮输入框
         getWindow().setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE);

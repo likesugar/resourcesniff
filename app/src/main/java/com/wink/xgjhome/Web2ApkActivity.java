@@ -28,6 +28,7 @@ public class Web2ApkActivity extends Activity {
 
     @Override protected void onCreate(Bundle b) {
         super.onCreate(b);
+        Immersive.hide(this);
         getWindow().setStatusBarColor(BG);
         LinearLayout root = new LinearLayout(this);
         root.setOrientation(LinearLayout.VERTICAL);

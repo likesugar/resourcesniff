@@ -31,6 +31,7 @@ public class ShortcutEditActivity extends Activity {
     @Override
     protected void onCreate(Bundle b) {
         super.onCreate(b);
+        Immersive.hide(this);
         LinearLayout root = new LinearLayout(this);
         root.setOrientation(LinearLayout.VERTICAL);
         root.setBackgroundColor(Theme.c(ShortcutEditActivity.this, 0xFF000000, 0xFFEEF4FF));

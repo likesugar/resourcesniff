@@ -32,6 +32,7 @@ public class XhsSettingsActivity extends Activity {
     @Override
     protected void onCreate(Bundle b) {
         super.onCreate(b);
+        Immersive.hide(this);
         dark = getSharedPreferences("settings", MODE_PRIVATE).getBoolean("dark", false);
         oled = getSharedPreferences("settings", MODE_PRIVATE).getBoolean("oled", false);
         XhsEngine.init(this);

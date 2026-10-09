@@ -27,6 +27,7 @@ public class ShortcutActivity extends Activity {
     @Override
     protected void onCreate(Bundle b) {
         super.onCreate(b);
+        Immersive.hide(this);
         App0 = getApplicationContext();
         LinearLayout root = new LinearLayout(this);
         root.setOrientation(LinearLayout.VERTICAL);
