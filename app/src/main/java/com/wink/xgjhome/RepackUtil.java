@@ -256,20 +256,51 @@ public class RepackUtil {
         while ((n = is.read(buf)) > 0) to.write(buf, 0, n);
         is.close(); to.close();
         File unsigned = new File(ctx.getCacheDir(), "web2apk_unsigned.apk");
+        if (pkg == null || pkg.length() == 0) pkg = toPkg(ctx, label);
         build(tpl, unsigned, label, json, icon, pkg);
         signWithApksig(unsigned, outFile);
     }
 
-    static String toPkg(String label) {
-        net.sourceforge.pinyin4j.format.HanyuPinyinOutputFormat f = new net.sourceforge.pinyin4j.format.HanyuPinyinOutputFormat();
-        f.setToneType(net.sourceforge.pinyin4j.format.HanyuPinyinToneType.WITHOUT_TONE);
-        f.setVCharType(net.sourceforge.pinyin4j.format.HanyuPinyinVCharType.WITH_V);
+    // 拼音表来自 assets/pinyindb/unicode_to_hanyu_pinyin.txt（pinyin4j 的表,R8 只带类不带资源,真机查表必挂,故自读）
+    static final java.util.HashMap<String, String> PYDB = new java.util.HashMap<>();
+    static void loadPyDB(Context ctx) throws Exception {
+        if (!PYDB.isEmpty()) return;
+        java.io.InputStream is = ctx.getAssets().open("pinyindb/unicode_to_hanyu_pinyin.txt");
+        java.io.BufferedReader br = new java.io.BufferedReader(new java.io.InputStreamReader(is, StandardCharsets.UTF_8));
+        String ln;
+        while ((ln = br.readLine()) != null) {
+            int sp = ln.indexOf(' ');
+            if (sp < 1) continue;
+            String key = ln.substring(0, sp).trim();
+            String val = ln.substring(sp).replace("(", "").replace(")", "").trim();
+            String[] parts = val.split(",");
+            if (parts.length > 0 && !parts[0].startsWith("none")) {
+                String p = parts[0];
+                if (p.length() > 1 && Character.isDigit(p.charAt(p.length() - 1))) p = p.substring(0, p.length() - 1);
+                PYDB.put(key, p.replace("ü", "v"));
+            }
+        }
+        br.close();
+    }
+    static String toPkg(Context ctx, String label) {
+        try { loadPyDB(ctx); } catch (Throwable ignore) { }
         StringBuilder sb = new StringBuilder();
         for (char ch : label.toCharArray()) {
-            try {
-                String[] py = net.sourceforge.pinyin4j.PinyinHelper.toHanyuPinyinStringArray(ch, f);
-                if (py != null && py.length > 0) { sb.append(py[0]); continue; }
-            } catch (Throwable ignore) {}
+            String py = PYDB.get(String.format("%04X", (int) ch));
+            if (py != null && py.length() > 0) { sb.append(py); continue; }
+            if ((ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z') || (ch >= '0' && ch <= '9'))
+                sb.append(Character.toLowerCase(ch));
+        }
+        String s = sb.toString();
+        if (s.length() == 0) s = "app";
+        if (s.charAt(0) >= '0' && s.charAt(0) <= '9') s = "a" + s;
+        if (s.length() > 24) s = s.substring(0, 24);
+        return "com." + s + ".web";
+    }
+
+    static String toPkg(String label) { // 无Context兜底: 仅ASCII
+        StringBuilder sb = new StringBuilder();
+        for (char ch : label.toCharArray()) {
             if ((ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z') || (ch >= '0' && ch <= '9'))
                 sb.append(Character.toLowerCase(ch));
         }
