@@ -21,7 +21,7 @@ import java.io.FileOutputStream;
 public class Web2ApkActivity extends Activity {
     private static final int BG = 0xFF17191D, ROW = 0xFF212429, ACCENT = 0xFF25D0A5, TXT = 0xFFF2F3F5, SUB = 0xFF9AA0A6;
     private static final String[] TOGGLES = {"隐藏", "隐藏导航栏", "隐藏状态栏", "用户滑动", "暗黑模式", "浏览器标识"};
-    private EditText nameI, urlI;
+    private EditText nameI, pkgI, urlI;
     private byte[] iconBytes;
     private int dp(int v) { return (int) (v * getResources().getDisplayMetrics().density); }
 
@@ -53,6 +53,13 @@ public class Web2ApkActivity extends Activity {
         nameI.setTextColor(TXT);
         nameI.setHintTextColor(SUB);
         root.addView(nameI);
+
+        pkgI = new EditText(this);
+        pkgI.setHint("包名（留空=自动 com.拼音.web）");
+        pkgI.setTextColor(TXT);
+        pkgI.setHintTextColor(SUB);
+        pkgI.setTextSize(13);
+        root.addView(pkgI);
 
         urlI = new EditText(this);
         urlI.setHint("网址 https://...");
@@ -131,7 +138,14 @@ public class Web2ApkActivity extends Activity {
                 File dir = new File(getExternalFilesDir(null), "web2apk");
                 if (!dir.exists()) dir.mkdirs();
                 final File out = new File(dir, name + ".apk");
-                RepackUtil.buildFromAssets(getApplicationContext(), url, name, icon, out);
+                String pkg = pkgI.getText().toString().trim().toLowerCase();
+                if (pkg.length() > 0 && !pkg.matches("[a-z][a-z0-9_]*(\\.[a-z0-9_]+)+")) {
+                    runOnUiThread(new Runnable() { public void run() {
+                        Toast.makeText(Web2ApkActivity.this, "包名格式不对，如 com.abc.web", Toast.LENGTH_SHORT).show();
+                    }});
+                    return;
+                }
+                RepackUtil.buildFromAssets(getApplicationContext(), url, name, icon, pkg.length() > 0 ? pkg : null, out);
                 runOnUiThread(new Runnable() { public void run() {
                     Toast.makeText(Web2ApkActivity.this, "打包完成: " + out.getAbsolutePath(), Toast.LENGTH_LONG).show();
                     try {

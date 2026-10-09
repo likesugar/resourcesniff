@@ -239,7 +239,7 @@ public class RepackUtil {
         signer.sign();
     }
 
-    public static void buildFromAssets(Context ctx, String url, String label, byte[] icon, File outFile) throws Exception {
+    public static void buildFromAssets(Context ctx, String url, String label, byte[] icon, String pkg, File outFile) throws Exception {
         android.content.SharedPreferences cf = ctx.getSharedPreferences("web2apk_cfg", Context.MODE_PRIVATE);
         String json = "{\"app_name\":\"" + label.replace("\"", "") + "\",\"url\":\"" + url.replace("\"", "") +
                 "\",\"night\":" + ("1".equals(cf.getString("暗黑模式", "0")) ? 1 : 0) +
@@ -256,7 +256,7 @@ public class RepackUtil {
         while ((n = is.read(buf)) > 0) to.write(buf, 0, n);
         is.close(); to.close();
         File unsigned = new File(ctx.getCacheDir(), "web2apk_unsigned.apk");
-        build(tpl, unsigned, label, json, icon);
+        build(tpl, unsigned, label, json, icon, pkg);
         signWithApksig(unsigned, outFile);
     }
 
@@ -280,12 +280,12 @@ public class RepackUtil {
         return "com." + s + ".web";
     }
 
-    static void build(File template, File outFile, String label, String json, byte[] icon) throws Exception {
+    static void build(File template, File outFile, String label, String json, byte[] icon, String pkg) throws Exception {
         initKeys();
         List<Ent> ents = readZip(template);
         Map<String,String> rep = new HashMap<>();
         rep.put("xapk", label);
-        String pkg = toPkg(label);
+        if (pkg == null || pkg.length() == 0) pkg = toPkg(label);
         rep.put("com.wink.webshell", pkg);
         LinkedHashMap<String,byte[]> files = new LinkedHashMap<>();
         for (Ent e : ents) {
