@@ -68,6 +68,8 @@
   <textarea id="cfgList"></textarea>
   <div class="lbl">转盘单次消耗积分(1-30000)</div>
   <input id="cfgCost" type="number" inputmode="numeric">
+  <div class="lbl">老虎机单次消耗积分(1-30000)</div>
+  <input id="cfgSlotCost" type="number" inputmode="numeric">
   <button onclick="saveCfg()">保存</button>
   <div class="lbl">老虎机各符号权重(1-99, 越大越易停)</div>
   <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:6px">
@@ -86,6 +88,7 @@ function getList(){
   return ['+10','+50','+100','谢谢参与','+20','再来一次','+5','+888']
 }
 function getCost(){var c=parseInt(localStorage.ent_cost);return (c>=1&&c<=30000)?c:50}
+function getSlotCost(){var c=parseInt(localStorage.ent_slot_cost);return (c>=1&&c<=30000)?c:50}
 function getPts(){return parseInt(localStorage.ent_pts)||100}
 function setPts(p){localStorage.ent_pts=p;document.getElementById('pts').textContent='💰 积分: '+p}
 function settle(txt){var m=txt.match(/([+-]?\d+)/);if(m)addPts(parseInt(m[1]));return txt}
@@ -101,6 +104,7 @@ function toggleCfg(){
   if(c.style.display=='block'){c.style.display='none';return}
   document.getElementById('cfgList').value=getList().join('\n');
   document.getElementById('cfgCost').value=getCost();
+  document.getElementById('cfgSlotCost').value=getSlotCost();
   refreshWeightsUI();
   c.style.display='block';
 }
@@ -110,6 +114,8 @@ function saveCfg(){
   localStorage.ent_list=JSON.stringify(lines);
   var c=parseInt(document.getElementById('cfgCost').value);
   if(c>=1&&c<=30000)localStorage.ent_cost=c;
+  var sc=parseInt(document.getElementById('cfgSlotCost').value);
+  if(sc>=1&&sc<=30000)localStorage.ent_slot_cost=sc;
   c.style.display='none';drawWheel();
   refreshCostLabel();
   alert('已保存: '+lines.length+' 个奖项, 消耗'+getCost()+'分');
@@ -228,7 +234,7 @@ function saveWeights(){
 }
 function slotSpin(){
   if(slotSpinning)return;
-  var cost=getCost(),pts=getPts();
+  var cost=getSlotCost(),pts=getPts();
   if(pts<cost){alert('积分不足(需要'+cost+'，当前'+pts+')\n用下方「增加积分」');return}
   slotSpinning=true;
   setPts(pts-cost);
@@ -269,7 +275,7 @@ function evalSlots(cells){
   var grid=[];
   for(var r=0;r<4;r++){grid.push([0,1,2,3].map(function(c){return cells[r*4+c].textContent}))}
   var sym=function(i){return grid[Math.floor(i/4)][i%4]};
-  var cost=getCost(),win=0,lines=[];
+  var cost=getSlotCost(),win=0,lines=[];
   var linesIdx=[[0,1,2,3],[4,5,6,7],[8,9,10,11],[12,13,14,15],[0,5,10,15],[3,6,9,12]];
   for(var li=0;li<linesIdx.length;li++){
     var L=linesIdx[li];

@@ -31,105 +31,23 @@
                 android:layout_width="match_parent" android:layout_height="wrap_content"
                 android:orientation="vertical"
                 android:background="@drawable/bg_card_md3"
-                android:padding="20dp">
+                android:paddingLeft="20dp" android:paddingRight="20dp" android:paddingTop="8dp" android:paddingBottom="20dp">
 
-                <ScrollView android:id="@+id/platScroll"
-                    android:layout_width="match_parent" android:layout_height="240dp"
-                    android:scrollbars="none" android:overScrollMode="never">
-                <ScrollView android:id="@+id/platScroll"
-                    android:layout_width="match_parent" android:layout_height="240dp"
-                    android:scrollbars="none" android:overScrollMode="never">
-                    <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical">
-                <!-- 哔哩哔哩 -->
-                <LinearLayout
+                <LinearLayout android:id="@+id/platList"
                     android:layout_width="match_parent" android:layout_height="wrap_content"
-                    android:orientation="horizontal" android:gravity="center_vertical">
-                    <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content"
-                        android:layout_weight="1" android:orientation="vertical">
-                        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
-                            android:text="哔哩哔哩" android:textSize="18sp" android:textStyle="bold" android:id="@+id/t1"/>
-                        <TextView android:id="@+id/biliState"
-                            android:layout_width="wrap_content" android:layout_height="wrap_content"
-                            android:text="未登录" android:textSize="14sp" android:paddingTop="4dp"/>
-                    </LinearLayout>
-                    <TextView android:id="@+id/biliAction"
-                        android:layout_width="wrap_content" android:layout_height="wrap_content"
-                        android:text="网页登录" android:textSize="16sp" android:padding="8dp"/>
-                </LinearLayout>
-                <View android:layout_width="match_parent" android:layout_height="1dp"
-                    android:layout_marginTop="16dp" android:layout_marginBottom="16dp" android:id="@+id/div1"/>
-
-                <!-- 抖音 -->
-                <LinearLayout
-                    android:layout_width="match_parent" android:layout_height="wrap_content"
-                    android:orientation="horizontal" android:gravity="center_vertical">
-                    <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content"
-                        android:layout_weight="1" android:orientation="vertical">
-                        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
-                            android:text="抖音" android:textSize="18sp" android:textStyle="bold" android:id="@+id/t2"/>
-                        <TextView android:id="@+id/dyState"
-                            android:layout_width="wrap_content" android:layout_height="wrap_content"
-                            android:text="未登录" android:textSize="14sp" android:paddingTop="4dp"/>
-                    </LinearLayout>
-                    <TextView android:id="@+id/dyAction"
-                        android:layout_width="wrap_content" android:layout_height="wrap_content"
-                        android:text="网页登录" android:textSize="16sp" android:padding="8dp"/>
-                </LinearLayout>
-                <View android:layout_width="match_parent" android:layout_height="1dp"
-                    android:layout_marginTop="16dp" android:layout_marginBottom="16dp" android:id="@+id/div2"/>
-
-                <!-- YouTube -->
-                <LinearLayout
-                    android:layout_width="match_parent" android:layout_height="wrap_content"
-                    android:orientation="horizontal" android:gravity="center_vertical">
-                    <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content"
-                        android:layout_weight="1" android:orientation="vertical">
-                        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
-                            android:text="YouTube" android:textSize="18sp" android:textStyle="bold" android:id="@+id/t3"/>
-                        <TextView android:id="@+id/ytState"
-                            android:layout_width="wrap_content" android:layout_height="wrap_content"
-                            android:text="未登录" android:textSize="14sp" android:paddingTop="4dp"/>
-                    </LinearLayout>
-                    <TextView android:id="@+id/ytAction"
-                        android:layout_width="wrap_content" android:layout_height="wrap_content"
-                        android:text="网页登录" android:textSize="16sp" android:padding="8dp"/>
-                </LinearLayout>
-
-                <View android:layout_width="match_parent" android:layout_height="1dp"
-                    android:background="@color/divider" android:layout_marginTop="16dp" android:layout_marginBottom="16dp" android:id="@+id/divCust"/>
-                    </LinearLayout>
-                </ScrollView>
-
-                </ScrollView>
-
-                <LinearLayout
-                    android:layout_width="match_parent" android:layout_height="wrap_content"
-                    android:orientation="horizontal" android:gravity="center_vertical">
-                    <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content"
-                        android:layout_weight="1" android:orientation="vertical">
-                        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
-                            android:text="＋ 自定义平台" android:textSize="18sp" android:textStyle="bold" android:id="@+id/tCust"/>
-                        <TextView android:id="@+id/custState"
-                            android:layout_width="wrap_content" android:layout_height="wrap_content"
-                            android:text="未配置" android:textSize="14sp" android:paddingTop="4dp"/>
-                    </LinearLayout>
-                    <TextView android:id="@+id/custAction"
-                        android:layout_width="wrap_content" android:layout_height="wrap_content"
-                        android:text="配置" android:textSize="16sp" android:padding="8dp"/>
-                </LinearLayout>
+                    android:orientation="vertical"/>
 
                 <TextView android:layout_width="match_parent" android:layout_height="wrap_content"
                     android:text="登录后使用账号可访问的画质与资源。会员、地区和平台验证限制仍以网站为准。"
-                    android:textSize="14sp" android:id="@+id/desc1"
-                    android:paddingTop="18dp"/>
+                    android:textSize="13sp" android:id="@+id/desc1"
+                    android:paddingTop="16dp"/>
                 <TextView android:layout_width="match_parent" android:layout_height="wrap_content"
-                    android:text="登录信息只保存在本机，用于对应平台的请求。不会读取或保存密码，登录过期后请重新登录。"
-                    android:textSize="14sp" android:id="@+id/desc2"
-                    android:paddingTop="10dp"/>
-
+                    android:text="登录信息只保存在本机，不会读取或保存密码；登录过期请回到这里重新登录。"
+                    android:textSize="13sp" android:id="@+id/desc2"
+                    android:paddingTop="8dp"/>
                 <TextView android:id="@+id/btnClearAll"
                     android:layout_width="wrap_content" android:layout_height="wrap_content"
-                    android:text="清除全部网页登录" android:textSize="16sp" android:paddingTop="22dp"/>
+                    android:text="清除全部网页登录" android:textSize="15sp" android:paddingTop="16dp"/>
             </LinearLayout>
 
             <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
