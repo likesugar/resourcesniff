@@ -610,6 +610,7 @@ public class HomeActivity extends Activity {
             public void afterTextChanged(android.text.Editable e) {
                 if (!pkgAuto[0]) return;
                 String slug = toPinyinSlug(e.toString());
+                if (slug.length() > 0 && slug.substring(0, 1).matches("[0-9]")) slug = "x" + slug;
                 if (slug.length() > 0) {
                     pkgAuto[0] = false;
                     pkgI.setText("com." + slug + ".wy");
@@ -645,6 +646,14 @@ public class HomeActivity extends Activity {
                             Toast.makeText(HomeActivity.this, "名称或包名不合法", Toast.LENGTH_SHORT).show();
                             return;
                         }
+                        // 每段必须字母开头
+                        StringBuilder fix = new StringBuilder();
+                        for (String seg : pk.split("\\.")) {
+                            if (seg.length() == 0) continue;
+                            if (!seg.substring(0, 1).matches("[a-zA-Z]")) seg = "x" + seg;
+                            fix.append(seg).append(".");
+                        }
+                        if (fix.length() > 0) pk = fix.substring(0, fix.length() - 1);
                         android.content.Intent it = new android.content.Intent(HomeActivity.this, Web2ApkActivity.class);
                         it.putExtra("name", n);
                         it.putExtra("pkg", pk);

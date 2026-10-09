@@ -39,6 +39,7 @@ public class SniffActivity extends Activity {
         "(https?://|www\\.)[\\w\\-./?:#=&%+~@!$'*;,\\[\\]]+", Pattern.CASE_INSENSITIVE);
 
     private WebView webView;
+    private boolean dyDesktopSet = false;
     private EditText etUrl;
     private LinearLayout topBar;
     private LinearLayout bottomPanel;
@@ -433,6 +434,13 @@ public class SniffActivity extends Activity {
                 diagActive = url != null && (url.contains("stripchat") || url.contains("zh.stripchat"));
                 if (diagActive) dumpDiag("PAGE: " + url);
                 // B站手机UA会导致房间初始化失败，全程桌面UA
+                if (url != null && url.contains("live.douyin.com") && !dyDesktopSet) {
+                    dyDesktopSet = true;
+                    view.getSettings().setUserAgentString("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/130.0.0.0 Safari/537.36");
+                    view.stopLoading();
+                    view.loadUrl(url);
+                    return;
+                }
                 if (url != null && url.contains("bilibili.com") && !biliDesktopSet) {
                     biliDesktopSet = true;
                     view.getSettings().setUserAgentString("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/130.0.0.0 Safari/537.36");
