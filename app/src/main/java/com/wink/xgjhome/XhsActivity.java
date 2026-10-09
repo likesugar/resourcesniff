@@ -60,6 +60,7 @@ public class XhsActivity extends Activity implements XhsEngine.Listener {
     @Override
     protected void onResume() {
         super.onResume();
+        if (XhsEngine.store().autoReadClipboard()) detectClipboard();
         XhsEngine.addListener(this);
         onChanged();
         if (XhsEngine.store().autoReadClipboard()) detectClipboard();
@@ -262,11 +263,12 @@ public class XhsActivity extends Activity implements XhsEngine.Listener {
         List<String> links = XhsParser.extractLinks(text, null);
         if (links.isEmpty()) return;
         getSharedPreferences("xhs_settings", MODE_PRIVATE).edit().putString("last_clip", text).apply();
-        if (XhsEngine.store().showClipboardBubble()) {
+        if (XhsEngine.store().autoReadClipboard()) {
+            // 原版行为：自动读取剪贴板=直接开始下载
+            submit(text, false);
+        } else if (XhsEngine.store().showClipboardBubble()) {
             bubble.setVisibility(View.VISIBLE);
             ui.postDelayed(new Runnable() { public void run() { bubble.setVisibility(View.GONE); } }, 8000);
-        } else {
-            submit(text, false);
         }
     }
 

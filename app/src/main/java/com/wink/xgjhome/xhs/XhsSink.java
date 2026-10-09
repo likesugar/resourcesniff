@@ -36,7 +36,8 @@ public final class XhsSink {
             Uri coll = collection(isVideo);
             android.database.Cursor cur = c.getContentResolver().query(coll,
                     new String[]{MediaStore.MediaColumns._ID},
-                    MediaStore.MediaColumns.RELATIVE_PATH + "=? AND " + MediaStore.MediaColumns.DISPLAY_NAME + "=?",
+                    MediaStore.MediaColumns.RELATIVE_PATH + "=? AND " + MediaStore.MediaColumns.DISPLAY_NAME
+                            + "=? AND " + MediaStore.MediaColumns.IS_PENDING + "=0",
                     new String[]{relDir + "/", name}, null);
             boolean hit = cur != null && cur.moveToFirst();
             if (cur != null) cur.close();
@@ -64,6 +65,7 @@ public final class XhsSink {
                 done.put(MediaStore.MediaColumns.IS_PENDING, 0);
                 c.getContentResolver().update(uri, done, null, null);
             }
+            try { android.media.MediaScannerConnection.scanFile(c, new String[]{name}, new String[]{mimeOf(name)}, null); } catch (Throwable ignored) { }
         } catch (Throwable t) {
             try { c.getContentResolver().delete(uri, null, null); } catch (Throwable ignored) { }
             if (t instanceof Exception) throw (Exception) t;
