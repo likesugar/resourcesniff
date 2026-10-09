@@ -20,7 +20,7 @@ import java.io.FileOutputStream;
 
 public class Web2ApkActivity extends Activity {
     private static final int BG = 0xFF17191D, ROW = 0xFF212429, ACCENT = 0xFF25D0A5, TXT = 0xFFF2F3F5, SUB = 0xFF9AA0A6;
-    private static final String[] TOGGLES = {"隐藏导航栏", "隐藏状态栏", "暗黑模式", "用户滑动", "浏览器标识"};
+    private static final String[] TOGGLES = {"隐藏", "隐藏导航栏", "隐藏状态栏", "用户滑动", "暗黑模式", "浏览器标识"};
     private EditText nameI, urlI;
     private byte[] iconBytes;
     private int dp(int v) { return (int) (v * getResources().getDisplayMetrics().density); }
