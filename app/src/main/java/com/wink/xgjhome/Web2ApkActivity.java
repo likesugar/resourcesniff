@@ -23,6 +23,7 @@ public class Web2ApkActivity extends Activity {
     private static final String[] TOGGLES = {"隐藏", "隐藏导航栏", "沉浸式状态栏", "用户滑动", "暗黑模式", "浏览器标识"};
     private EditText nameI, pkgI, urlI;
     private byte[] iconBytes;
+    private TextView pathL;
     private int dp(int v) { return (int) (v * getResources().getDisplayMetrics().density); }
 
     @Override protected void onCreate(Bundle b) {
@@ -119,6 +120,12 @@ public class Web2ApkActivity extends Activity {
         buildBtn.setOnClickListener(new View.OnClickListener() { public void onClick(View v) { doBuild(); } });
         root.addView(buildBtn, bp);
 
+        pathL = new TextView(this);
+        pathL.setTextColor(SUB);
+        pathL.setTextSize(13);
+        pathL.setPadding(dp(4), dp(10), dp(4), 0);
+        root.addView(pathL, new LinearLayout.LayoutParams(-1, -2));
+
         ScrollView sc = new ScrollView(this);
         sc.addView(root);
         setContentView(sc);
@@ -131,7 +138,6 @@ public class Web2ApkActivity extends Activity {
             Toast.makeText(this, "请填名称和 http(s) 网址", Toast.LENGTH_SHORT).show();
             return;
         }
-        Toast.makeText(this, "正在打包...", Toast.LENGTH_SHORT).show();
         final byte[] icon = iconBytes;
         new Thread(new Runnable() { public void run() {
             try {
@@ -147,7 +153,7 @@ public class Web2ApkActivity extends Activity {
                 }
                 RepackUtil.buildFromAssets(getApplicationContext(), url, name, icon, pkg.length() > 0 ? pkg : null, out);
                 runOnUiThread(new Runnable() { public void run() {
-                    Toast.makeText(Web2ApkActivity.this, "打包完成: " + out.getAbsolutePath(), Toast.LENGTH_LONG).show();
+                    pathL.setText("安装包: " + out.getAbsolutePath());
                     try {
                         android.net.Uri uri = androidx.core.content.FileProvider.getUriForFile(Web2ApkActivity.this,
                                 getPackageName() + ".files", out);
@@ -155,13 +161,11 @@ public class Web2ApkActivity extends Activity {
                         it.setDataAndType(uri, "application/vnd.android.package-archive");
                         it.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION | Intent.FLAG_ACTIVITY_NEW_TASK);
                         startActivity(it);
-                    } catch (Throwable t) {
-                        Toast.makeText(Web2ApkActivity.this, "APK 在: " + out.getAbsolutePath(), Toast.LENGTH_LONG).show();
-                    }
+                    } catch (Throwable t) { }
                 }});
             } catch (final Throwable t) {
                 runOnUiThread(new Runnable() { public void run() {
-                    Toast.makeText(Web2ApkActivity.this, "打包失败: " + t, Toast.LENGTH_LONG).show();
+                    pathL.setText("打包失败: " + t);
                 }});
             }
         }}).start();
