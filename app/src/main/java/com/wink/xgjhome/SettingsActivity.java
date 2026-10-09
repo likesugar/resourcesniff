@@ -31,6 +31,7 @@ public class SettingsActivity extends Activity {
             {"哔哩哔哩", "https://passport.bilibili.com/h5-app/passport/login", "SESSDATA=", "https://www.bilibili.com", "📺", "0xFFFB7299"},
             {"抖音", "https://www.douyin.com/jingxuan", "sessionid=", "https://www.douyin.com", "🎵", "0xFF161823"},
             {"YouTube", "https://www.youtube.com/signin?next=%2F&hl=zh-CN", "SAPISID=", "https://www.youtube.com", "▶️", "0xFFFF0033"},
+            {"小红书", "https://www.xiaohongshu.com", "web_session=", "https://www.xiaohongshu.com", "📕", "0xFFFF2442"},
     };
 
     private boolean dark;

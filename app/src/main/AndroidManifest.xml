@@ -29,6 +29,8 @@
         <activity android:name=".CalendarActivity" android:exported="false"/>
         <activity android:name=".RecordActivity" android:exported="false"/>
         <activity android:name=".VideoDlActivity" android:exported="false" android:configChanges="orientation|screenSize"/>
+        <activity android:name=".XhsActivity" android:exported="false" android:configChanges="orientation|screenSize"/>
+        <activity android:name=".XhsSettingsActivity" android:exported="false" android:windowSoftInputMode="adjustResize"/>
         <activity android:name=".ShortcutActivity" android:exported="false"/>
         <activity android:name=".MedPlanActivity" android:exported="false"/>
         <activity android:name=".SpiderActivity" android:exported="false" android:configChanges="orientation|screenSize|keyboardHidden"/>
