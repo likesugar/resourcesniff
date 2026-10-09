@@ -20,6 +20,8 @@ public final class XhsNet {
 
     private XhsNet() {}
 
+    public static String ua() { return UA; }
+
     /** 平台账号 Cookie（设置→平台账号→小红书 登录后走系统 CookieManager 共享） */
     public static String cookie() {
         try {

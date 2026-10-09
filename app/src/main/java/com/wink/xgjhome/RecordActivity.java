@@ -578,8 +578,8 @@ public class RecordActivity extends Activity {
         pm.getMenu().add("打开所在目录").setOnMenuItemClickListener(new android.view.MenuItem.OnMenuItemClickListener() {
             public boolean onMenuItemClick(android.view.MenuItem it) { openDir(); return true; }
         });
-        pm.getMenu().add("打开录制合并目录").setOnMenuItemClickListener(new android.view.MenuItem.OnMenuItemClickListener() {
-            public boolean onMenuItemClick(android.view.MenuItem it) { openMergedDir(); return true; }
+        pm.getMenu().add("播放合并视频").setOnMenuItemClickListener(new android.view.MenuItem.OnMenuItemClickListener() {
+            public boolean onMenuItemClick(android.view.MenuItem it) { playMerged(); return true; }
         });
         pm.getMenu().add("取消").setOnMenuItemClickListener(new android.view.MenuItem.OnMenuItemClickListener() {
             public boolean onMenuItemClick(android.view.MenuItem it) { RecManager.recCancel(j.id); rebuild(); return true; }
@@ -587,25 +587,26 @@ public class RecordActivity extends Activity {
         pm.show();
     }
 
-    private void openMergedDir() {
-        // SAF 直达应用专属目录，绕开 /Android/data 权限（避免文件管理器"工作区创建失败"）
+    private void playMerged() {
+        // 内置播放器播放最新的合并成片（files/录制合并/ 下最新 .mp4）
         try {
-            android.net.Uri doc = android.provider.DocumentsContract.buildDocumentUri(
-                "com.android.externalstorage.documents", "primary:Android/data/com.wink.xgjhome/files/录制合并");
-            Intent i = new Intent(Intent.ACTION_VIEW);
-            i.setDataAndType(doc, android.provider.DocumentsContract.Document.MIME_TYPE_DIR);
-            i.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION | Intent.FLAG_ACTIVITY_NEW_TASK);
-            startActivity(i);
-            return;
-        } catch (Throwable ignored) {}
-        try {
-            Intent i = new Intent(Intent.ACTION_OPEN_DOCUMENT_TREE);
-            i.putExtra(android.provider.DocumentsContract.EXTRA_INITIAL_URI,
-                android.provider.DocumentsContract.buildDocumentUri("com.android.externalstorage.documents",
-                    "primary:Android/data/com.wink.xgjhome/files"));
-            i.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION | Intent.FLAG_ACTIVITY_NEW_TASK);
-            startActivity(i);
-        } catch (Throwable t) { openDir(); }
+            java.io.File root = new java.io.File(getExternalFilesDir(null), "录制合并");
+            java.io.File best = null;
+            java.util.ArrayDeque<java.io.File> stack = new java.util.ArrayDeque<>();
+            stack.push(root);
+            while (!stack.isEmpty()) {
+                java.io.File d = stack.pop();
+                java.io.File[] fs = d.listFiles();
+                if (fs == null) continue;
+                for (java.io.File f : fs) {
+                    if (f.isDirectory()) stack.push(f);
+                    else if (f.getName().toLowerCase().endsWith(".mp4")
+                            && (best == null || f.lastModified() > best.lastModified())) best = f;
+                }
+            }
+            if (best != null) { playInApp(best.getAbsolutePath(), best.getName()); return; }
+            Toast.makeText(this, "暂无合并视频", Toast.LENGTH_SHORT).show();
+        } catch (Throwable e) { Toast.makeText(this, "打开失败", Toast.LENGTH_SHORT).show(); }
     }
 
     private void openDir() {

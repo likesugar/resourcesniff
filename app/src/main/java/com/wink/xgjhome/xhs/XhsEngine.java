@@ -4,6 +4,7 @@ import android.content.Context;
 import android.os.Handler;
 import android.os.Looper;
 
+import org.json.JSONArray;
 import org.json.JSONObject;
 
 import java.io.File;
@@ -25,207 +26,215 @@ public final class XhsEngine {
     private static final List<Listener> LISTENERS = new ArrayList<Listener>();
     private static final Map<String, AtomicBoolean> CANCELS = new LinkedHashMap<String, AtomicBoolean>();
     private static final List<XhsStore.Task> TASKS = new ArrayList<XhsStore.Task>();
-    private static XhsStore store;
+    private static XhsStore STORE;
+    private static Context CTX;
+
+    private XhsEngine() {}
 
     public static void init(Context c) {
-        XhsApp.init(c);
-        if (store == null) {
-            store = new XhsStore(c.getApplicationContext());
-            synchronized (TASKS) {
-                TASKS.clear();
-                TASKS.addAll(store.loadTasks());
-                for (XhsStore.Task t : TASKS)
-                    if ("running".equals(t.status) || "pending".equals(t.status)) t.status = "stopped";
-            }
-        }
+        if (STORE != null) return;
+        CTX = c.getApplicationContext();
+        STORE = new XhsStore(CTX);
+        restore();
     }
 
-    public static XhsStore store() { return store; }
+    public static XhsStore store() { return STORE; }
+    public static List<XhsStore.Task> tasks() { return TASKS; }
 
-    public static List<XhsStore.Task> tasks() { synchronized (TASKS) { return new ArrayList<XhsStore.Task>(TASKS); } }
+    public static void addListener(Listener l) { if (!LISTENERS.contains(l)) LISTENERS.add(l); }
+    public static void removeListener(Listener l) { LISTENERS.remove(l); }
+    private static void notifyUi() { MAIN.post(new Runnable() { public void run() {
+        for (Listener l : LISTENERS) { try { l.onChanged(); } catch (Throwable ignored) { } }
+    }}); }
 
-    public static void addListener(Listener l) { synchronized (LISTENERS) { if (!LISTENERS.contains(l)) LISTENERS.add(l); } }
-    public static void removeListener(Listener l) { synchronized (LISTENERS) { LISTENERS.remove(l); } }
+    // ---------- 提交 ----------
+    public static XhsStore.Task enqueue(Context c, String rawText, boolean infoOnly) {
+        List<String> links = XhsParser.extractLinks(rawText, null);
+        if (links.isEmpty()) return null;
+        String link = links.get(0);
+        for (XhsStore.Task t : TASKS) if (link.equals(t.url) && !("done".equals(t.status) || "failed".equals(t.status))) return t;
+        final XhsStore.Task t = new XhsStore.Task();
+        t.id = "t" + System.currentTimeMillis();
+        t.url = link;
+        t.description = infoOnly ? rawText : XhsParser.extractShareTitle(rawText);
+        t.status = "pending";
+        t.created = System.currentTimeMillis();
+        TASKS.add(0, t);
+        persist();
+        notifyUi();
+        runTask(t, rawText);
+        return t;
+    }
 
-    private static void notifyUi() {
-        MAIN.post(new Runnable() { public void run() {
-            synchronized (LISTENERS) { for (Listener l : LISTENERS) l.onChanged(); }
+    private static void runTask(final XhsStore.Task task, final String rawText) {
+        POOL.execute(new Runnable() { public void run() {
+            AtomicBoolean cancel = CANCELS.get(task.id);
+            if (cancel == null) { cancel = new AtomicBoolean(false); CANCELS.put(task.id, cancel); }
+            try {
+                task.status = "running";
+                task.error = null;
+                notifyUi();
+                String url = task.url;
+                if (XhsParser.isShortUrl(url)) {
+                    final String u0 = url;
+                    url = XhsNet.resolveShort(url);
+                    if (url == null || url.isEmpty()) throw new Exception("短链解析失败");
+                    task.url = url;
+                }
+                String html = XhsNet.fetchHtml(url);
+                if (html == null || html.isEmpty()) throw new Exception("页面获取失败");
+                XhsParser.Note note = XhsParser.parse(html, XhsParser.extractPostId(url), url);
+                if (note == null || note.items.isEmpty()) throw new Exception("解析失败：未找到媒体");
+                task.title = XhsNaming.sanitize(note.title);
+                task.author = note.authorName;
+                if (task.description == null || task.description.isEmpty()) task.description = note.body;
+                task.noteJson = noteToJson(note);
+                task.status = "selecting";
+                task.progress = 0;
+                if (STORE.selectiveDownload()) {
+                    persist(); notifyUi();          // 等 UI 弹勾选
+                } else {
+                    downloadItemsList(task, note.items);
+                }
+            } catch (Throwable e) {
+                if (isCancel(e)) { task.status = "stopped"; }
+                else { task.status = "failed"; task.error = e.getMessage() == null ? e.toString() : e.getMessage(); }
+                persist(); notifyUi();
+            }
         }});
     }
 
-    private static void persist() {
-        if (store != null) synchronized (TASKS) { store.saveTasks(TASKS); }
-    }
-
-    private static XhsStore.Task findTask(String id) {
-        synchronized (TASKS) { for (XhsStore.Task t : TASKS) if (t.id.equals(id)) return t; }
-        return null;
-    }
-
-    // ---------- 入口：解析并建任务 ----------
-    /** mode: download=解析并下载 / info=仅解析保存信息 */
-    public static XhsStore.Task enqueue(Context c, String input, boolean infoOnly) {
-        List<String> links = XhsParser.extractLinks(input, new XhsParser.ShortUrlResolver() {
-            public String resolve(String u) { return XhsNet.resolveShort(u); }
-        });
-        if (links.isEmpty()) return null;
-        final String link = links.get(0);
-        final String noteId = XhsParser.extractPostId(link);
-        synchronized (TASKS) {
-            for (XhsStore.Task t : TASKS)
-                if (t.url.equals(link) && ("running".equals(t.status) || "pending".equals(t.status))) return t;
-        }
-        final XhsStore.Task task = new XhsStore.Task();
-        task.id = noteId != null ? noteId : ("t" + System.currentTimeMillis());
-        task.url = link;
-        task.status = "pending";
-        task.created = System.currentTimeMillis();
-        synchronized (TASKS) { TASKS.add(0, task); }
-        persist();
+    /** 用户勾选后继续 */
+    public static void continueSelective(final XhsStore.Task t, final List<XhsParser.Media> chosen) {
+        if (chosen == null || chosen.isEmpty()) { remove(t); return; }
+        t.status = "running";
         notifyUi();
-        final boolean info = infoOnly;
-        POOL.execute(new Runnable() { public void run() { runTask(task, info); } });
-        return task;
-    }
-
-    private static void runTask(final XhsStore.Task task, final boolean infoOnly) {
-        try {
-            task.status = "running";
-            task.error = null;
-            notifyUi(); persist();
-            String html = XhsNet.fetchHtml(task.url);
-            XhsParser.Note note = XhsParser.parse(html, XhsParser.extractPostId(task.url), task.url);
-            task.noteJson = noteToJson(note);
-            task.title = note.title == null || note.title.isEmpty()
-                    ? (note.body == null || note.body.isEmpty() ? "笔记 " + task.id : note.body) : note.title;
-            if (task.title.length() > 60) task.title = task.title.substring(0, 60);
-            task.author = note.authorName == null ? "" : note.authorName;
-            task.description = note.description;
-            if (!note.items.isEmpty()) task.coverUrl = note.items.get(0).previewUrl;
-            if (infoOnly) {
-                task.status = "done";
-                task.progress = 100;
-                notifyUi(); persist();
-                return;
+        POOL.execute(new Runnable() { public void run() {
+            try {
+                XhsParser.Note note = noteFromJson(t.noteJson);
+                downloadItemsList(t, chosen);
+            } catch (Throwable e) {
+                if (isCancel(e)) t.status = "stopped";
+                else { t.status = "failed"; t.error = e.getMessage() == null ? e.toString() : e.getMessage(); }
+                persist(); notifyUi();
             }
-            if (store.selectiveDownload()) {
-                task.status = "selecting";
-                notifyUi(); persist();
-                return;
-            }
-            Context c = XhsApp.context();
-            File dir = noteDir(c, store, note, task);
-            downloadItems(task, note, dir);
-            task.status = "done";
-            task.progress = 100;
-        } catch (Throwable e) {
-            if ("cancelled".equals(e.getMessage())) task.status = "stopped";
-            else { task.status = "failed"; task.error = e.getMessage() == null ? e.toString() : e.getMessage(); }
-        }
-        notifyUi(); persist();
+        }});
     }
 
-    private static File noteDir(Context c, XhsStore st, XhsParser.Note note, XhsStore.Task task) {
-        XhsNaming.Note n = new XhsNaming.Note(task.title, note.authorName, note.authorId, note.noteId, note.publishTime);
-        String base = st.useCustomNaming()
-                ? XhsNaming.apply(st.namingTemplate(), n, 1, task.created)
-                : ((note.authorName == null || note.authorName.isEmpty() ? "" : note.authorName + "-")
-                    + XhsNaming.sanitize(task.title));
-        File dir = new File(st.mediaDir(c), base);
-        dir.mkdirs();
-        return dir;
-    }
-
-    private static void downloadItems(final XhsStore.Task task, XhsParser.Note note, File dir) throws Exception {
-        downloadItemsList(task, note.items, dir);
-    }
-
-    private static void downloadItemsList(final XhsStore.Task task, List<XhsParser.Media> items, File dir) throws Exception {
-        XhsParser.Note note = noteFromJson(task.noteJson);
-        if (items.isEmpty()) throw new Exception("未解析到媒体");
-        XhsNaming.Note n = new XhsNaming.Note(task.title, note.authorName, note.authorId, note.noteId, note.publishTime);
-        boolean checkExisting = store.checkExistingFiles();
+    private static void downloadItemsList(final XhsStore.Task task, List<XhsParser.Media> items) throws Exception {
+        boolean useStore = STORE.customStorageDir() == null || STORE.customStorageDir().trim().isEmpty();
+        String relDir = (nz(task.author).isEmpty() ? "" : task.author + "-") + nz(task.title);
+        relDir = XhsNaming.sanitize(relDir);
+        if (relDir.isEmpty()) relDir = "XHS_" + task.id;
+        File dir = useStore ? null : STORE.mediaDir(CTX);
         int index = 0;
+        boolean checkExisting = STORE.checkExistingFiles();
         for (XhsParser.Media m : items) {
             index++;
             AtomicBoolean cancel = CANCELS.get(task.id);
             if (cancel != null && cancel.get()) throw new Exception("cancelled");
             boolean isVideo = "video".equals(m.kind);
             boolean isLive = "live".equals(m.kind);
-            String base = store.useCustomNaming()
-                    ? XhsNaming.apply(store.namingTemplate(), n, index, task.created)
+            String base = STORE.useCustomNaming()
+                    ? XhsNaming.apply(STORE.namingTemplate(), namingNote(noteFromJson(task.noteJson)), index, task.created)
                     : XhsNaming.sanitize((index > 1 ? task.title + "_" + index : task.title));
             if (isLive) base = base + "_live";
             task.status = "running";
+            XhsNet.Progress cb = new XhsNet.Progress() {
+                public void onProgress(long done, long total) {
+                    task.totalBytes = total; task.doneBytes = done;
+                    task.progress = total > 0 ? (int) (done * 100 / total) : 0;
+                    notifyUi();
+                }
+            };
             if (isVideo || isLive) {
-                File dest = unique(dir, base + ".mp4", checkExisting);
-                if (dest != null) addFile(task, dest);
-                else downloadTo(task, m.url, dir, base + ".mp4", "视频");
+                String name = base + ".mp4";
+                String saved = saveOne(useStore, true, dir, relDir, name, m.url, cb, cancel, checkExisting);
+                if (saved != null) task.files.add(saved);
                 if (isLive && m.previewUrl != null && !m.previewUrl.isEmpty()) {
-                    File img = unique(dir, base + ".jpg", checkExisting);
-                    if (img != null) addFile(task, img);
-                    else downloadTo(task, m.previewUrl, dir, base + ".jpg", "实况图");
+                    String img = base + ".jpg";
+                    String s2 = saveOne(useStore, false, dir, relDir, img, m.previewUrl, null, cancel, checkExisting);
+                    if (s2 != null) task.files.add(s2);
                 }
             } else {
-                String ext = XhsNet.probeExt(m.url, m.url.toLowerCase().contains(".png") ? ".png"
-                        : m.url.toLowerCase().contains(".webp") ? ".webp" : ".jpg");
-                File img = unique(dir, base + ext, checkExisting);
-                if (img != null) addFile(task, img);
-                else downloadTo(task, m.url, dir, base + ext, "图片");
+                String ext = XhsNet.probeExt(m.url, m.url.toLowerCase().contains(".png") ? ".png" : ".jpg");
+                String name = base + ext;
+                String saved = saveOne(useStore, false, dir, relDir, name, m.url, cb, cancel, checkExisting);
+                if (saved != null) task.files.add(saved);
             }
         }
+        task.status = "done";
+        task.progress = 100;
+        persist(); notifyUi();
     }
 
-    /** 已存在同名文件时跳过（checkExisting 开启时返回已存在的文件） */
-    private static File unique(File dir, String name, boolean checkExisting) {
+    /** 返回保存位置字符串（content:// 或文件路径）；重复跳过返回 null */
+    private static String saveOne(boolean useStore, boolean isVideo, File dir, String relDir, String name,
+                                  String url, XhsNet.Progress cb, AtomicBoolean cancel, boolean checkExisting) throws Exception {
+        if (useStore) {
+            if (checkExisting && XhsSink.existsStore(CTX, isVideo, "Pictures/XHS下载/" + relDir, name)) return null;
+            String rel = (isVideo ? "Movies/" : "Pictures/") + "XHS下载/" + relDir;
+            return XhsSink.saveStore(CTX, isVideo, rel, name, url, cb, cancel);
+        }
+        if (!dir.exists()) dir.mkdirs();
+        if (checkExisting && uniqueFile(dir, name) == null) return null;
+        File dest = new File(dir, name);
+        XhsSink.saveFile(dest, url, cb, cancel);
+        return dest.getAbsolutePath();
+    }
+
+    /** checkExisting：存在同名返回 null 表示跳过，否则返回目标（重命名 _1/_2） */
+    private static File uniqueFile(File dir, String name) {
         File f = new File(dir, name);
-        if (f.exists()) return checkExisting ? f : null;
+        if (!STORE.checkExistingFiles()) return f;
+        if (!f.exists()) return f;
+        String base = name;
+        String ext = "";
+        int dot = name.lastIndexOf('.');
+        if (dot > 0) { base = name.substring(0, dot); ext = name.substring(dot); }
+        int i = 1;
+        while (new File(dir, base + "_" + i + ext).exists()) i++;
+        return new File(dir, base + "_" + i + ext);
+    }
+
+    private static boolean isCancel(Throwable e) {
+        return e instanceof java.io.IOException && "cancelled".equals(e.getMessage());
+    }
+
+    // ---------- 序列化 / 历史 ----------
+    public static void persist() {
+        try {
+            JSONArray arr = new JSONArray();
+            for (XhsStore.Task t : TASKS) arr.put(t.toJson());
+            JSONObject o = new JSONObject();
+            o.put("tasks", arr);
+            CTX.getSharedPreferences("xhs_tasks", Context.MODE_PRIVATE)
+              .edit().putString("data", o.toString()).apply();
+        } catch (Throwable ignored) { }
+    }
+
+    private static void restore() {
+        try {
+            String s = CTX.getSharedPreferences("xhs_tasks", Context.MODE_PRIVATE).getString("data", null);
+            if (s == null) return;
+            JSONObject o = new JSONObject(s);
+            JSONArray arr = o.optJSONArray("tasks");
+            if (arr == null) return;
+            for (int i = arr.length() - 1; i >= 0; i--) {
+                XhsStore.Task t = XhsStore.Task.fromJson(arr.optJSONObject(i));
+                if (t != null) {
+                    if ("running".equals(t.status) || "pending".equals(t.status)) t.status = "stopped";
+                    TASKS.add(0, t);
+                }
+            }
+        } catch (Throwable ignored) { }
+    }
+
+    public static XhsStore.Task findTask(String id) {
+        for (XhsStore.Task t : TASKS) if (id.equals(t.id)) return t;
         return null;
     }
 
-    /** 选择性下载：UI 选好后回调，只下载选中的媒体 */
-    public static void continueSelective(final XhsStore.Task t, final List<XhsParser.Media> chosen) {
-        if (chosen == null || chosen.isEmpty()) { remove(t); return; }
-        POOL.execute(new Runnable() { public void run() {
-            try {
-                XhsStore.Task fresh = findTask(t.id);
-                if (fresh == null) return;
-                fresh.status = "running"; fresh.progress = 0; notifyUi(); persist();
-                Context c = XhsApp.context();
-                XhsParser.Note note = noteFromJson(fresh.noteJson);
-                note.items.clear();
-                note.items.addAll(chosen);
-                File dir = noteDir(c, store, note, fresh);
-                downloadItems(fresh, note, dir);
-                fresh.status = "done"; fresh.progress = 100;
-            } catch (Throwable e) {
-                XhsStore.Task fresh = findTask(t.id);
-                if (fresh != null) { fresh.status = "failed"; fresh.error = e.getMessage(); }
-            }
-            notifyUi(); persist();
-        }});
-    }
-
-    private static void addFile(XhsStore.Task task, File f) {
-        if (!task.files.contains(f.getAbsolutePath())) task.files.add(f.getAbsolutePath());
-        notifyUi();
-    }
-
-    private static void downloadTo(final XhsStore.Task task, String url, File dir, String name, String label) throws Exception {
-        File dest = new File(dir, name);
-        AtomicBoolean cancel = CANCELS.get(task.id);
-        XhsNet.download(url, dest, "https://www.xiaohongshu.com/", new XhsNet.Progress() {
-            public void onProgress(long done, long total) {
-                task.totalBytes = total;
-                task.doneBytes = done;
-                task.progress = (int) (done * 100 / total);
-                notifyUi();
-            }
-        }, cancel);
-        addFile(task, dest);
-    }
-
-    // ---------- 操作 ----------
     public static void cancel(String id) {
         AtomicBoolean c = CANCELS.get(id);
         if (c == null) { c = new AtomicBoolean(true); CANCELS.put(id, c); } else c.set(true);
@@ -240,50 +249,79 @@ public final class XhsEngine {
         t.status = "pending";
         t.error = null;
         persist(); notifyUi();
-        POOL.execute(new Runnable() { public void run() { runTask(t, false); } });
+        POOL.execute(new Runnable() { public void run() {
+            try {
+                if (t.noteJson != null && !t.noteJson.isEmpty()) {
+                    XhsParser.Note note = noteFromJson(t.noteJson);
+                    if (!note.items.isEmpty()) { downloadItemsList(t, note.items); return; }
+                }
+                runTaskSync(t);
+            } catch (Throwable e) {
+                if (isCancel(e)) t.status = "stopped";
+                else { t.status = "failed"; t.error = e.getMessage() == null ? e.toString() : e.getMessage(); }
+                persist(); notifyUi();
+            }
+        }});
+    }
+
+    private static void runTaskSync(XhsStore.Task task) throws Exception {
+        task.status = "running"; notifyUi();
+        String url = task.url;
+        if (XhsParser.isShortUrl(url)) url = XhsNet.resolveShort(url);
+        String html = XhsNet.fetchHtml(url);
+        XhsParser.Note note = XhsParser.parse(html, XhsParser.extractPostId(url), url);
+        if (note == null || note.items.isEmpty()) throw new Exception("解析失败");
+        task.title = XhsNaming.sanitize(note.title);
+        task.author = note.authorName;
+        task.noteJson = noteToJson(note);
+        downloadItemsList(task, note.items);
     }
 
     public static void remove(XhsStore.Task t) {
-        synchronized (TASKS) { TASKS.remove(t); }
+        CANCELS.remove(t.id);
+        TASKS.remove(t);
         persist(); notifyUi();
     }
 
     public static void clearDone() {
-        synchronized (TASKS) {
-            Iterator<XhsStore.Task> it = TASKS.iterator();
-            while (it.hasNext()) if ("done".equals(it.next().status)) it.remove();
+        Iterator<XhsStore.Task> it = TASKS.iterator();
+        while (it.hasNext()) {
+            XhsStore.Task t = it.next();
+            if ("done".equals(t.status) || "failed".equals(t.status)) { CANCELS.remove(t.id); it.remove(); }
         }
         persist(); notifyUi();
     }
 
-    // ---------- note <-> json ----------
+    // ---------- Note JSON ----------
     public static String noteToJson(XhsParser.Note n) {
         try {
             JSONObject o = new JSONObject();
-            o.put("noteId", nz(n.noteId)); o.put("type", nz(n.type)); o.put("title", nz(n.title));
-            o.put("desc", nz(n.body)); o.put("authorName", nz(n.authorName)); o.put("authorId", nz(n.authorId));
+            o.put("id", nz(n.noteId)); o.put("title", nz(n.title)); o.put("body", nz(n.body));
+            o.put("authorName", nz(n.authorName)); o.put("authorId", nz(n.authorId));
             o.put("publishTime", nz(n.publishTime)); o.put("canonicalUrl", nz(n.canonicalUrl));
-            org.json.JSONArray arr = new org.json.JSONArray();
+            JSONArray arr = new JSONArray();
             for (XhsParser.Media m : n.items) {
                 JSONObject mo = new JSONObject();
-                mo.put("kind", nz(m.kind)); mo.put("url", nz(m.url)); mo.put("previewUrl", nz(m.previewUrl));
-                mo.put("liveVideoUrl", nz(m.liveVideoUrl)); mo.put("width", m.width); mo.put("height", m.height);
+                mo.put("kind", nz(m.kind)); mo.put("url", nz(m.url));
+                mo.put("previewUrl", nz(m.previewUrl)); mo.put("liveVideoUrl", nz(m.liveVideoUrl));
+                mo.put("width", m.width); mo.put("height", m.height);
                 arr.put(mo);
             }
             o.put("items", arr);
             return o.toString();
-        } catch (Throwable t) { return null; }
+        } catch (Throwable t) { return "{}"; }
     }
 
-    public static XhsParser.Note noteFromJson(String json) {
+    public static XhsParser.Note noteFromJson(String s) {
         XhsParser.Note n = new XhsParser.Note();
+        if (s == null || s.isEmpty()) return n;
         try {
-            JSONObject o = new JSONObject(json);
-            n.noteId = o.optString("noteId"); n.type = o.optString("type");
-            n.title = o.optString("title"); n.body = o.optString("desc");
+            JSONObject o = new JSONObject(s);
+            n.noteId = o.optString("id"); n.title = o.optString("title");
+            n.body = o.optString("body");
             n.authorName = o.optString("authorName"); n.authorId = o.optString("authorId");
             n.publishTime = o.optString("publishTime"); n.canonicalUrl = o.optString("canonicalUrl");
-            org.json.JSONArray arr = o.optJSONArray("items");
+            JSONArray arr = o.optJSONArray("items");
             if (arr != null) for (int i = 0; i < arr.length(); i++) {
                 JSONObject mo = arr.optJSONObject(i);
                 if (mo == null) continue;
@@ -295,6 +333,10 @@ public final class XhsEngine {
             }
         } catch (Throwable ignored) { }
         return n;
+    }
+
+    private static XhsNaming.Note namingNote(XhsParser.Note n) {
+        return new XhsNaming.Note(nz(n.title), nz(n.authorName), nz(n.authorId), nz(n.noteId), nz(n.publishTime));
     }
 
     private static String nz(String s) { return s == null ? "" : s; }

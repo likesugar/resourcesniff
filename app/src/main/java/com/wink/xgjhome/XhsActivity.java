@@ -11,7 +11,6 @@ import android.graphics.drawable.GradientDrawable;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
-import android.os.Environment;
 import android.os.Handler;
 import android.text.Editable;
 import android.text.TextWatcher;
@@ -35,30 +34,26 @@ import com.wink.xgjhome.xhs.XhsStore;
 import java.io.File;
 import java.util.List;
 
-/** 小红书下载器 · 主页（复刻原版 MainScreen：搜索栏+过滤标签+任务列表+剪贴板气泡+手动输入弹窗） */
+/** 小红书下载器 · 主页面（复刻 XHS_Downloader_Android 主界面） */
 public class XhsActivity extends Activity implements XhsEngine.Listener {
 
     private boolean dark, oled;
-    private int accent = 0xFF1677FF;
-    private String filter = "all";
-    private String query = "";
-    private LinearLayout listBody;
-    private TextView tvAll, tvPending, tvFailed;
+    private int accent;
+    private LinearLayout listBody, tabAll, tabPending, tabFailed;
+    private String query = "", filter = "all";
     private EditText etSearch;
-    private FrameLayout bubble;
     private final Handler ui = new Handler();
-    private String lastClip = "";
+    private LinearLayout bubble;
 
     @Override
     protected void onCreate(Bundle b) {
         super.onCreate(b);
+        XhsEngine.init(this);
         dark = getSharedPreferences("settings", MODE_PRIVATE).getBoolean("dark", false);
         oled = getSharedPreferences("settings", MODE_PRIVATE).getBoolean("oled", false);
-        if (dark) accent = 0xFF4D9AFF;
-        XhsEngine.init(this);
+        accent = dark ? 0xFF7AB8FF : 0xFF1677FF;
         buildUi();
         applyTheme();
-        getWindow().setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_STATE_ALWAYS_HIDDEN);
     }
 
     @Override
@@ -80,7 +75,7 @@ public class XhsActivity extends Activity implements XhsEngine.Listener {
     private int dp(float v) { return (int) (v * getResources().getDisplayMetrics().density); }
     private String nz(String s) { return s == null ? "" : s; }
 
-    // ================= UI =================
+    // ================= UI 构建 =================
     private void buildUi() {
         FrameLayout root = new FrameLayout(this);
         root.setBackgroundColor(dark ? (oled ? Color.BLACK : 0xFF141414) : 0xFFEEF4FF);
@@ -89,29 +84,29 @@ public class XhsActivity extends Activity implements XhsEngine.Listener {
         page.setOrientation(LinearLayout.VERTICAL);
         root.addView(page, new FrameLayout.LayoutParams(-1, -1));
 
-        // 顶栏：标题 + 设置齿轮（对齐原版顶部）
+        // 顶栏：标题 + 设置
         LinearLayout top = new LinearLayout(this);
         top.setOrientation(LinearLayout.HORIZONTAL);
         top.setGravity(Gravity.CENTER_VERTICAL);
         top.setPadding(dp(16), dp(12), dp(16), dp(12));
         TextView title = new TextView(this);
         title.setText("小红书下载器");
-        title.setTextSize(18);
+        title.setTextSize(20);
         title.setTypeface(Typeface.DEFAULT_BOLD);
         title.setTextColor(dark ? Color.WHITE : 0xFF1F2329);
         top.addView(title, new LinearLayout.LayoutParams(0, -2, 1f));
         TextView gear = new TextView(this);
         gear.setText("⚙");
         gear.setTextSize(22);
-        gear.setPadding(dp(8), 0, dp(4), 0);
+        gear.setPadding(dp(10), 0, dp(2), 0);
         gear.setTextColor(dark ? Color.WHITE : 0xFF1F2329);
-        gear.setOnClickListener(new View.OnClickListener() { public void onClick(View v) {
-            startActivity(new Intent(XhsActivity.this, XhsSettingsActivity.class));
-        }});
+        gear.setOnClickListener(new View.OnClickListener() {
+            public void onClick(View v) { startActivity(new Intent(XhsActivity.this, XhsSettingsActivity.class)); }
+        });
         top.addView(gear);
         page.addView(top, new LinearLayout.LayoutParams(-1, -2));
 
-        // 搜索栏（对齐原版 SearchBar）
+        // 搜索栏
         LinearLayout searchWrap = new LinearLayout(this);
         searchWrap.setOrientation(LinearLayout.HORIZONTAL);
         searchWrap.setPadding(dp(16), 0, dp(16), dp(8));
@@ -131,16 +126,18 @@ public class XhsActivity extends Activity implements XhsEngine.Listener {
         searchWrap.addView(etSearch, new LinearLayout.LayoutParams(-1, -2));
         page.addView(searchWrap);
 
-        // 过滤标签（全部/待选择/失败）
+        // 标签行：全部 / 待选择 / 失败
         HorizontalScrollView tabsScroll = new HorizontalScrollView(this);
         tabsScroll.setHorizontalScrollBarEnabled(false);
         LinearLayout tabs = new LinearLayout(this);
         tabs.setOrientation(LinearLayout.HORIZONTAL);
         tabs.setPadding(dp(16), 0, dp(16), dp(8));
-        tvAll = tab(tabs, "全部");
-        tvPending = tab(tabs, "待选择");
-        tvFailed = tab(tabs, "失败");
-        restyleTabs();
+        tabAll = makeTab("全部", "all");
+        tabPending = makeTab("待选择", "pending");
+        tabFailed = makeTab("失败", "failed");
+        tabs.addView(tabAll);
+        tabs.addView(tabPending);
+        tabs.addView(tabFailed);
         tabsScroll.addView(tabs);
         page.addView(tabsScroll, new LinearLayout.LayoutParams(-1, -2));
 
@@ -149,114 +146,160 @@ public class XhsActivity extends Activity implements XhsEngine.Listener {
         scroll.setFillViewport(true);
         listBody = new LinearLayout(this);
         listBody.setOrientation(LinearLayout.VERTICAL);
-        listBody.setPadding(dp(16), 0, dp(16), dp(96));
-        scroll.addView(listBody, new ScrollView.LayoutParams(-1, -2));
-        page.addView(scroll, new LinearLayout.LayoutParams(-1, 0, 1f));
+        listBody.setPadding(dp(16), dp(4), dp(16), dp(96));
+        scroll.addView(listBody, new LinearLayout.LayoutParams(-1, -2));
+        page.addView(scroll, new LinearLayout.LayoutParams(-1, -1, 1f));
 
-        // 底部按钮：粘贴解析 + 手动输入（对齐原版底部入口）
-        LinearLayout bottom = new LinearLayout(this);
-        bottom.setOrientation(LinearLayout.HORIZONTAL);
-        bottom.setGravity(Gravity.CENTER);
-        bottom.setPadding(dp(16), dp(8), dp(16), dp(16));
-        bottom.addView(bigBtn("📋 粘贴解析", new View.OnClickListener() { public void onClick(View v) { doPaste(); } }));
-        bottom.addView(bigBtn("✎ 手动输入", new View.OnClickListener() { public void onClick(View v) { showInputDialog(""); } }));
-        FrameLayout.LayoutParams bp = new FrameLayout.LayoutParams(-1, -2, Gravity.BOTTOM);
-        root.addView(bottom, bp);
+        // 底部输入按钮
+        TextView inputBtn = new TextView(this);
+        inputBtn.setText("＋ 输入链接下载");
+        inputBtn.setTextSize(15);
+        inputBtn.setTypeface(Typeface.DEFAULT_BOLD);
+        inputBtn.setTextColor(Color.WHITE);
+        inputBtn.setGravity(Gravity.CENTER);
+        GradientDrawable bg = new GradientDrawable();
+        bg.setColor(accent);
+        bg.setCornerRadius(dp(26));
+        inputBtn.setBackground(bg);
+        int pad = dp(14);
+        inputBtn.setPadding(0, pad, 0, pad);
+        FrameLayout.LayoutParams flp = new FrameLayout.LayoutParams(-2, -2, Gravity.BOTTOM | Gravity.CENTER_HORIZONTAL);
+        flp.bottomMargin = dp(20);
+        inputBtn.setLayoutParams(flp);
+        inputBtn.setOnClickListener(new View.OnClickListener() {
+            public void onClick(View v) { showInputDialog(null); }
+        });
+        root.addView(inputBtn);
 
-        // 剪贴板气泡（叠加层）
-        bubble = new FrameLayout(this);
-        root.addView(bubble, new FrameLayout.LayoutParams(-1, -2, Gravity.BOTTOM));
-        bubble.setPadding(0, 0, 0, dp(76));
+        // 剪贴板气泡
+        bubble = new LinearLayout(this);
+        bubble.setOrientation(LinearLayout.HORIZONTAL);
+        bubble.setGravity(Gravity.CENTER_VERTICAL);
+        bubble.setPadding(dp(14), dp(10), dp(14), dp(10));
+        GradientDrawable bbg = new GradientDrawable();
+        bbg.setColor(dark ? 0xFF2A2A2A : Color.WHITE);
+        bbg.setCornerRadius(dp(22));
+        if (dark) bbg.setStroke(dp(1), 0x33FFFFFF); else bbg.setStroke(dp(1), 0x22000000);
+        bubble.setBackground(bbg);
+        TextView bt = new TextView(this);
+        bt.setText("检测到小红书链接，去下载？");
+        bt.setTextSize(13);
+        bt.setTextColor(dark ? Color.WHITE : 0xFF1F2329);
+        bubble.addView(bt);
+        TextView go = new TextView(this);
+        go.setText("  下载");
+        go.setTextSize(13);
+        go.setTypeface(Typeface.DEFAULT_BOLD);
+        go.setTextColor(accent);
+        go.setOnClickListener(new View.OnClickListener() {
+            public void onClick(View v) {
+                bubble.setVisibility(View.GONE);
+                String text = clipboardText();
+                if (!text.isEmpty()) submit(text, false);
+            }
+        });
+        bubble.addView(go);
+        bubble.setVisibility(View.GONE);
+        FrameLayout.LayoutParams blp = new FrameLayout.LayoutParams(-2, -2, Gravity.BOTTOM | Gravity.CENTER_HORIZONTAL);
+        blp.bottomMargin = dp(84);
+        bubble.setLayoutParams(blp);
+        root.addView(bubble);
 
         setContentView(root);
     }
 
-    private TextView tab(LinearLayout parent, final String label) {
+    private LinearLayout makeTab(final String label, final String key) {
+        LinearLayout t = new LinearLayout(this);
+        t.setGravity(Gravity.CENTER);
+        t.setPadding(dp(14), dp(6), dp(14), dp(6));
+        t.setOrientation(LinearLayout.HORIZONTAL);
         TextView tv = new TextView(this);
         tv.setText(label);
-        tv.setTextSize(14);
-        tv.setPadding(dp(14), dp(6), dp(14), dp(6));
-        tv.setOnClickListener(new View.OnClickListener() { public void onClick(View v) {
-            filter = label.equals("全部") ? "all" : label.equals("待选择") ? "pending" : "failed";
-            restyleTabs();
-            rebuildList();
-        }});
-        parent.addView(tv);
-        return tv;
+        tv.setTextSize(13);
+        t.setTag(tv);
+        t.addView(tv);
+        t.setOnClickListener(new View.OnClickListener() {
+            public void onClick(View v) { filter = key; restyleTab(tabAll, "全部", "all"); restyleTab(tabPending, "待选择", "pending"); restyleTab(tabFailed, "失败", "failed"); rebuildList(); }
+        });
+        restyleTab(t, label, key);
+        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(-2, -2);
+        lp.rightMargin = dp(8);
+        t.setLayoutParams(lp);
+        return t;
     }
 
-    private void restyleTabs() {
-        restyleTab(tvAll, "全部", "all");
-        restyleTab(tvPending, "待选择", "pending");
-        restyleTab(tvFailed, "失败", "failed");
-    }
-
-    private void restyleTab(TextView tv, String label, String key) {
-        boolean sel = filter.equals(key);
+    private void restyleTab(LinearLayout t, String label, String key) {
+        TextView tv = (TextView) t.getTag();
+        int count = 0;
+        for (XhsStore.Task task : XhsEngine.tasks()) {
+            if ("all".equals(key)) count++;
+            else if ("failed".equals(key)) { if ("failed".equals(task.status)) count++; }
+            else { if ("pending".equals(task.status) || "running".equals(task.status) || "stopped".equals(task.status) || "selecting".equals(task.status)) count++; }
+        }
+        tv.setText(label + (count > 0 ? " (" + count + ")" : ""));
+        boolean sel = key.equals(filter);
         GradientDrawable g = new GradientDrawable();
         g.setCornerRadius(dp(14));
-        g.setColor(sel ? accent : (dark ? 0x22FFFFFF : 0xFFFFFFFF));
-        tv.setBackground(g);
-        tv.setTextColor(sel ? Color.WHITE : (dark ? 0xFFB0B8C4 : 0xFF8A94A6));
-        int n = countFor(key);
-        tv.setText(n > 0 ? label + " (" + n + ")" : label);
+        g.setColor(sel ? accent : (dark ? 0x22FFFFFF : 0x14000000));
+        t.setBackground(g);
+        tv.setTextColor(sel ? Color.WHITE : (dark ? 0xAAFFFFFF : 0xFF6B7280));
     }
 
-    private int countFor(String key) {
-        int n = 0;
-        for (XhsStore.Task t : XhsEngine.tasks()) {
-            if ("failed".equals(key)) { if ("failed".equals(t.status)) n++; }
-            else if ("pending".equals(key)) {
-                if ("selecting".equals(t.status) || "running".equals(t.status) || "pending".equals(t.status) || "stopped".equals(t.status)) n++;
-            } else n++;
+    // ================= 剪贴板 =================
+    private String clipboardText() {
+        try {
+            ClipboardManager cm = (ClipboardManager) getSystemService(Context.CLIPBOARD_SERVICE);
+            if (cm == null || !cm.hasPrimaryClip() || cm.getPrimaryClip() == null || cm.getPrimaryClip().getItemCount() == 0) return "";
+            CharSequence s = cm.getPrimaryClip().getItemAt(0).coerceToText(this);
+            return s == null ? "" : s.toString();
+        } catch (Throwable t) { return ""; }
+    }
+
+    private void detectClipboard() {
+        final String text = clipboardText();
+        if (text.isEmpty() || text.equals(getSharedPreferences("xhs_settings", MODE_PRIVATE).getString("last_clip", ""))) return;
+        List<String> links = XhsParser.extractLinks(text, null);
+        if (links.isEmpty()) return;
+        getSharedPreferences("xhs_settings", MODE_PRIVATE).edit().putString("last_clip", text).apply();
+        if (XhsEngine.store().showClipboardBubble()) {
+            bubble.setVisibility(View.VISIBLE);
+            ui.postDelayed(new Runnable() { public void run() { bubble.setVisibility(View.GONE); } }, 8000);
+        } else {
+            submit(text, false);
         }
-        return n;
     }
 
-    private TextView bigBtn(String text, View.OnClickListener l) {
-        TextView btn = new TextView(this);
-        btn.setText(text);
-        btn.setTextSize(15);
-        btn.setTextColor(Color.WHITE);
-        btn.setGravity(Gravity.CENTER);
-        btn.setPadding(dp(20), dp(12), dp(20), dp(12));
-        GradientDrawable g = new GradientDrawable();
-        g.setCornerRadius(dp(24));
-        g.setColor(accent);
-        btn.setBackground(g);
-        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(-2, -2);
-        lp.leftMargin = dp(10);
-        btn.setLayoutParams(lp);
-        btn.setOnClickListener(l);
-        return btn;
+    // ================= 提交 =================
+    private void submit(String text, boolean infoOnly) {
+        if (text == null || text.trim().isEmpty()) { toast("请输入链接"); return; }
+        List<String> links = XhsParser.extractLinks(text, null);
+        if (links.isEmpty()) { toast("未识别到小红书链接"); return; }
+        XhsStore.Task t = XhsEngine.enqueue(this, text, infoOnly);
+        if (t == null) toast("未识别到小红书链接");
+        else toast(infoOnly ? "已加入解析（仅保存信息）" : "已开始解析下载");
     }
 
     // ================= 列表 =================
     private void rebuildList() {
-        if (listBody == null) return;
+        restyleTab(tabAll, "全部", "all");
+        restyleTab(tabPending, "待选择", "pending");
+        restyleTab(tabFailed, "失败", "failed");
         listBody.removeAllViews();
-        restyleTabs();
-        List<XhsStore.Task> tasks = XhsEngine.tasks();
         int shown = 0;
+        List<XhsStore.Task> tasks = XhsEngine.tasks();
         for (final XhsStore.Task t : tasks) {
-            if (!query.isEmpty()) {
-                String hay = nz(t.title) + " " + nz(t.author);
-                if (!hay.toLowerCase().contains(query.toLowerCase())) continue;
-            }
-            boolean hit;
-            if ("failed".equals(filter)) hit = "failed".equals(t.status);
-            else if ("pending".equals(filter)) hit = "selecting".equals(t.status) || "running".equals(t.status)
-                    || "pending".equals(t.status) || "stopped".equals(t.status);
-            else hit = true;
-            if (!hit) continue;
+            if (filter.equals("failed") && !"failed".equals(t.status)) continue;
+            if (filter.equals("pending") && !("pending".equals(t.status) || "running".equals(t.status)
+                    || "stopped".equals(t.status) || "selecting".equals(t.status))) continue;
+            if (!query.isEmpty() && !(nz(t.title) + nz(t.author)).contains(query)) continue;
             listBody.addView(taskCard(t));
             shown++;
         }
         if (shown == 0) {
             TextView empty = new TextView(this);
-            empty.setText("暂无任务\n复制小红书分享链接后点「粘贴解析」");
+            empty.setText(query.isEmpty() ? "暂无下载记录\n粘贴小红书分享链接开始下载" : "无匹配记录");
             empty.setGravity(Gravity.CENTER);
-            empty.setTextSize(13);
+            empty.setTextSize(14);
             empty.setTextColor(0xFF8A94A6);
             empty.setPadding(0, dp(80), 0, 0);
             listBody.addView(empty, new LinearLayout.LayoutParams(-1, -2));
@@ -272,6 +315,7 @@ public class XhsActivity extends Activity implements XhsEngine.Listener {
         lp.bottomMargin = dp(10);
         card.setLayoutParams(lp);
 
+        // 状态色标题
         int statusColor;
         String statusText;
         if ("failed".equals(t.status)) { statusColor = 0xFFE5484D; statusText = "失败"; }
@@ -282,32 +326,27 @@ public class XhsActivity extends Activity implements XhsEngine.Listener {
         else { statusColor = 0xFF8A94A6; statusText = "排队中"; }
 
         TextView title = new TextView(this);
-        String tt = nz(t.title);
-        title.setText(tt.isEmpty() ? "解析中…" : tt);
+        title.setText(nz(t.title).isEmpty() ? "解析中…" : t.title);
         title.setTextSize(15);
         title.setTypeface(Typeface.DEFAULT_BOLD);
-        title.setTextColor(statusColor);
+        title.setTextColor(dark ? Color.WHITE : 0xFF1F2329);
+        title.setMaxLines(2);
         card.addView(title, new LinearLayout.LayoutParams(-1, -2));
 
-        LinearLayout metaRow = new LinearLayout(this);
-        metaRow.setOrientation(LinearLayout.HORIZONTAL);
-        metaRow.setPadding(0, dp(4), 0, 0);
-        TextView meta = new TextView(this);
-        meta.setTextSize(12);
-        meta.setTextColor(0xFF8A94A6);
-        String m = "";
-        if (!nz(t.author).isEmpty()) m += "@" + t.author + " · ";
-        if ("failed".equals(t.status) && !nz(t.error).isEmpty()) m += t.error;
-        else if (!"done".equals(t.status) && t.totalBytes > 0) m += fmtSize(t.doneBytes) + " / " + fmtSize(t.totalBytes);
-        else if ("done".equals(t.status)) m += t.files.size() + " 个文件";
-        meta.setText(m);
-        metaRow.addView(meta, new LinearLayout.LayoutParams(0, -2, 1f));
-        TextView st = new TextView(this);
-        st.setText(statusText);
-        st.setTextSize(12);
-        st.setTextColor(statusColor);
-        metaRow.addView(st);
-        card.addView(metaRow, new LinearLayout.LayoutParams(-1, -2));
+        String meta = nz(t.author);
+        if (!meta.isEmpty()) meta = "@" + meta + " · ";
+        meta += statusText;
+        if ("running".equals(t.status) && t.progress > 0) meta += " " + t.progress + "%";
+        if ("failed".equals(t.status) && !nz(t.error).isEmpty()) meta += " · " + t.error;
+        else if ("done".equals(t.status)) meta += " · " + t.files.size() + " 个文件";
+        TextView metaV = new TextView(this);
+        metaV.setText(meta);
+        metaV.setTextSize(12);
+        metaV.setTextColor(statusColor);
+        metaV.setMaxLines(2);
+        LinearLayout.LayoutParams mp = new LinearLayout.LayoutParams(-1, -2);
+        mp.topMargin = dp(4);
+        card.addView(metaV, mp);
 
         if ("running".equals(t.status)) {
             ProgressBar pb = new ProgressBar(this, null, android.R.attr.progressBarStyleHorizontal);
@@ -347,7 +386,7 @@ public class XhsActivity extends Activity implements XhsEngine.Listener {
         }
         card.addView(actions, acp);
 
-        // 点卡片：复制文案（对齐原版 TaskCell 点击行为之一）
+        // 点卡片：复制文案
         card.setOnClickListener(new View.OnClickListener() { public void onClick(View v) {
             if (!nz(t.description).isEmpty()) copyText(t.description);
         }});
@@ -371,93 +410,24 @@ public class XhsActivity extends Activity implements XhsEngine.Listener {
         return btn;
     }
 
-    private String fmtSize(long b) {
-        if (b < 1024) return b + "B";
-        if (b < 1024 * 1024) return String.format("%.1fKB", b / 1024f);
-        return String.format("%.1fMB", b / 1024f / 1024f);
-    }
-
-    // ================= 动作 =================
-    private void detectClipboard() {
-        try {
-            ClipboardManager cm = (ClipboardManager) getSystemService(Context.CLIPBOARD_SERVICE);
-            if (cm == null || !cm.hasPrimaryClip()) return;
-            CharSequence cs = cm.getPrimaryClip().getItemAt(0).getText();
-            if (cs == null) return;
-            String s = cs.toString().trim();
-            if (s.equals(lastClip) || s.isEmpty()) return;
-            lastClip = s;
-            if (!XhsNet.hasWebSession()) { /* 未登录也能解析图文，先不拦 */ }
-            final List<String> links = XhsParser.extractLinks(s, new XhsParser.ShortUrlResolver() {
-                public String resolve(String u) { return XhsNet.resolveShort(u); }
-            });
-            if (links.isEmpty()) return;
-            if (XhsEngine.store().showClipboardBubble()) showBubble(links.get(0));
-            else if (XhsEngine.store().autoReadClipboard()) XhsEngine.enqueue(this, s, false);
-        } catch (Throwable ignored) { }
-    }
-
-    private void showBubble(final String link) {
-        bubble.removeAllViews();
-        LinearLayout bar = new LinearLayout(this);
-        bar.setOrientation(LinearLayout.HORIZONTAL);
-        bar.setGravity(Gravity.CENTER_VERTICAL);
-        bar.setPadding(dp(14), dp(10), dp(14), dp(10));
-        GradientDrawable g = new GradientDrawable();
-        g.setCornerRadius(dp(24));
-        g.setColor(dark ? 0xFF2A2A2A : Color.WHITE);
-        bar.setBackground(g);
-        TextView tv = new TextView(this);
-        tv.setText("检测到小红书链接，立即解析？");
-        tv.setTextSize(13);
-        tv.setTextColor(dark ? Color.WHITE : 0xFF1F2329);
-        bar.addView(tv, new LinearLayout.LayoutParams(0, -2, 1f));
-        TextView go = new TextView(this);
-        go.setText("解析");
-        go.setTextSize(13);
-        go.setTypeface(Typeface.DEFAULT_BOLD);
-        go.setTextColor(accent);
-        go.setPadding(dp(10), 0, 0, 0);
-        go.setOnClickListener(new View.OnClickListener() { public void onClick(View v) {
-            XhsEngine.enqueue(XhsActivity.this, link, false);
-            bubble.removeAllViews();
-        }});
-        bar.addView(go);
-        LinearLayout.LayoutParams bp = new LinearLayout.LayoutParams(-1, -2);
-        bp.setMargins(dp(16), 0, dp(16), 0);
-        bubble.addView(bar, bp);
-        ui.postDelayed(new Runnable() { public void run() { bubble.removeAllViews(); } }, 6000);
-    }
-
-    private void doPaste() {
-        try {
-            ClipboardManager cm = (ClipboardManager) getSystemService(Context.CLIPBOARD_SERVICE);
-            CharSequence cs = cm == null || !cm.hasPrimaryClip() ? null : cm.getPrimaryClip().getItemAt(0).getText();
-            String s = cs == null ? "" : cs.toString().trim();
-            if (s.isEmpty()) { toast("剪贴板为空"); return; }
-            XhsStore.Task t = XhsEngine.enqueue(this, s, false);
-            if (t == null) toast("未找到小红书链接");
-        } catch (Throwable e) { toast("读取剪贴板失败"); }
-    }
-
-    /** 手动输入弹窗（对齐原版：输入链接 → 下载 / 复制文案 / 仅保存信息） */
+    // ================= 输入弹窗 =================
     private void showInputDialog(final String preset) {
         LinearLayout wrap = new LinearLayout(this);
         wrap.setOrientation(LinearLayout.VERTICAL);
-        wrap.setPadding(dp(20), dp(10), dp(20), 0);
+        wrap.setPadding(dp(20), dp(12), dp(20), 0);
         final EditText et = new EditText(this);
-        et.setText(preset);
-        et.setHint("粘贴笔记链接或分享文本，如\nhttp://xhslink.com/xxxx 或 https://www.xiaohongshu.com/explore/...");
-        et.setTextSize(13);
+        et.setHint("粘贴小红书分享链接或含链接的文案");
+        et.setTextSize(14);
+        et.setTextColor(dark ? Color.WHITE : 0xFF1F2329);
+        et.setHintTextColor(0xFF8A94A6);
+        et.setBackgroundResource(dark ? R.drawable.bg_input_flat : R.drawable.bg_input);
         et.setMinLines(3);
         et.setGravity(Gravity.TOP);
-        et.setBackgroundResource(dark ? R.drawable.bg_input_flat : R.drawable.bg_input);
-        et.setPadding(dp(12), dp(10), dp(12), dp(10));
-        et.setTextColor(dark ? Color.WHITE : 0xFF1F2329);
+        et.setPadding(dp(14), dp(10), dp(14), dp(10));
+        if (preset != null) et.setText(preset);
         wrap.addView(et, new LinearLayout.LayoutParams(-1, -2));
-
         new AlertDialog.Builder(this)
-                .setTitle("手动输入")
+                .setTitle("输入链接")
                 .setView(wrap)
                 .setPositiveButton("下载", new android.content.DialogInterface.OnClickListener() {
                     public void onClick(android.content.DialogInterface d, int w) {
@@ -477,42 +447,7 @@ public class XhsActivity extends Activity implements XhsEngine.Listener {
                 .show();
     }
 
-    private void submit(String s, boolean infoOnly) {
-        if (nz(s).trim().isEmpty()) { toast("请输入链接"); return; }
-        XhsStore.Task t = XhsEngine.enqueue(this, s, infoOnly);
-        if (t == null) toast("链接无效，请重新输入");
-    }
-
-    private void openFolder(XhsStore.Task t) {
-        try {
-            if (!t.files.isEmpty()) {
-                Intent i = new Intent(Intent.ACTION_VIEW);
-                i.setDataAndType(Uri.fromFile(new File(t.files.get(0)).getParentFile()), "resource/folder");
-                startActivity(i);
-                return;
-            }
-        } catch (Throwable ignored) { }
-        toast(nz(t.files.isEmpty() ? "" : t.files.get(0)));
-    }
-
-    private void copyText(String s) {
-        if (nz(s).isEmpty()) { toast("没有文案"); return; }
-        ClipboardManager cm = (ClipboardManager) getSystemService(Context.CLIPBOARD_SERVICE);
-        cm.setPrimaryClip(android.content.ClipData.newPlainText("xhs", s));
-        toast("已复制");
-    }
-
-    private void confirmDelete(final XhsStore.Task t) {
-        new AlertDialog.Builder(this)
-                .setMessage("删除该任务记录？（已下载的文件保留）")
-                .setPositiveButton("删除", new android.content.DialogInterface.OnClickListener() {
-                    public void onClick(android.content.DialogInterface d, int w) { XhsEngine.remove(t); }
-                })
-                .setNegativeButton("取消", null)
-                .show();
-    }
-
-    /** 选择性下载：勾选要保存的媒体（对齐原版选择性下载环节） */
+    /** 选择性下载：勾选要保存的媒体 */
     private void showSelectDialog(final XhsStore.Task t) {
         XhsParser.Note note = XhsEngine.noteFromJson(t.noteJson);
         final List<XhsParser.Media> items = note.items;
@@ -540,6 +475,57 @@ public class XhsActivity extends Activity implements XhsEngine.Listener {
                 .setNegativeButton("取消", new android.content.DialogInterface.OnClickListener() {
                     public void onClick(android.content.DialogInterface d, int w) { XhsEngine.remove(t); }
                 })
+                .show();
+    }
+
+    /** 打开文件/目录（MediaStore 模式存的是 content://，直接列文件并打开） */
+    private void openFolder(final XhsStore.Task t) {
+        if (t.files.isEmpty()) { toast("无文件"); return; }
+        final String first = t.files.get(0);
+        if (first.startsWith("content://")) {
+            AlertDialog.Builder b = new AlertDialog.Builder(this).setTitle("已保存 " + t.files.size() + " 个文件");
+            CharSequence[] names = new CharSequence[t.files.size()];
+            for (int i = 0; i < t.files.size(); i++) {
+                String u = t.files.get(i);
+                String q = Uri.parse(u).getQueryParameter("displayName");
+                names[i] = q != null ? q : ("文件 " + (i + 1));
+            }
+            b.setItems(names, new android.content.DialogInterface.OnClickListener() {
+                public void onClick(android.content.DialogInterface d, int w) { openAny(t.files.get(w)); }
+            }).show();
+            return;
+        }
+        try {
+            Intent i = new Intent(Intent.ACTION_VIEW);
+            i.setDataAndType(Uri.fromFile(new File(first).getParentFile()), "resource/folder");
+            startActivity(i);
+            return;
+        } catch (Throwable ignored) { }
+        toast(first);
+    }
+
+    private void openAny(String s) {
+        try {
+            Intent i = new Intent(Intent.ACTION_VIEW);
+            i.setDataAndType(Uri.parse(s), s.contains(".mp4") || s.contains(".mov") ? "video/*" : "image/*");
+            i.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+            startActivity(i);
+        } catch (Throwable e) { toast("无法打开"); }
+    }
+
+    private void copyText(String s) {
+        ClipboardManager cm = (ClipboardManager) getSystemService(Context.CLIPBOARD_SERVICE);
+        cm.setPrimaryClip(android.content.ClipData.newPlainText("xhs", s));
+        toast("已复制");
+    }
+
+    private void confirmDelete(final XhsStore.Task t) {
+        new AlertDialog.Builder(this)
+                .setMessage("删除该任务记录？（已下载的文件保留）")
+                .setPositiveButton("删除", new android.content.DialogInterface.OnClickListener() {
+                    public void onClick(android.content.DialogInterface d, int w) { XhsEngine.remove(t); }
+                })
+                .setNegativeButton("取消", null)
                 .show();
     }
 
