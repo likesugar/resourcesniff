@@ -1,6 +1,8 @@
 package com.wink.xgjhome;
 
 import android.app.Activity;
+import android.app.AlertDialog;
+import android.content.DialogInterface;
 import android.graphics.Typeface;
 import android.graphics.drawable.GradientDrawable;
 import android.os.Build;
@@ -15,6 +17,7 @@ import android.widget.LinearLayout;
 import android.widget.ScrollView;
 import android.widget.Switch;
 import android.widget.TextView;
+import android.widget.Toast;
 
 /** 网页转APK 配置编辑器: 页与指示器 / 浏览器与脚本 / 应用栏 / 侧滑栏 */
 public class Web2ApkActivity extends Activity {
@@ -30,6 +33,7 @@ public class Web2ApkActivity extends Activity {
     private String appName = "xapk", pkg = "main";
     private LinearLayout content;
     private LinearLayout tabs;
+    private int curTab;
     private TextView tvName, tvSub;
 
     private int dp(int v) { return (int) (v * getResources().getDisplayMetrics().density); }
@@ -129,6 +133,7 @@ public class Web2ApkActivity extends Activity {
     }
 
     private void showTab(int idx) {
+        curTab = idx;
         for (int i = 0; i < tabs.getChildCount(); i++) {
             TextView t = (TextView) tabs.getChildAt(i);
             boolean sel = (i == idx);
@@ -145,7 +150,7 @@ public class Web2ApkActivity extends Activity {
             row("🔄", "离屏预加载", "0页", false);
             rowSub("👆", "用户滑动", null, null, false);
             rowSub("🔁", "变换动画", "必须保证离屏预加载开启1～2页，不建议在性能较差的网站上开启。", "正常", false);
-            section("浏览页");
+            section("pages", "浏览页");
         } else if (idx == 1) {
             head("浏览器配置");
             row("🌙", "夜间模式", "跟随主题", false);
@@ -154,7 +159,7 @@ public class Web2ApkActivity extends Activity {
             row("🧭", "浏览器标识", "默认", false);
             rowSub("💻", "电脑模式", "开启需搭配PC UA使用", null, false);
             row("JS", "启用JavaScript", null, true);
-            section("网页控制");
+            section("webctl", "网页控制");
         } else if (idx == 2) {
             row("▤", "启用应用栏", null, true);
             row("🔖", "应用栏样式", "默认风格", false);
@@ -163,10 +168,10 @@ public class Web2ApkActivity extends Activity {
             row("🔍", "搜索功能", null, false);
             row("T", "标题", "AppBar", false);
             row("Tẗ", "子标题", null, false);
-            section("菜单项");
+            section("menu", "菜单项");
         } else {
             row("☰", "启用侧滑栏", null, false);
-            section("侧滑项");
+            section("drawer", "侧滑项");
         }
     }
 
@@ -182,7 +187,22 @@ public class Web2ApkActivity extends Activity {
     }
 
     // 分组尾: 标题 + 右侧 🗑 ＋
-    private void section(String t) {
+    private void section(final String key, String t) {
+        // 已存页面列表
+        for (final String[] pg : getPages(key)) {
+            View row = rowBase("🌐", pg[0], pg[1]);
+            row.setOnLongClickListener(new View.OnLongClickListener() {
+                public boolean onLongClick(View v) {
+                    delPage(key, pg[0]);
+                    showTab(curTab);
+                    return true;
+                }
+            });
+            content.addView(row, new LinearLayout.LayoutParams(-1, -2));
+            View dv = new View(this);
+            dv.setBackgroundColor(DIV);
+            content.addView(dv, new LinearLayout.LayoutParams(-1, dp(1)));
+        }
         LinearLayout sec = new LinearLayout(this);
         sec.setOrientation(LinearLayout.HORIZONTAL);
         sec.setGravity(Gravity.CENTER_VERTICAL);
@@ -198,8 +218,69 @@ public class Web2ApkActivity extends Activity {
         TextView del = glyph("🗑", TXT, 15);
         del.setPadding(0, 0, dp(18), 0);
         sec.addView(del);
-        sec.addView(glyph("＋", TXT, 17));
+        TextView add = glyph("＋", TXT, 17);
+        add.setOnClickListener(new View.OnClickListener() {
+            public void onClick(View v) { addPageDialog(key); }
+        });
+        sec.addView(add);
         content.addView(sec, new LinearLayout.LayoutParams(-1, -2));
+    }
+
+    private java.util.List<String[]> getPages(String key) {
+        java.util.List<String[]> out = new java.util.ArrayList<>();
+        String l = getSharedPreferences("web2apk_" + pkg, MODE_PRIVATE).getString("pages_" + key, "");
+        for (String e : l.split("\u0002")) {
+            if (e.length() == 0) continue;
+            String[] p2 = e.split("\u0001", -1);
+            if (p2.length >= 2) out.add(new String[]{p2[0], p2[1]});
+        }
+        return out;
+    }
+
+    private void delPage(String key, String name) {
+        StringBuilder sb = new StringBuilder();
+        for (String[] pg : getPages(key)) {
+            if (pg[0].equals(name)) continue;
+            if (sb.length() > 0) sb.append('\u0002');
+            sb.append(pg[0]).append('\u0001').append(pg[1]);
+        }
+        getSharedPreferences("web2apk_" + pkg, MODE_PRIVATE).edit().putString("pages_" + key, sb.toString()).apply();
+    }
+
+    private void addPageDialog(final String key) {
+        final android.widget.EditText nI = new android.widget.EditText(this);
+        nI.setHint("名称");
+        nI.setTextSize(15);
+        final android.widget.EditText uI = new android.widget.EditText(this);
+        uI.setHint("网址 https://...");
+        uI.setTextSize(15);
+        LinearLayout box = new LinearLayout(this);
+        box.setOrientation(LinearLayout.VERTICAL);
+        int p16 = dp(16);
+        box.setPadding(p16, p16 / 2, p16, 0);
+        LinearLayout.LayoutParams ep = new LinearLayout.LayoutParams(-1, -2);
+        ep.setMargins(0, p16 / 2, 0, p16 / 2);
+        box.addView(nI, ep);
+        box.addView(uI, ep);
+        new android.app.AlertDialog.Builder(this)
+                .setTitle("添加网页")
+                .setView(box)
+                .setPositiveButton("添加", new android.content.DialogInterface.OnClickListener() {
+                    public void onClick(DialogInterface d, int w) {
+                        String n = nI.getText().toString().trim();
+                        String u = uI.getText().toString().trim();
+                        if (n.length() == 0 || !u.startsWith("http")) {
+                            Toast.makeText(Web2ApkActivity.this, "名称必填, 网址需 http(s) 开头", Toast.LENGTH_SHORT).show();
+                            return;
+                        }
+                        String cur = getSharedPreferences("web2apk_" + pkg, MODE_PRIVATE).getString("pages_" + key, "");
+                        String add = (cur.length() > 0 ? cur + "\u0002" : "") + n + "\u0001" + u;
+                        getSharedPreferences("web2apk_" + pkg, MODE_PRIVATE).edit().putString("pages_" + key, add).apply();
+                        showTab(curTab);
+                    }
+                })
+                .setNegativeButton("取消", null)
+                .show();
     }
 
     private View rowBase(String icon, String title, String sub) {

@@ -143,7 +143,7 @@ public class SettingsActivity extends Activity {
             String sub;
             if (isCustom(i)) sub = in ? "已登录(检测到Cookie)" : "已配置 · 点登录生效";
             else sub = in ? "已登录" : "未登录";
-            View row = platRow(p[4], (int) Long.parseLong(p[5], 16), p[0], sub,
+            View row = platRow(p[4], (int) ((long) Long.decode(p[5])), p[0], sub,
                     in ? "管理" : "登录", color(0xFFB4C5FF, 0xFF315CDE),
                     new View.OnClickListener() {
                         public void onClick(View v) { openWeb(idx); }
