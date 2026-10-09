@@ -455,6 +455,13 @@ public class HomeActivity extends Activity {
             if (auto != null) {
                 et.setText(auto);
                 et.setHint("");
+                // 自动开始嗅探
+                final android.app.Dialog dAuto = d;
+                dAuto.findViewById(R.id.btn_go).postDelayed(new Runnable() {
+                    public void run() {
+                        try { if (dAuto.isShowing()) dAuto.findViewById(R.id.btn_go).performClick(); } catch (Throwable ignored) {}
+                    }
+                }, 400);
             }
         }
         dyT.setOnClickListener(new View.OnClickListener() {
@@ -481,7 +488,14 @@ public class HomeActivity extends Activity {
                             if (auto != null) { pasted = auto; getSharedPreferences("settings", MODE_PRIVATE).edit().putString("dyid", auto.replace("https://live.douyin.com/","")).apply(); }
                         }
                         et.setText(pasted);
-                        if (pasted.startsWith("https://live.douyin.com/")) d.findViewById(R.id.btn_go).performClick();
+                        if (pasted.startsWith("https://live.douyin.com/")) {
+                            final android.app.Dialog dP = d;
+                            d.findViewById(R.id.btn_go).postDelayed(new Runnable() {
+                                public void run() {
+                                    try { if (dP.isShowing()) dP.findViewById(R.id.btn_go).performClick(); } catch (Throwable ignored) {}
+                                }
+                            }, 300);
+                        }
                     }
                 } catch (Exception e) { }
             }
@@ -535,7 +549,14 @@ public class HomeActivity extends Activity {
                             if (auto != null) { pasted = auto; getSharedPreferences("settings", MODE_PRIVATE).edit().putString("dyid", auto.replace("https://live.douyin.com/","")).apply(); }
                         }
                         et.setText(pasted);
-                        if (pasted.startsWith("https://live.douyin.com/")) d.findViewById(R.id.btn_go).performClick();
+                        if (pasted.startsWith("https://live.douyin.com/")) {
+                            final android.app.Dialog dP = d;
+                            d.findViewById(R.id.btn_go).postDelayed(new Runnable() {
+                                public void run() {
+                                    try { if (dP.isShowing()) dP.findViewById(R.id.btn_go).performClick(); } catch (Throwable ignored) {}
+                                }
+                            }, 300);
+                        }
                     }
                 } catch (Exception e) { }
             }
