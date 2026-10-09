@@ -1,6 +1,5 @@
 package com.wink.xgjhome.xhs;
 
-import android.content.Context;
 import android.webkit.CookieManager;
 
 import java.io.File;
@@ -10,10 +9,14 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 /** 网络层：短链解析 / 页面抓取 / 媒体下载。对齐原版 XhsNetwork + ResumableTransfer */
 public final class XhsNet {
-    static final String UA = "Mozilla/5.0 (Linux; Android 13; RMX3823) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Mobile Safari/537.36";
+    /** 对齐原版 ResumableTransfer.USER_AGENT */
+    static final String UA = "Mozilla/5.0 (Linux; Android 10) AppleWebKit/537.36 Chrome/141.0 Mobile Safari/537.36 xiaohongshu";
+
+    public interface Progress { void onProgress(long done, long total); }
 
     private XhsNet() {}
 
@@ -32,25 +35,26 @@ public final class XhsNet {
         return c != null && c.contains("web_session=");
     }
 
-    /** 短链跟随 30x（对齐原版最多 5 跳） */
+    /** 短链解析：跟随 302/301 */
     public static String resolveShort(String url) {
         try {
             HttpURLConnection conn = (HttpURLConnection) new URL(url).openConnection();
-            conn.setInstanceFollowRedirects(false);
-            conn.setConnectTimeout(10000);
-            conn.setReadTimeout(10000);
-            conn.setRequestProperty("User-Agent", UA);
-            int code = conn.getResponseCode();
-            String loc = null;
-            if (code == 301 || code == 302 || code == 303 || code == 307 || code == 308)
-                loc = conn.getHeaderField("Location");
-            conn.disconnect();
-            if (loc != null && !loc.isEmpty()) return loc;
-        } catch (Throwable ignored) {}
+            try {
+                conn.setInstanceFollowRedirects(false);
+                conn.setConnectTimeout(8000);
+                conn.setReadTimeout(8000);
+                conn.setRequestProperty("User-Agent", UA);
+                int code = conn.getResponseCode();
+                if (code == 301 || code == 302 || code == 303 || code == 307 || code == 308) {
+                    String loc = conn.getHeaderField("Location");
+                    if (loc != null && !loc.isEmpty()) return loc;
+                }
+            } finally { conn.disconnect(); }
+        } catch (Throwable ignored) { }
         return null;
     }
 
-    /** 抓笔记页面 HTML（带平台 Cookie） */
+    /** 拉取笔记页 HTML（带平台账号 Cookie） */
     public static String fetchHtml(String url) throws Exception {
         HttpURLConnection conn = (HttpURLConnection) new URL(url).openConnection();
         try {
@@ -59,8 +63,8 @@ public final class XhsNet {
             conn.setRequestProperty("User-Agent", UA);
             conn.setRequestProperty("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8");
             conn.setRequestProperty("Accept-Language", "zh-CN,zh;q=0.9");
-            String c = cookie();
-            if (c != null && !c.isEmpty()) conn.setRequestProperty("Cookie", c);
+            String cookie = cookie();
+            if (cookie != null && !cookie.isEmpty()) conn.setRequestProperty("Cookie", cookie);
             int code = conn.getResponseCode();
             if (code != 200) throw new Exception("HTTP " + code);
             InputStream in = conn.getInputStream();
@@ -70,16 +74,11 @@ public final class XhsNet {
             while ((n = in.read(buf)) > 0) bos.write(buf, 0, n);
             in.close();
             return bos.toString("UTF-8");
-        } finally {
-            conn.disconnect();
-        }
+        } finally { conn.disconnect(); }
     }
 
-    public interface Progress { void onProgress(long done, long total); }
-
-    /** 断点续传下载：.part 半成品 + Range 续传（对齐原版 ResumableTransfer） */
-    public static void download(String url, File dest, String referer, Progress cb,
-                                java.util.concurrent.atomic.AtomicBoolean cancel) throws Exception {
+    /** 断点续传下载（.part 临时文件 + Range 续传） */
+    public static void download(String url, File dest, String referer, Progress cb, AtomicBoolean cancel) throws Exception {
         File part = new File(dest.getParentFile(), dest.getName() + ".part");
         long existing = part.exists() ? part.length() : 0;
         HttpURLConnection conn = (HttpURLConnection) new URL(url).openConnection();
@@ -88,14 +87,26 @@ public final class XhsNet {
             conn.setReadTimeout(30000);
             conn.setRequestProperty("User-Agent", UA);
             if (referer != null && !referer.isEmpty()) conn.setRequestProperty("Referer", referer);
+            String cookie = cookie();
+            if (cookie != null && !cookie.isEmpty()) conn.setRequestProperty("Cookie", cookie);
             if (existing > 0) conn.setRequestProperty("Range", "bytes=" + existing + "-");
             int code = conn.getResponseCode();
-            if (code != 200 && code != 206) throw new Exception("HTTP " + code);
-            long total = conn.getContentLength();
-            if (total > 0 && code == 206) total += existing;
-            InputStream in = conn.getInputStream();
-            OutputStream out = new FileOutputStream(part, code == 206);
-            long done = code == 206 ? existing : 0;
+            long total;
+            InputStream in;
+            OutputStream out;
+            if (code == 206) {
+                total = existing + conn.getContentLength();
+                in = conn.getInputStream();
+                out = new FileOutputStream(part, true);
+            } else if (code == 200) {
+                total = conn.getContentLength();
+                existing = 0;
+                in = conn.getInputStream();
+                out = new FileOutputStream(part, false);
+            } else {
+                throw new Exception("HTTP " + code);
+            }
+            long done = existing;
             byte[] buf = new byte[16384];
             int n;
             while ((n = in.read(buf)) > 0) {
@@ -105,17 +116,15 @@ public final class XhsNet {
                 }
                 out.write(buf, 0, n);
                 done += n;
-                if (cb != null && total > 0) cb.onProgress(done, total);
+                if (cb != null) cb.onProgress(done, total);
             }
             out.close();
             in.close();
-            if (part.exists() && !part.renameTo(dest)) {
+            if (!part.renameTo(dest)) {
                 copyFile(part, dest);
                 part.delete();
             }
-        } finally {
-            conn.disconnect();
-        }
+        } finally { conn.disconnect(); }
     }
 
     private static void copyFile(File src, File dst) throws Exception {
@@ -128,7 +137,7 @@ public final class XhsNet {
         fos.close();
     }
 
-    /** HEAD 探测真实扩展名 */
+    /** HEAD 探测扩展名 */
     public static String probeExt(String url, String fallback) {
         HttpURLConnection conn = null;
         try {
