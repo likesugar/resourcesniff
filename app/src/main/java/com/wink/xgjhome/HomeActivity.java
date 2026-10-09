@@ -226,9 +226,6 @@ public class HomeActivity extends Activity {
         findViewById(R.id.cardChat).setOnClickListener(new View.OnClickListener() {
             public void onClick(View v) { startActivity(new Intent(HomeActivity.this, ChatActivity.class)); }
         });
-        findViewById(R.id.cardWeb2Apk).setOnClickListener(new View.OnClickListener() {
-            public void onClick(View v) { showWeb2ApkDialog(); }
-        });
         findViewById(R.id.cardEnt).setOnClickListener(new View.OnClickListener() {
             public void onClick(View v) { startActivity(new Intent(HomeActivity.this, EntertainmentActivity.class)); }
         });
@@ -560,107 +557,5 @@ public class HomeActivity extends Activity {
         d.show();
     }
 
-    private String toPinyinSlug(String s) {
-        StringBuilder out = new StringBuilder();
-        for (char ch : s.toCharArray()) {
-            String[] p = net.sourceforge.pinyin4j.PinyinHelper.toHanyuPinyinStringArray(ch);
-            if (p != null && p.length > 0) {
-                String t = p[0].replaceAll("[0-9]", "");
-                out.append(Character.toLowerCase(t.charAt(0))).append(t.substring(1));
-            } else if (Character.isLetterOrDigit(ch)) {
-                out.append(Character.toLowerCase(ch));
-            } else if (out.length() > 0 && out.charAt(out.length() - 1) != '-') {
-                out.append('-');
-            }
-        }
-        String r = out.toString().replaceAll("^-+|-+$", "");
-        return r.length() == 0 ? "" : r;
-    }
 
-    private void showWeb2ApkDialog() {
-        final android.widget.EditText nameI = new android.widget.EditText(this);
-        nameI.setHint("应用名称");
-        nameI.setTextSize(16);
-        final android.widget.EditText pkgI = new android.widget.EditText(this);
-        pkgI.setHint("应用包名");
-        pkgI.setTextSize(16);
-
-        android.widget.LinearLayout box = new android.widget.LinearLayout(this);
-        box.setOrientation(android.widget.LinearLayout.VERTICAL);
-        int p16 = (int) (16 * getResources().getDisplayMetrics().density);
-        box.setPadding(p16, p16 / 2, p16, 0);
-
-        android.widget.LinearLayout.LayoutParams ep = new android.widget.LinearLayout.LayoutParams(-1, -2);
-        ep.setMargins(0, p16 / 2, 0, p16 / 2);
-        box.addView(nameI, ep);
-        box.addView(pkgI, ep);
-        final boolean[] pkgAuto = {true};
-        pkgI.addTextChangedListener(new android.text.TextWatcher() {
-            public void beforeTextChanged(CharSequence c, int a, int b, int q) {}
-            public void onTextChanged(CharSequence c, int a, int b, int q) {}
-            public void afterTextChanged(android.text.Editable e) {
-                String t = e.toString();
-                if (t.length() > 0 && !t.startsWith("com.") && !t.equals("com.")) pkgAuto[0] = false;
-                if (t.length() == 0) pkgAuto[0] = true;
-            }
-        });
-        nameI.addTextChangedListener(new android.text.TextWatcher() {
-            public void beforeTextChanged(CharSequence c, int a, int b, int q) {}
-            public void onTextChanged(CharSequence c, int a, int b, int q) {}
-            public void afterTextChanged(android.text.Editable e) {
-                if (!pkgAuto[0]) return;
-                String slug = toPinyinSlug(e.toString());
-                if (slug.length() > 0 && slug.substring(0, 1).matches("[0-9]")) slug = "x" + slug;
-                if (slug.length() > 0) {
-                    pkgAuto[0] = false;
-                    pkgI.setText("com." + slug + ".wy");
-                    pkgI.setSelection(pkgI.getText().length());
-                    pkgAuto[0] = true;
-                }
-            }
-        });
-
-        android.widget.LinearLayout tpl = new android.widget.LinearLayout(this);
-        tpl.setOrientation(android.widget.LinearLayout.HORIZONTAL);
-        tpl.setGravity(android.view.Gravity.CENTER_VERTICAL);
-        android.widget.TextView tt = new android.widget.TextView(this);
-        tt.setText("启动页初始化模版");
-        tt.setTextSize(15);
-        android.widget.TextView tv = new android.widget.TextView(this);
-        tv.setText("空白 ›");
-        tv.setTextSize(15);
-        android.widget.LinearLayout.LayoutParams tvp = new android.widget.LinearLayout.LayoutParams(0, -2, 1f);
-        tvp.rightMargin = p16;
-        tv.setLayoutParams(tvp);
-        tpl.addView(tt); tpl.addView(tv);
-        box.addView(tpl, new android.widget.LinearLayout.LayoutParams(-1, -2));
-
-        new android.app.AlertDialog.Builder(this)
-                .setTitle("创建应用")
-                .setView(box)
-                .setPositiveButton("创建", new android.content.DialogInterface.OnClickListener() {
-                    public void onClick(DialogInterface d, int w) {
-                        String n = nameI.getText().toString().trim();
-                        String pk = pkgI.getText().toString().trim();
-                        if (n.length() == 0 || !pk.matches("[a-zA-Z][a-zA-Z0-9_.]*")) {
-                            Toast.makeText(HomeActivity.this, "名称或包名不合法", Toast.LENGTH_SHORT).show();
-                            return;
-                        }
-                        // 每段必须字母开头
-                        StringBuilder fix = new StringBuilder();
-                        for (String seg : pk.split("\\.")) {
-                            if (seg.length() == 0) continue;
-                            if (!seg.substring(0, 1).matches("[a-zA-Z]")) seg = "x" + seg;
-                            fix.append(seg).append(".");
-                        }
-                        if (fix.length() > 0) pk = fix.substring(0, fix.length() - 1);
-                        android.content.Intent it = new android.content.Intent(HomeActivity.this, Web2ApkActivity.class);
-                        it.putExtra("name", n);
-                        it.putExtra("pkg", pk);
-                        startActivity(it);
-                    }
-                })
-                .setNegativeButton("取消", null)
-                .show();
-    }
 }
