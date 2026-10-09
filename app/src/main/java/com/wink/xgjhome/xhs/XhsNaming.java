@@ -31,7 +31,7 @@ public final class XhsNaming {
         }
         String out = sb.toString().trim();
         if (out.length() > 100) out = out.substring(0, 100);
-        return out.isEmpty() ? "untitled" : out;
+        return out; // 空回退交给上层（原版无 untitled）
     }
 
     /** 笔记元数据（命名所需字段） */

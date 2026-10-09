@@ -86,6 +86,8 @@ public final class XhsEngine {
                 XhsParser.Note note = XhsParser.parse(html, XhsParser.extractPostId(url), url);
                 if (note == null || note.items.isEmpty()) throw new Exception("解析失败：未找到媒体");
                 task.title = XhsNaming.sanitize(note.title);
+                if (task.title.isEmpty() && nz(note.body).length() > 0)
+                    task.title = XhsNaming.sanitize(nz(note.body).length() > 30 ? nz(note.body).substring(0, 30) : nz(note.body));
                 task.author = note.authorName;
                 if (task.description == null || task.description.isEmpty()) task.description = note.body;
                 task.noteJson = noteToJson(note);

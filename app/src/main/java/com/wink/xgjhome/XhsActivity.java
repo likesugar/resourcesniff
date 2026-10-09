@@ -261,8 +261,12 @@ public class XhsActivity extends Activity implements XhsEngine.Listener {
 
     private void detectClipboard() {
         final String text = clipboardText();
+        boolean dbg = XhsEngine.store().debugNotification();
+        if (dbg) toast("CB: auto=" + XhsEngine.store().autoReadClipboard() + " len=" + text.length()
+                + " last=" + (text.equals(getSharedPreferences("xhs_settings", MODE_PRIVATE).getString("last_clip", ""))));
         if (text.isEmpty() || text.equals(getSharedPreferences("xhs_settings", MODE_PRIVATE).getString("last_clip", ""))) return;
         List<String> links = XhsParser.extractLinks(text, null);
+        if (dbg) toast("CB links=" + links.size());
         if (links.isEmpty()) return;
         getSharedPreferences("xhs_settings", MODE_PRIVATE).edit().putString("last_clip", text).apply();
         if (XhsEngine.store().autoReadClipboard()) {
