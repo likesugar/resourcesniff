@@ -178,17 +178,41 @@ public class RepackUtil {
     }
 
     // ================= 主入口 =================
-    public static void buildFromAssets(Context ctx, String json, String pkg, String label, File outFile) throws Exception {
+    public static void buildFromAssets(Context ctx, String json, String pkg, String label, byte[] icon, File outFile) throws Exception {
         java.io.InputStream is = ctx.getAssets().open("web2apk_template.apk");
         File tpl = new File(ctx.getCacheDir(), "web2apk_template.apk");
         FileOutputStream to = new FileOutputStream(tpl);
         byte[] buf = new byte[8192]; int n;
         while ((n = is.read(buf)) > 0) to.write(buf, 0, n);
         is.close(); to.close();
-        build(tpl, outFile, pkg, label, json);
+        File unsigned = new File(ctx.getCacheDir(), "web2apk_unsigned.apk");
+        build(tpl, unsigned, pkg, label, json, icon);
+        signWithApksig(unsigned, outFile, 24);
     }
 
-    static void build(File template, File outFile, String pkg, String label, String json) throws Exception {
+    public static void signWithApksig(File inApk, File outApk, int minSdk) throws Exception {
+        byte[] kb = Base64.getMimeDecoder().decode(KEY_B64);
+        byte[] cb = Base64.getMimeDecoder().decode(CERT_B64);
+        java.security.PrivateKey pk = java.security.KeyFactory.getInstance("RSA")
+                .generatePrivate(new java.security.spec.PKCS8EncodedKeySpec(kb));
+        java.security.cert.X509Certificate ct = (java.security.cert.X509Certificate)
+                java.security.cert.CertificateFactory.getInstance("X.509")
+                        .generateCertificate(new java.io.ByteArrayInputStream(cb));
+        com.android.apksig.ApkSigner.SignerConfig sc = new com.android.apksig.ApkSigner.SignerConfig.Builder(
+                "web2apk", pk, java.util.Collections.singletonList(ct)).build();
+        com.android.apksig.ApkSigner signer = new com.android.apksig.ApkSigner.Builder(
+                java.util.Collections.singletonList(sc))
+                .setInputApk(inApk)
+                .setOutputApk(outApk)
+                .setMinSdkVersion(minSdk)
+                .setV1SigningEnabled(true)
+                .setV2SigningEnabled(true)
+                .setV3SigningEnabled(true)
+                .build();
+        signer.sign();
+    }
+
+    static void build(File template, File outFile, String pkg, String label, String json, byte[] icon) throws Exception {
         initKeys();
         List<Ent> ents = readZip(template);
         Map<String,String> rep = new HashMap<>();
@@ -200,6 +224,7 @@ public class RepackUtil {
             byte[] d = e.data;
             if (e.name.equals("AndroidManifest.xml")) d = patchAxml(d, rep);
             else if (e.name.equals("assets/site.json")) d = json.getBytes(StandardCharsets.UTF_8);
+            else if (icon != null && e.name.contains("ic_launcher")) d = icon;
             files.put(e.name, d);
         }
         // ---- 写zip ----
@@ -277,9 +302,8 @@ public class RepackUtil {
         zo.write(eocdRaw);
         byte[] zip0 = zo.toByteArray();
 
-        byte[] signed = signV2V3(zip0, cdStart, cdSize, cdB, eocdRaw, order.size());
         FileOutputStream fo = new FileOutputStream(outFile);
-        fo.write(signed); fo.close();
+        fo.write(zip0); fo.close();
     }
 
     // ---- V2/V3 signing block ----

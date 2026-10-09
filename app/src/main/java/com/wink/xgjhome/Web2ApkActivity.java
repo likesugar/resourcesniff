@@ -19,6 +19,9 @@ import android.widget.TextView;
 import android.widget.Toast;
 
 import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
+import java.io.ByteArrayOutputStream;
 import java.io.FileOutputStream;
 
 /** 网页转APK: 网站列表 + 夜间模式/启用JS/隐藏导航栏/隐藏状态栏 + 打包 */
@@ -134,6 +137,17 @@ public class Web2ApkActivity extends Activity {
         });
         root.addView(build, bp);
 
+        try {
+            File savedIcon = new File(getFilesDir(), "web2apk_icon.png");
+            if (savedIcon.exists()) {
+                FileInputStream fi = new FileInputStream(savedIcon);
+                ByteArrayOutputStream bo = new ByteArrayOutputStream();
+                byte[] b2 = new byte[8192]; int n2;
+                while ((n2 = fi.read(b2)) > 0) bo.write(b2, 0, n2);
+                fi.close();
+                iconBytes = bo.toByteArray();
+            }
+        } catch (Throwable ignored) {}
         setContentView(root);
         render();
     }
@@ -184,6 +198,42 @@ public class Web2ApkActivity extends Activity {
             empty.setPadding(dp(16), dp(24), dp(16), dp(24));
             content.addView(empty);
         }
+        // 自定义图标
+        LinearLayout irow = new LinearLayout(this);
+        irow.setOrientation(LinearLayout.HORIZONTAL);
+        irow.setGravity(Gravity.CENTER_VERTICAL);
+        irow.setBackgroundColor(ROW);
+        irow.setPadding(dp(16), dp(14), dp(16), dp(14));
+        LinearLayout ic = new LinearLayout(this);
+        ic.setGravity(Gravity.CENTER);
+        GradientDrawable ig = new GradientDrawable();
+        ig.setCornerRadius(dp(8));
+        ig.setColor(0xFF2A2E33);
+        ic.setBackground(ig);
+        TextView iv = glyph(iconBytes == null ? "🖼" : "✓", iconBytes == null ? TXT : ACCENT, 13);
+        ic.addView(iv);
+        irow.addView(ic, new LinearLayout.LayoutParams(dp(34), dp(34)));
+        TextView it = new TextView(this);
+        it.setText(iconBytes == null ? "应用图标：默认（点此自定义）" : "应用图标：已自定义 ✓");
+        it.setTextColor(TXT);
+        it.setTextSize(16);
+        it.setTypeface(Typeface.DEFAULT_BOLD);
+        LinearLayout.LayoutParams itp = new LinearLayout.LayoutParams(0, -2, 1f);
+        itp.setMargins(dp(14), 0, dp(10), 0);
+        it.setLayoutParams(itp);
+        irow.addView(it);
+        irow.setOnClickListener(new View.OnClickListener() {
+            public void onClick(View v) {
+                android.content.Intent it2 = new android.content.Intent(android.content.Intent.ACTION_GET_CONTENT);
+                it2.setType("image/*");
+                try { startActivityForResult(android.content.Intent.createChooser(it2, "选择图标"), 7001); }
+                catch (Throwable t) { Toast.makeText(Web2ApkActivity.this, "无法打开图片选择", Toast.LENGTH_SHORT).show(); }
+            }
+        });
+        content.addView(irow, new LinearLayout.LayoutParams(-1, -2));
+        View idv = new View(this);
+        idv.setBackgroundColor(DIV);
+        content.addView(idv, new LinearLayout.LayoutParams(-1, dp(1)));
         // 四个开关
         toggleRow("🌙", "夜间模式");
         toggleRow("JS", "启用JavaScript");
@@ -284,6 +334,30 @@ public class Web2ApkActivity extends Activity {
                 .show();
     }
 
+    private byte[] iconBytes;
+
+    @Override
+    protected void onActivityResult(int req, int res, android.content.Intent data) {
+        super.onActivityResult(req, res, data);
+        if (req == 7001 && res == RESULT_OK && data != null && data.getData() != null) {
+            try {
+                android.graphics.Bitmap bmp = android.graphics.BitmapFactory.decodeStream(
+                        getContentResolver().openInputStream(data.getData()));
+                if (bmp == null) { Toast.makeText(this, "图片解析失败", Toast.LENGTH_SHORT).show(); return; }
+                android.graphics.Bitmap out = android.graphics.Bitmap.createScaledBitmap(bmp, 192, 192, true);
+                ByteArrayOutputStream bo = new ByteArrayOutputStream();
+                out.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, bo);
+                iconBytes = bo.toByteArray();
+                FileOutputStream fo = new FileOutputStream(new File(getFilesDir(), "web2apk_icon.png"));
+                fo.write(iconBytes); fo.close();
+                render();
+                Toast.makeText(this, "图标已设置", Toast.LENGTH_SHORT).show();
+            } catch (Throwable t) {
+                Toast.makeText(this, "图标设置失败: " + t, Toast.LENGTH_SHORT).show();
+            }
+        }
+    }
+
     private String getPref(String k) {
         return getSharedPreferences("web2apk_" + pkg, MODE_PRIVATE).getString(k, null);
     }
@@ -320,7 +394,7 @@ public class Web2ApkActivity extends Activity {
                 File dir = new File(getExternalFilesDir(null), "web2apk");
                 if (!dir.exists()) dir.mkdirs();
                 File out = new File(dir, appName + "_" + pkg + ".apk");
-                RepackUtil.buildFromAssets(getApplicationContext(), cfg, pkg, appName, out);
+                RepackUtil.buildFromAssets(getApplicationContext(), cfg, pkg, appName, iconBytes, out);
                 runOnUiThread(new Runnable() { public void run() {
                     Toast.makeText(Web2ApkActivity.this, "打包完成: " + out.getAbsolutePath(), Toast.LENGTH_LONG).show();
                     try {
