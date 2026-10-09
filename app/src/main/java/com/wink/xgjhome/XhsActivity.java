@@ -62,7 +62,16 @@ public class XhsActivity extends Activity implements XhsEngine.Listener {
         super.onResume();
         XhsEngine.addListener(this);
         onChanged();
-        if (XhsEngine.store().autoReadClipboard()) detectClipboard();
+        if (XhsEngine.store().autoReadClipboard())
+            ui.postDelayed(new Runnable() { public void run() { detectClipboard(); } }, 400);
+    }
+
+    @Override
+    public void onWindowFocusChanged(boolean hasFocus) {
+        super.onWindowFocusChanged(hasFocus);
+        // Android 10+ 无焦点读剪贴板返回空——等窗口焦点到手再读
+        if (hasFocus && XhsEngine.store().autoReadClipboard())
+            ui.postDelayed(new Runnable() { public void run() { detectClipboard(); } }, 200);
     }
 
     @Override
