@@ -496,7 +496,14 @@ public class OfflineActivity extends Activity {
             File t = new File(f.getAbsolutePath() + ".tmp." + Thread.currentThread().getId());
             FileOutputStream fo = new FileOutputStream(t);
             fo.write(b); fo.close();
-            t.renameTo(f);
+            if (!t.renameTo(f)) {
+                java.io.FileInputStream fi = new java.io.FileInputStream(t);
+                FileOutputStream fo2 = new FileOutputStream(f);
+                byte[] bb = new byte[16384]; int nn;
+                while ((nn = fi.read(bb)) > 0) fo2.write(bb, 0, nn);
+                fi.close(); fo2.close();
+                t.delete();
+            }
         } catch (Throwable e) { }
     }
 
@@ -853,9 +860,13 @@ public class OfflineActivity extends Activity {
                 String path = pu.getPath();
                 if (path != null && path.length() > 1) {
                     File rf = new File(pd, path.substring(1));
-                    if (rf.exists() && rf.isFile()) return serveRes(rf);
+                    if (rf.exists() && rf.isFile()) { dlog("RES_HIT " + path + " " + rf.length()); return serveRes(rf); }
+                    dlog("RES_MISS " + path + " dir=" + pd.getAbsolutePath() + " exists=" + pd.exists());
+                    File sub = new File(pd, path.substring(1, path.lastIndexOf('/') > 0 ? path.lastIndexOf('/') : 1));
+                    File[] ls = sub.listFiles();
+                    if (ls != null) { int j = 0; for (File x : ls) { dlog("  f" + (j++) + ": " + x.getName() + " " + x.length()); if (j > 25) break; } }
                 }
-            } catch (Throwable ignored) {}
+            } catch (Throwable e2) { dlog("RES_ERR " + e2); }
             toastOnce(snapBusy ? "正在离线保存中,稍后再试" : "该页面未离线保存");
             return new WebResourceResponse("text/plain", "utf-8", new java.io.ByteArrayInputStream(new byte[0]));
         }
