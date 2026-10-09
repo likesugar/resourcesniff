@@ -39,7 +39,7 @@ public class XhsActivity extends Activity implements XhsEngine.Listener {
 
     private boolean dark, oled;
     private int accent;
-    private LinearLayout listBody, tabAll, tabPending, tabFailed;
+    private LinearLayout listBody, tabAll, tabDone, tabPending, tabFailed;
     private String query = "", filter = "all";
     private EditText etSearch;
     private final Handler ui = new Handler();
@@ -146,9 +146,11 @@ public class XhsActivity extends Activity implements XhsEngine.Listener {
         tabs.setOrientation(LinearLayout.HORIZONTAL);
         tabs.setPadding(dp(16), 0, dp(16), dp(8));
         tabAll = makeTab("全部", "all");
+        tabDone = makeTab("已完成", "done");
         tabPending = makeTab("待选择", "pending");
         tabFailed = makeTab("失败", "failed");
         tabs.addView(tabAll);
+        tabs.addView(tabDone);
         tabs.addView(tabPending);
         tabs.addView(tabFailed);
         tabsScroll.addView(tabs);
@@ -232,7 +234,7 @@ public class XhsActivity extends Activity implements XhsEngine.Listener {
         t.setTag(tv);
         t.addView(tv);
         t.setOnClickListener(new View.OnClickListener() {
-            public void onClick(View v) { filter = key; restyleTab(tabAll, "全部", "all"); restyleTab(tabPending, "待选择", "pending"); restyleTab(tabFailed, "失败", "failed"); rebuildList(); }
+            public void onClick(View v) { filter = key; restyleTab(tabAll, "全部", "all"); restyleTab(tabDone, "已完成", "done"); restyleTab(tabPending, "待选择", "pending"); restyleTab(tabFailed, "失败", "failed"); rebuildList(); }
         });
         restyleTab(t, label, key);
         LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(-2, -2);
@@ -307,6 +309,7 @@ public class XhsActivity extends Activity implements XhsEngine.Listener {
         List<XhsStore.Task> tasks = XhsEngine.tasks();
         for (final XhsStore.Task t : tasks) {
             if (filter.equals("failed") && !"failed".equals(t.status)) continue;
+            if (filter.equals("done") && !"done".equals(t.status)) continue;
             if (filter.equals("pending") && !("pending".equals(t.status) || "running".equals(t.status)
                     || "stopped".equals(t.status) || "selecting".equals(t.status))) continue;
             if (!query.isEmpty() && !(nz(t.title) + nz(t.author)).contains(query)) continue;
@@ -393,10 +396,14 @@ public class XhsActivity extends Activity implements XhsEngine.Listener {
                 actions.addView(miniBtn("重试", new View.OnClickListener() {
                     public void onClick(View v) { XhsEngine.retry(t); }
                 }));
-            if ("done".equals(t.status) && !t.files.isEmpty())
+            if ("done".equals(t.status) && !t.files.isEmpty()) {
+                actions.addView(miniBtn("播放", new View.OnClickListener() {
+                    public void onClick(View v) { playTask(t); }
+                }));
                 actions.addView(miniBtn("打开目录", new View.OnClickListener() {
                     public void onClick(View v) { openFolder(t); }
                 }));
+            }
             if (!"running".equals(t.status))
                 actions.addView(miniBtn("删除", new View.OnClickListener() {
                     public void onClick(View v) { confirmDelete(t); }
@@ -494,6 +501,24 @@ public class XhsActivity extends Activity implements XhsEngine.Listener {
                     public void onClick(android.content.DialogInterface d, int w) { XhsEngine.remove(t); }
                 })
                 .show();
+    }
+
+    /** 内置播放器播放任务里的视频（没有视频则播第一个文件） */
+    private void playTask(final XhsStore.Task t) {
+        if (t.files.isEmpty()) { toast("无文件"); return; }
+        String pick = t.files.get(0);
+        for (String f : t.files) {
+            String low = f.toLowerCase();
+            if (low.endsWith(".mp4") || low.endsWith(".mov")) { pick = f; break; }
+        }
+        try {
+            if (pick.startsWith("content://")) { openAny(pick); return; }
+            Intent i = new Intent(this, NativePlayerActivity.class);
+            i.putExtra("url", pick);
+            i.putExtra("title", nz(t.title).isEmpty() ? "播放" : t.title);
+            i.putExtra("kernel", "native");
+            startActivity(i);
+        } catch (Throwable e) { openAny(pick); }
     }
 
     /** 打开文件/目录（MediaStore 模式存的是 content://，直接列文件并打开） */
