@@ -80,7 +80,7 @@ public final class XhsSink {
         if (part.exists() && part.length() > 0) {
             XhsNet.download(url, dest, "https://www.xiaohongshu.com/", cb, cancel); // 续传走单线程
         } else {
-            XhsNet.downloadMT(url, dest, "https://www.xiaohongshu.com/", 4, cb, cancel);
+            XhsNet.downloadMT(url, dest, "https://www.xiaohongshu.com/", 8, cb, cancel);
         }
     }
 
@@ -99,7 +99,7 @@ public final class XhsSink {
         // 多线程下载到缓存临时文件，再拷贝进 MediaStore（MediaStore 不支持随机写）
         java.io.File tmp = java.io.File.createTempFile("xhs", ".part", c.getCacheDir());
         try {
-            XhsNet.downloadMT(url, tmp, "https://www.xiaohongshu.com/", 4, cb, cancel);
+            XhsNet.downloadMT(url, tmp, "https://www.xiaohongshu.com/", 8, cb, cancel);
             java.io.InputStream in = new java.io.FileInputStream(tmp);
             byte[] buf = new byte[32768];
             int k;

@@ -122,11 +122,12 @@ public final class XhsEngine {
     }
 
     private static void downloadItemsList(final XhsStore.Task task, List<XhsParser.Media> items) throws Exception {
-        boolean useStore = STORE.customStorageDir() == null || STORE.customStorageDir().trim().isEmpty();
+        String custom = STORE.customStorageDir();
+        boolean useStore = custom != null && !custom.trim().isEmpty();
         String relDir = (nz(task.author).isEmpty() ? "" : task.author + "-") + nz(task.title);
         relDir = XhsNaming.sanitize(relDir);
         if (relDir.isEmpty()) relDir = "XHS_" + task.id;
-        File dir = useStore ? null : STORE.mediaDir(CTX);
+        File dir = new File(STORE.mediaDir(CTX), relDir);
         int index = 0;
         boolean checkExisting = STORE.checkExistingFiles();
         for (XhsParser.Media m : items) {

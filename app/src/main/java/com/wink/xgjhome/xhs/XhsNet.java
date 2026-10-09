@@ -157,7 +157,7 @@ public final class XhsNet {
         File part = new File(dest.getParentFile(), dest.getName() + ".part");
         java.io.RandomAccessFile raf = new java.io.RandomAccessFile(part, "rw");
         raf.setLength(len[0]);
-        int n = Math.max(1, Math.min(threads, 6));
+        int n = Math.max(1, Math.min(threads, 8));
         long seg = len[0] / n;
         final java.util.concurrent.atomic.AtomicLong done = new java.util.concurrent.atomic.AtomicLong(0);
         final long total = len[0];

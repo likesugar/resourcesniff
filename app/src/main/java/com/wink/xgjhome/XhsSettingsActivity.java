@@ -139,7 +139,7 @@ public class XhsSettingsActivity extends Activity {
         tvAccount.setTextColor(logged ? 0xFF0E9F6E : 0xFFE5A50A);
         String custom = store.customStorageDir();
         tvStorage.setText(custom == null || custom.trim().isEmpty()
-                ? "默认：/sdcard/Pictures/XHS下载" : custom);
+                ? "默认：/storage/emulated/0/Android/data/com.wink.xgjhome/files/xhs" : custom);
     }
 
     private void editTemplate() {

@@ -55,7 +55,7 @@ public final class XhsStore {
     public boolean checkExistingFiles() { return sp.getBoolean("checkExistingFilesBeforeSave", true); }
     public void setCheckExistingFiles(boolean v) { sp.edit().putBoolean("checkExistingFilesBeforeSave", v).apply(); }
 
-    /** 默认保存目录：Pictures/XHS下载（自定义目录优先） */
+    /** 默认保存目录：应用专属 files/xhs（直写免权限）；自定义目录优先 */
     public File mediaDir(Context c) {
         String custom = customStorageDir();
         if (custom != null && !custom.trim().isEmpty()) {
@@ -63,8 +63,7 @@ public final class XhsStore {
             f.mkdirs();
             if (f.canWrite()) return f;
         }
-        File f = new File(android.os.Environment.getExternalStoragePublicDirectory(
-                android.os.Environment.DIRECTORY_PICTURES), "XHS下载");
+        File f = new File(c.getExternalFilesDir(null), "xhs");
         f.mkdirs();
         return f;
     }

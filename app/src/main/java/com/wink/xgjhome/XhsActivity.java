@@ -60,7 +60,6 @@ public class XhsActivity extends Activity implements XhsEngine.Listener {
     @Override
     protected void onResume() {
         super.onResume();
-        if (XhsEngine.store().autoReadClipboard()) detectClipboard();
         XhsEngine.addListener(this);
         onChanged();
         if (XhsEngine.store().autoReadClipboard()) detectClipboard();
@@ -70,7 +69,10 @@ public class XhsActivity extends Activity implements XhsEngine.Listener {
     protected void onPause() {
         super.onPause();
         XhsEngine.removeListener(this);
+        // 离开页面清去重标记，回来再进时同一条剪贴板也能重新检测
+        getSharedPreferences("xhs_settings", MODE_PRIVATE).edit().remove("last_clip").apply();
     }
+
 
     @Override public void onChanged() { runOnUiThread(new Runnable() { public void run() { rebuildList(); } }); }
 
@@ -499,9 +501,12 @@ public class XhsActivity extends Activity implements XhsEngine.Listener {
             return;
         }
         try {
-            Intent i = new Intent(Intent.ACTION_VIEW);
-            i.setDataAndType(Uri.fromFile(new File(first).getParentFile()), "resource/folder");
-            startActivity(i);
+            AlertDialog.Builder b = new AlertDialog.Builder(this).setTitle("已保存 " + t.files.size() + " 个文件");
+            CharSequence[] names = new CharSequence[t.files.size()];
+            for (int i = 0; i < t.files.size(); i++) names[i] = new File(t.files.get(i)).getName();
+            b.setItems(names, new android.content.DialogInterface.OnClickListener() {
+                public void onClick(android.content.DialogInterface d, int w) { openAny(t.files.get(w)); }
+            }).show();
             return;
         } catch (Throwable ignored) { }
         toast(first);
@@ -510,7 +515,15 @@ public class XhsActivity extends Activity implements XhsEngine.Listener {
     private void openAny(String s) {
         try {
             Intent i = new Intent(Intent.ACTION_VIEW);
-            i.setDataAndType(Uri.parse(s), s.contains(".mp4") || s.contains(".mov") ? "video/*" : "image/*");
+            Uri u;
+            String type;
+            if (s.startsWith("content://")) { u = Uri.parse(s); type = s.contains(".mp4") || s.contains(".mov") ? "video/*" : "image/*"; }
+            else {
+                File f = new File(s);
+                u = androidx.core.content.FileProvider.getUriForFile(this, "com.wink.xgjhome.fp", f);
+                type = (s.endsWith(".mp4") || s.endsWith(".mov")) ? "video/mp4" : "image/*";
+            }
+            i.setDataAndType(u, type);
             i.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
             startActivity(i);
         } catch (Throwable e) { toast("无法打开"); }
