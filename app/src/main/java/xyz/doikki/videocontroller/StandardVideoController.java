@@ -63,8 +63,6 @@ public class StandardVideoController extends GestureVideoController implements V
         mLockButton = findViewById(R.id.lock);
         mLockButton.setOnClickListener(this);
         mLoadingProgress = findViewById(R.id.loading);
-        mKernelButton = findViewById(R.id.kernel_switch);
-        if (mKernelButton != null) mKernelButton.setOnClickListener(this);
     }
 
     public interface OnKernelSwitchListener { void onKernelSwitch(); }
@@ -91,10 +89,16 @@ public class StandardVideoController extends GestureVideoController implements V
         titleView.setTitle(title);
         addControlComponent(completeView, errorView, prepareView, titleView);
         if (isLive) {
-            addControlComponent(new LiveControlView(getContext()));
+            LiveControlView live = new LiveControlView(getContext());
+            addControlComponent(live);
+            mKernelButton = live.findViewById(R.id.kernel_switch);
         } else {
-            addControlComponent(new VodControlView(getContext()));
+            VodControlView vod = new VodControlView(getContext());
+            addControlComponent(vod);
+            mKernelButton = vod.findViewById(R.id.kernel_switch);
         }
+        // 耳机按钮在 Vod/Live 控制栏布局里, 必须在那里挂监听(此前挂在控制器自身布局上永远 findViewById=null)
+        if (mKernelButton != null) mKernelButton.setOnClickListener(this);
         addControlComponent(new GestureView(getContext()));
         setCanChangePosition(!isLive);
     }
