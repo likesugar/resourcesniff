@@ -37,6 +37,7 @@
         <activity android:name=".AiChatActivity" android:exported="false" android:windowSoftInputMode="adjustResize"/>
         <receiver android:name=".MedPlanActivity$MedPlanReceiver" android:exported="false"/>
         <receiver android:name=".MedPlanActivity$MedConfirmReceiver" android:exported="false"/>
+        <activity android:name=".Web2ApkActivity" android:exported="false" android:configChanges="orientation|screenSize|keyboardHidden"/>
         <activity android:name=".SettingsActivity" android:exported="false" android:windowSoftInputMode="adjustResize"/>
         <activity android:name=".LoginWebActivity" android:exported="false" android:configChanges="orientation|screenSize|keyboardHidden" android:windowSoftInputMode="adjustResize"/>
         <activity android:name=".ShortcutEditActivity" android:exported="false"/>

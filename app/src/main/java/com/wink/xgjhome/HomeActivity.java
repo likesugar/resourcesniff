@@ -227,11 +227,7 @@ public class HomeActivity extends Activity {
             public void onClick(View v) { startActivity(new Intent(HomeActivity.this, ChatActivity.class)); }
         });
         findViewById(R.id.cardWeb2Apk).setOnClickListener(new View.OnClickListener() {
-            public void onClick(View v) {
-                Intent i = new Intent(HomeActivity.this, SniffActivity.class);
-                i.putExtra("input", "https://github.com/xliaoy/Web-to-Android");
-                startActivity(i);
-            }
+            public void onClick(View v) { startActivity(new Intent(HomeActivity.this, Web2ApkActivity.class)); }
         });
         findViewById(R.id.cardEnt).setOnClickListener(new View.OnClickListener() {
             public void onClick(View v) { startActivity(new Intent(HomeActivity.this, EntertainmentActivity.class)); }
