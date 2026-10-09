@@ -408,6 +408,20 @@ public class HomeActivity extends Activity {
         } catch (Throwable e) { return null; }
     }
 
+    static String dyAutoResolve(String text, String savedId) {
+        if (text == null || text.length() == 0) {
+            return savedId.length() > 0 ? "https://live.douyin.com/" + savedId : null;
+        }
+        String t = text.trim();
+        if (t.matches("[0-9]{6,20}") || (t.matches("[0-9A-Za-z]{6,24}") && t.matches(".*[A-Za-z].*") && t.matches(".*[0-9].*")))
+            return "https://live.douyin.com/" + t;
+        java.util.regex.Matcher m = java.util.regex.Pattern.compile("live\\.douyin\\.com/([0-9A-Za-z]{6,24})").matcher(t);
+        if (m.find()) return "https://live.douyin.com/" + m.group(1);
+        m = java.util.regex.Pattern.compile("(?:search/|keyword=)([0-9]{6,20}|(?=.*[A-Za-z])(?=.*[0-9])[0-9A-Za-z]{6,24})").matcher(t);
+        if (m.find()) return "https://live.douyin.com/" + m.group(1);
+        return null;
+    }
+
     private void showSniffDialog() {
         android.app.Dialog d = new android.app.Dialog(this);
         d.setContentView(R.layout.dialog_sniff);
@@ -431,6 +445,21 @@ public class HomeActivity extends Activity {
             }
         };
         repaint.afterTextChanged(null);
+        // 开关开着: 自动识别剪贴板里的抖音号或自动填上次直播间
+        if (spf.getBoolean("douyin_live", false)) {
+            String clipText = null;
+            try {
+                ClipboardManager cm0 = (ClipboardManager) getSystemService(CLIPBOARD_SERVICE);
+                if (cm0 != null && cm0.getPrimaryClip() != null && cm0.getPrimaryClip().getItemAt(0) != null
+                        && cm0.getPrimaryClip().getItemAt(0).getText() != null)
+                    clipText = cm0.getPrimaryClip().getItemAt(0).getText().toString().trim();
+            } catch (Throwable ignored) {}
+            String auto = dyAutoResolve(clipText, spf.getString("dyid", ""));
+            if (auto != null) {
+                et.setText(auto);
+                et.setHint("");
+            }
+        }
         dyT.setOnClickListener(new View.OnClickListener() {
             public void onClick(View v) {
                 spf.edit().putBoolean("douyin_live", !spf.getBoolean("douyin_live", false)).apply();
@@ -448,7 +477,13 @@ public class HomeActivity extends Activity {
                     if (cm != null && cm.getPrimaryClip() != null
                             && cm.getPrimaryClip().getItemAt(0) != null
                             && cm.getPrimaryClip().getItemAt(0).getText() != null) {
-                        et.setText(cm.getPrimaryClip().getItemAt(0).getText().toString().trim());
+                        String pasted = cm.getPrimaryClip().getItemAt(0).getText().toString().trim();
+                        boolean dyOn0 = getSharedPreferences("settings", MODE_PRIVATE).getBoolean("douyin_live", false);
+                        if (dyOn0) {
+                            String auto = dyAutoResolve(pasted, getSharedPreferences("settings", MODE_PRIVATE).getString("dyid", ""));
+                            if (auto != null) { pasted = auto; getSharedPreferences("settings", MODE_PRIVATE).edit().putString("dyid", auto.replace("https://live.douyin.com/","")).apply(); }
+                        }
+                        et.setText(pasted);
                     }
                 } catch (Exception e) { }
             }
@@ -461,18 +496,11 @@ public class HomeActivity extends Activity {
                 String input = et.getText().toString().trim();
                 boolean dyOn = spf.getBoolean("douyin_live", false);
                 if (dyOn) {
-                    // 抖音号识别: 纯数字6-20位 或 字母+数字混合
-                    String t = input;
-                    if (t.matches("[0-9]{6,20}") || (t.matches("[0-9A-Za-z]{6,24}") && t.matches(".*[A-Za-z].*") && t.matches(".*[0-9].*"))) {
-                        input = "https://live.douyin.com/" + t;
-                        spf.edit().putString("dyid", t).apply();
-                    } else {
-                        java.util.regex.Matcher m2 = java.util.regex.Pattern.compile("live\\.douyin\\.com/([0-9A-Za-z]{6,24})").matcher(t);
-                        if (m2.find()) { input = "https://live.douyin.com/" + m2.group(1); spf.edit().putString("dyid", m2.group(1)).apply(); }
-                        else if (t.length() == 0) {
-                            String saved = spf.getString("dyid", "");
-                            if (saved.length() > 0) input = "https://live.douyin.com/" + saved;
-                        }
+                    String auto = dyAutoResolve(input, spf.getString("dyid", ""));
+                    if (auto != null) {
+                        input = auto;
+                        String id = input.replace("https://live.douyin.com/", "");
+                        spf.edit().putString("dyid", id).apply();
                     }
                 }
                 Intent i = new Intent(HomeActivity.this, SniffActivity.class);
@@ -502,7 +530,13 @@ public class HomeActivity extends Activity {
                     if (cm != null && cm.getPrimaryClip() != null
                             && cm.getPrimaryClip().getItemAt(0) != null
                             && cm.getPrimaryClip().getItemAt(0).getText() != null) {
-                        et.setText(cm.getPrimaryClip().getItemAt(0).getText().toString().trim());
+                        String pasted = cm.getPrimaryClip().getItemAt(0).getText().toString().trim();
+                        boolean dyOn0 = getSharedPreferences("settings", MODE_PRIVATE).getBoolean("douyin_live", false);
+                        if (dyOn0) {
+                            String auto = dyAutoResolve(pasted, getSharedPreferences("settings", MODE_PRIVATE).getString("dyid", ""));
+                            if (auto != null) { pasted = auto; getSharedPreferences("settings", MODE_PRIVATE).edit().putString("dyid", auto.replace("https://live.douyin.com/","")).apply(); }
+                        }
+                        et.setText(pasted);
                     }
                 } catch (Exception e) { }
             }
