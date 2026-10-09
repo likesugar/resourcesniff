@@ -23,7 +23,7 @@ echo "[2/6] aapt2 link..."
     --manifest "$PROJ/app/src/main/AndroidManifest.xml" \
     -R build_out/res.zip \
     --java build_out/gen --auto-add-overlay \
-    --min-sdk-version 29 --target-sdk-version 36 \
+    --min-sdk-version 24 --target-sdk-version 36 \
     -A "$PROJ/app/src/main/assets" \
     --version-code "$VC" --version-name "$VN"
 
@@ -43,7 +43,7 @@ java -jar ecj.jar -source 1.8 -target 1.8 -encoding UTF-8 -proc:none -nowarn \
 echo "[4/6] d8 dex..."
 find build_out/classes -name "*.class" > build_out/classlist.txt
 java -cp "$BT/lib/d8.jar" com.android.tools.r8.D8 --release \
-    --lib "$SDK" --min-api 29 --output build_out/dex \
+    --lib "$SDK" --min-api 24 --output build_out/dex \
     @build_out/classlist.txt $PROJ/app/libs/apksig.jar $PROJ/app/libs/pinyin4j-2.5.0.jar /home/z/my-project/android_build/ffk_out/classes.jar /home/z/my-project/android_build/ffk_out/sex/smart-exception-java-0.2.1.jar /home/z/my-project/android_build/ffk_out/sex/smart-exception-common-0.2.1.jar
 
 echo "[5/6] dex + zipalign..."

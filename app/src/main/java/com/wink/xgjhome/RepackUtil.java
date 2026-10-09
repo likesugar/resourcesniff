@@ -245,7 +245,7 @@ public class RepackUtil {
                 "\",\"night\":" + ("1".equals(cf.getString("暗黑模式", "0")) ? 1 : 0) +
                 ",\"js\":1" +
                 ",\"hide_nav\":" + ("1".equals(cf.getString("隐藏导航栏", "0")) ? 1 : 0) +
-                ",\"hide_status\":" + ("1".equals(cf.getString("隐藏状态栏", "0")) ? 1 : 0) +
+                ",\"hide_status\":" + ("1".equals(cf.getString("沉浸式状态栏", "0")) ? 1 : 0) +
                 ",\"user_slide\":" + ("1".equals(cf.getString("用户滑动", "1")) ? 1 : 0) +
                 ",\"hide\":" + ("1".equals(cf.getString("隐藏", "0")) ? 1 : 0) +
                 ",\"ua_desktop\":" + ("1".equals(cf.getString("浏览器标识", "0")) ? 1 : 0) + "}";
