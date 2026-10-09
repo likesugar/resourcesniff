@@ -395,7 +395,7 @@ public class Web2ApkActivity extends Activity {
                 File dir = new File(getExternalFilesDir(null), "web2apk");
                 if (!dir.exists()) dir.mkdirs();
                 File out = new File(dir, appName + "_" + pkg + ".apk");
-                RepackUtil.buildFromAssets(getApplicationContext(), cfg, pkg, appName, iconBytes, out);
+                RepackUtil.buildFromAssets(getApplicationContext(), cfg, pkg, appName, iconBytes, false, out);
                 runOnUiThread(new Runnable() { public void run() {
                     Toast.makeText(Web2ApkActivity.this, "打包完成: " + out.getAbsolutePath(), Toast.LENGTH_LONG).show();
                     try {

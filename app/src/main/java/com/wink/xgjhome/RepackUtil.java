@@ -178,7 +178,7 @@ public class RepackUtil {
     }
 
     // ================= 主入口 =================
-    public static void buildFromAssets(Context ctx, String json, String pkg, String label, byte[] icon, File outFile) throws Exception {
+    public static void buildFromAssets(Context ctx, String json, String pkg, String label, byte[] icon, boolean patchArsc, File outFile) throws Exception {
         java.io.InputStream is = ctx.getAssets().open("web2apk_template.apk");
         File tpl = new File(ctx.getCacheDir(), "web2apk_template.apk");
         FileOutputStream to = new FileOutputStream(tpl);
@@ -186,7 +186,7 @@ public class RepackUtil {
         while ((n = is.read(buf)) > 0) to.write(buf, 0, n);
         is.close(); to.close();
         File unsigned = new File(ctx.getCacheDir(), "web2apk_unsigned.apk");
-        build(tpl, unsigned, pkg, label, json, icon);
+        build(tpl, unsigned, pkg, label, json, icon, patchArsc);
         signWithApksig(unsigned, outFile, 24);
     }
 
@@ -232,7 +232,7 @@ public class RepackUtil {
         return outArr;
     }
 
-    static void build(File template, File outFile, String pkg, String label, String json, byte[] icon) throws Exception {
+    static void build(File template, File outFile, String pkg, String label, String json, byte[] icon, boolean doPatchArsc) throws Exception {
         initKeys();
         List<Ent> ents = readZip(template);
         Map<String,String> rep = new HashMap<>();
@@ -245,7 +245,7 @@ public class RepackUtil {
             if (e.name.equals("AndroidManifest.xml")) d = patchAxml(d, rep);
             else if (e.name.equals("assets/site.json")) d = json.getBytes(StandardCharsets.UTF_8);
             else if (icon != null && e.name.contains("ic_launcher")) d = icon;
-            else if (e.name.equals("resources.arsc")) d = patchArsc(d, pkg);
+            else if (e.name.equals("resources.arsc") && doPatchArsc) d = patchArsc(d, pkg);
             files.put(e.name, d);
         }
         // ---- 写zip ----
