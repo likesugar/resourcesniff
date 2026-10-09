@@ -212,6 +212,26 @@ public class RepackUtil {
         signer.sign();
     }
 
+        static byte[] patchArsc(byte[] arsc, String newPkg) throws Exception {
+        byte[] outArr = arsc.clone();
+        byte[] needle = "com.wink.webshell".getBytes(StandardCharsets.UTF_16LE);
+        byte[] pkgUtf16 = newPkg.getBytes(StandardCharsets.UTF_16LE);
+        int pos = -1;
+        for (int i = 0; i + needle.length <= outArr.length; i++) {
+            boolean match = true;
+            for (int k = 0; k < needle.length; k++) {
+                if (outArr[i + k] != needle[k]) { match = false; break; }
+            }
+            if (match) { pos = i; break; }
+        }
+        if (pos >= 0) {
+            int slot = 256; // ResTable_package.name = 128 个 UTF-16 单元 = 256 字节
+            for (int k = 0; k < slot && pos + k < outArr.length; k++) outArr[pos + k] = 0;
+            for (int k = 0; k < pkgUtf16.length && k < slot && pos + k < outArr.length; k++) outArr[pos + k] = pkgUtf16[k];
+        }
+        return outArr;
+    }
+
     static void build(File template, File outFile, String pkg, String label, String json, byte[] icon) throws Exception {
         initKeys();
         List<Ent> ents = readZip(template);
@@ -225,6 +245,7 @@ public class RepackUtil {
             if (e.name.equals("AndroidManifest.xml")) d = patchAxml(d, rep);
             else if (e.name.equals("assets/site.json")) d = json.getBytes(StandardCharsets.UTF_8);
             else if (icon != null && e.name.contains("ic_launcher")) d = icon;
+            else if (e.name.equals("resources.arsc")) d = patchArsc(d, pkg);
             files.put(e.name, d);
         }
         // ---- 写zip ----

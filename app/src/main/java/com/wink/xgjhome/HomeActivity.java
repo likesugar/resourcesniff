@@ -484,6 +484,7 @@ public class HomeActivity extends Activity {
                             if (auto != null) { pasted = auto; getSharedPreferences("settings", MODE_PRIVATE).edit().putString("dyid", auto.replace("https://live.douyin.com/","")).apply(); }
                         }
                         et.setText(pasted);
+                        if (pasted.startsWith("https://live.douyin.com/")) d.findViewById(R.id.btn_go).performClick();
                     }
                 } catch (Exception e) { }
             }
@@ -537,6 +538,7 @@ public class HomeActivity extends Activity {
                             if (auto != null) { pasted = auto; getSharedPreferences("settings", MODE_PRIVATE).edit().putString("dyid", auto.replace("https://live.douyin.com/","")).apply(); }
                         }
                         et.setText(pasted);
+                        if (pasted.startsWith("https://live.douyin.com/")) d.findViewById(R.id.btn_go).performClick();
                     }
                 } catch (Exception e) { }
             }
