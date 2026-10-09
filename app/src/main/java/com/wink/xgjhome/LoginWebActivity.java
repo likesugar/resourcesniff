@@ -58,13 +58,13 @@ public class LoginWebActivity extends Activity {
         final boolean bili = startUrl != null && startUrl.contains("bilibili.com");
         final boolean xhs = startUrl != null && startUrl.contains("xiaohongshu.com");
         final String desktopUa = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/130.0.0.0 Safari/537.36";
-        if (xhs) {
-            // 对齐 XHS_Downloader_Android：登录用电脑版 UA（默认 UA 首个括号改 X11; Linux x86_64，去掉 Version/Mobile）
+        if (xhs || douyin) {
+            // 电脑版 UA（默认 UA 首个括号改 X11; Linux x86_64，去掉 Version/Mobile）
             String ua = android.webkit.WebSettings.getDefaultUserAgent(this)
                     .replaceFirst("\\([^)]*\\)", "(X11; Linux x86_64)")
                     .replace(" Version/4.0", "").replace(" Mobile", "");
             ws.setUserAgentString(ua);
-        } else if (!douyin && !bili) {
+        } else if (!bili) {
             ws.setUserAgentString("Mozilla/5.0 (Linux; Android 13; M2102K1C) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36");
         }
         final boolean[] desktopFallback = {false};
