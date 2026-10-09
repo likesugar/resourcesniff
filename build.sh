@@ -31,7 +31,7 @@ echo "[3/6] ecj compile..."
 RJ=$(find build_out/gen -name R.java)
 curl -sL -o ecj.jar "https://repo1.maven.org/maven2/org/eclipse/jdt/ecj/3.33.0/ecj-3.33.0.jar"
 java -jar ecj.jar -source 1.8 -target 1.8 -encoding UTF-8 -proc:none -nowarn \
-    -cp "$SDK:/home/z/my-project/android_build/ffk_out/classes.jar:/home/z/my-project/android_build/ffk_out/sex/smart-exception-java-0.2.1.jar:/home/z/my-project/android_build/ffk_out/sex/smart-exception-common-0.2.1.jar" -d build_out/classes \
+    -cp "$SDK:$PROJ/app/libs/apksig.jar:$PROJ/app/libs/pinyin4j-2.5.0.jar:/home/z/my-project/android_build/ffk_out/classes.jar:/home/z/my-project/android_build/ffk_out/sex/smart-exception-java-0.2.1.jar:/home/z/my-project/android_build/ffk_out/sex/smart-exception-common-0.2.1.jar" -d build_out/classes \
     "$RJ" \
     "$PROJ"/app/src/main/java/com/wink/xgjhome/*.java \
     $PROJ/app/src/main/java/xyz/doikki/videoplayer/*/*.java \
@@ -44,7 +44,7 @@ echo "[4/6] d8 dex..."
 find build_out/classes -name "*.class" > build_out/classlist.txt
 java -cp "$BT/lib/d8.jar" com.android.tools.r8.D8 --release \
     --lib "$SDK" --min-api 29 --output build_out/dex \
-    @build_out/classlist.txt /home/z/my-project/android_build/ffk_out/classes.jar /home/z/my-project/android_build/ffk_out/sex/smart-exception-java-0.2.1.jar /home/z/my-project/android_build/ffk_out/sex/smart-exception-common-0.2.1.jar
+    @build_out/classlist.txt $PROJ/app/libs/apksig.jar $PROJ/app/libs/pinyin4j-2.5.0.jar /home/z/my-project/android_build/ffk_out/classes.jar /home/z/my-project/android_build/ffk_out/sex/smart-exception-java-0.2.1.jar /home/z/my-project/android_build/ffk_out/sex/smart-exception-common-0.2.1.jar
 
 echo "[5/6] dex + zipalign..."
 for d in build_out/dex/*.dex; do

@@ -174,6 +174,20 @@ public class RepackUtil {
         return out.toByteArray();
     }
 
+    static byte[] patchArscPkg(byte[] a, String pkg) throws Exception {
+        byte[] oldU = "com.wink.webshell".getBytes(StandardCharsets.UTF_16LE);
+        byte[] newU = pkg.getBytes(StandardCharsets.UTF_16LE);
+        byte[] out = new byte[oldU.length];
+        System.arraycopy(newU, 0, out, 0, newU.length);
+        for (int k = newU.length; k < oldU.length; k++) out[k] = 0;
+        for (int i = 0; i + oldU.length <= a.length; i++) {
+            boolean m = true;
+            for (int k = 0; k < oldU.length; k++) if (a[i+k] != oldU[k]) { m = false; break; }
+            if (m) { System.arraycopy(out, 0, a, i, out.length); i += oldU.length - 1; }
+        }
+        return a;
+    }
+
     // ================= ZIP =================
     static class Ent { String name; byte[] data; boolean stored; }
     static List<Ent> readZip(File f) throws Exception {
@@ -246,16 +260,39 @@ public class RepackUtil {
         signWithApksig(unsigned, outFile);
     }
 
+    static String toPkg(String label) {
+        net.sourceforge.pinyin4j.format.HanyuPinyinOutputFormat f = new net.sourceforge.pinyin4j.format.HanyuPinyinOutputFormat();
+        f.setToneType(net.sourceforge.pinyin4j.format.HanyuPinyinToneType.WITHOUT_TONE);
+        f.setVCharType(net.sourceforge.pinyin4j.format.HanyuPinyinVCharType.WITH_V);
+        StringBuilder sb = new StringBuilder();
+        for (char ch : label.toCharArray()) {
+            try {
+                String[] py = net.sourceforge.pinyin4j.PinyinHelper.toHanyuPinyinStringArray(ch, f);
+                if (py != null && py.length > 0) { sb.append(py[0]); continue; }
+            } catch (Throwable ignore) {}
+            if ((ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z') || (ch >= '0' && ch <= '9'))
+                sb.append(Character.toLowerCase(ch));
+        }
+        String s = sb.toString();
+        if (s.length() == 0) s = "app";
+        if (s.charAt(0) >= '0' && s.charAt(0) <= '9') s = "a" + s;
+        if (s.length() > 24) s = s.substring(0, 24);
+        return "com." + s + ".web";
+    }
+
     static void build(File template, File outFile, String label, String json, byte[] icon) throws Exception {
         initKeys();
         List<Ent> ents = readZip(template);
         Map<String,String> rep = new HashMap<>();
         rep.put("xapk", label);
+        String pkg = toPkg(label);
+        rep.put("com.wink.webshell", pkg);
         LinkedHashMap<String,byte[]> files = new LinkedHashMap<>();
         for (Ent e : ents) {
             if (e.name.startsWith("META-INF/")) continue;
             byte[] d = e.data;
             if (e.name.equals("AndroidManifest.xml")) d = patchAxml(d, rep);
+            else if (e.name.endsWith(".arsc")) d = patchArscPkg(d, pkg);
             else if (e.name.equals("assets/site.json")) d = json.getBytes(StandardCharsets.UTF_8);
             else if (icon != null && e.name.contains("ic_launcher")) d = icon;
             files.put(e.name, d);
