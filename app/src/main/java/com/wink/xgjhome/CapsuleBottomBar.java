@@ -20,7 +20,7 @@ public class CapsuleBottomBar extends FrameLayout {
     public interface OnItem { void onItem(int index); }
 
     private static final int COUNT = 4;
-    private static final String[] LABELS = {"🏠 首页", "🎬 媒体", "⚙️ 设置", "📡 播放器"};
+    private static final String[] LABELS = {"首页", "媒体", "设置", "播放器"};
 
     private final TextView[] items = new TextView[COUNT];
     private final View pill;

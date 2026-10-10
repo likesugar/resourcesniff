@@ -81,7 +81,6 @@ public class HomeActivity extends Activity {
     private SettingsPageView pageSettings;
     private boolean pagesBuilt = false;
     private CapsuleBottomBar bottomBar;
-    private android.view.GestureDetector pageGesture;
     private static final int[] MEDIA_CARDS = {R.id.cardPlayer, R.id.cardDownload, R.id.cardVideoDl, R.id.cardXhs};
 
     /** 三态导航: 0=首页 1=媒体 2=设置(内嵌页) */
@@ -153,19 +152,7 @@ public class HomeActivity extends Activity {
         pageSettings.setVisibility(View.GONE);
         pageHost.addView(pageSettings, new FrameLayout.LayoutParams(
                 FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT));
-        // 来回滑动提示 ↔（置于页面容器上方）
-        android.widget.LinearLayout hintRow = new android.widget.LinearLayout(this);
-        hintRow.setOrientation(android.widget.LinearLayout.HORIZONTAL);
-        hintRow.setGravity(android.view.Gravity.CENTER);
-        TextView hint = new TextView(this);
-        hint.setText("←↔→  左右滑动切换");
-        hint.setTextSize(11);
-        hint.setTextColor(0xFF8A94A6);
-        hint.setPadding(0, (int)(4 * getResources().getDisplayMetrics().density), 0, (int)(2 * getResources().getDisplayMetrics().density));
-        hintRow.addView(hint);
-        toolColumn.addView(hintRow, homeIdx, new android.view.ViewGroup.LayoutParams(
-                android.view.ViewGroup.LayoutParams.MATCH_PARENT, android.view.ViewGroup.LayoutParams.WRAP_CONTENT));
-        toolColumn.addView(pageHost, homeIdx + 1, new android.view.ViewGroup.LayoutParams(
+        toolColumn.addView(pageHost, homeIdx, new android.view.ViewGroup.LayoutParams(
                 android.view.ViewGroup.LayoutParams.MATCH_PARENT, android.view.ViewGroup.LayoutParams.MATCH_PARENT));
     }
 
@@ -247,36 +234,32 @@ public class HomeActivity extends Activity {
         if (hasFocus) applyImmersive();
     }
 
+    private float swX0, swY0; private boolean swTracking;
     @Override
     public boolean dispatchTouchEvent(android.view.MotionEvent ev) {
-        if (pageGesture != null && bottomBar != null) {
-            int[] loc = new int[2];
-            bottomBar.getLocationOnScreen(loc);
-            boolean onBar = ev.getRawY() >= loc[1] - dp2(8);
-            if (!onBar) pageGesture.onTouchEvent(ev);
-            else pageGesture.onTouchEvent(android.view.MotionEvent.obtain(ev.getDownTime(), ev.getEventTime(), android.view.MotionEvent.ACTION_CANCEL, ev.getX(), ev.getY(), 0));
+        switch (ev.getActionMasked()) {
+            case android.view.MotionEvent.ACTION_DOWN:
+                swX0 = ev.getX(); swY0 = ev.getY(); swTracking = true; break;
+            case android.view.MotionEvent.ACTION_UP: {
+                if (swTracking) {
+                    swTracking = false;
+                    float dx = ev.getX() - swX0, dy = ev.getY() - swY0;
+                    int edge = (int) (getResources().getDisplayMetrics().widthPixels * 0.08f);
+                    if (Math.abs(dx) > 150 && Math.abs(dx) > Math.abs(dy) * 1.5f
+                            && swX0 > edge && swX0 < getResources().getDisplayMetrics().widthPixels - edge) {
+                        int target = dx < 0 ? (pageIdx + 1) % 3 : (pageIdx + 2) % 3;
+                        switchToPage(target);
+                    }
+                }
+                break;
+            }
+            case android.view.MotionEvent.ACTION_CANCEL: swTracking = false; break;
         }
         return super.dispatchTouchEvent(ev);
     }
-
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         RecManager.init(getApplicationContext());
-        pageGesture = new android.view.GestureDetector(this, new android.view.GestureDetector.SimpleOnGestureListener() {
-            public boolean onFling(android.view.MotionEvent e1, android.view.MotionEvent e2, float vx, float vy) {
-                if (e1 == null || e2 == null) return false;
-                // 豁免系统边缘返回手势(左右边缘起手的横滑不切页)
-                int edge = (int) (getResources().getDisplayMetrics().widthPixels * 0.08f);
-                if (e1.getX() < edge || e1.getX() > getResources().getDisplayMetrics().widthPixels - edge) return false;
-                float dx = e2.getX() - e1.getX(), dy = e2.getY() - e1.getY();
-                if (Math.abs(dx) > 150 && Math.abs(dx) > Math.abs(dy) * 1.5f) {
-                    int target = dx < 0 ? (pageIdx + 1) % 3 : (pageIdx + 2) % 3;
-                    switchToPage(target);
-                    return true;
-                }
-                return false;
-            }
-        });
         Thread.setDefaultUncaughtExceptionHandler(new Thread.UncaughtExceptionHandler() {
             @Override
             public void uncaughtException(Thread t, Throwable e) {
