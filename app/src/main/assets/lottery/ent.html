@@ -41,7 +41,20 @@
   <div class="tab" id="tab1" onclick="tab(1)">🎰 老虎机</div>
 </div>
 <div class="page on" id="pg0">
-<div id="dialWrap"><canvas id="wheel" width="640" height="640"></canvas><div id="go" onclick="spin()">GO</div></div>
+<button class="btn" style="width:auto;display:inline-block;margin:8px 0 0 12px;padding:7px 20px" onclick="app.close()">← 返回</button>
+<div style="display:flex;align-items:flex-start;flex-wrap:wrap">
+  <div id="dialWrap" style="margin:6px 0 0 10px"><canvas id="wheel" width="640" height="640"></canvas><div id="go" onclick="spin()">GO</div></div>
+  <div id="helpBox" style="flex:1;min-width:220px;margin:14px 12px 0;background:#221733;border:1px solid #5b3a8c;border-radius:14px;padding:12px">
+    <button style="padding:6px 14px;background:#315CDE;color:#fff;border:none;border-radius:14px;font-size:12px;font-weight:bold" onclick="toggleCfg()">⚙ 自定义</button>
+    <div style="color:#fff;font-size:13px;line-height:1.8;margin-top:10px">
+      <b style="color:#f5c26b">🎡 玩法说明</b><br>
+      1. 按 GO 转动大转盘，指针停在奖项格即得奖励<br>
+      2. 每次转动消耗积分（可在自定义里改）<br>
+      3. 中奖自动加积分，余额见顶部<br>
+      4. 奖池内容、消耗、中奖难度都可在「自定义」里调整
+    </div>
+  </div>
+</div>
 <div id="res"></div>
 <button class="btn" onclick="spin()">转起来</button>
 </div>
@@ -81,7 +94,6 @@
   <div id="wRow" style="display:flex;gap:4px;flex-wrap:wrap"></div>
   <button onclick="saveWeights()">保存权重</button>
 </div>
-<button id="cfgBtn" onclick="toggleCfg()">⚙ 自定义</button>
 <script>
 function getList(){
   try{var l=JSON.parse(localStorage.ent_list);if(l&&l.length>=2)return l}catch(e){}

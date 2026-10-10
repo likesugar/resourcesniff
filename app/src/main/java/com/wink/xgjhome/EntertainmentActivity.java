@@ -23,6 +23,10 @@ public class EntertainmentActivity extends Activity {
         ws.setUserAgentString("Mozilla/5.0 (Linux; Android 13) Chrome/120 Mobile");
         web.setWebViewClient(new WebViewClient());
         web.setWebChromeClient(new android.webkit.WebChromeClient()); // 没有它 alert() 会被静默吞掉(积分不足提示/错误提示全部看不到)
+        web.addJavascriptInterface(new Object() {
+            @android.webkit.JavascriptInterface
+            public void close() { runOnUiThread(new Runnable() { public void run() { finish(); } }); }
+        }, "app");
         // 悬浮模式切换: 刮刮卡/转盘 ↔ 幸运水果机
         android.widget.FrameLayout root = new android.widget.FrameLayout(this);
         root.addView(web, new android.widget.FrameLayout.LayoutParams(
