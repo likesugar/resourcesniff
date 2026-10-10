@@ -131,10 +131,9 @@ public class CapsuleBottomBar extends FrameLayout {
                 float dy = ev.getY() - downY;
                 if (!swiping && Math.abs(dx) > dp(40) && Math.abs(dx) > Math.abs(dy)) {
                     swiping = true;
-                    int target;
-                    if (dx < 0) target = (active + 1) % ITEM_COUNT;          // 左滑下一个
-                    else target = (active - 1 + ITEM_COUNT) % ITEM_COUNT;    // 右滑上一个
-                    select(target, true);
+                    // 滑动循环: 首页↔媒体↔设置 (播放器仅点按)
+                    int target = dx < 0 ? (active + 1) % 3 : (active - 1 + 3) % 3;
+                    if (target != active) select(target, true);
                 }
                 break;
             }

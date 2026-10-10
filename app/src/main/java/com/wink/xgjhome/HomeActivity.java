@@ -74,21 +74,28 @@ public class HomeActivity extends Activity {
 
     private float dp2(float v) { return v * getResources().getDisplayMetrics().density; }
 
-    private boolean mediaPage = false;
+    private int pageIdx = 0; // 0=首页 1=媒体 2=设置
     private CapsuleBottomBar bottomBar;
     private android.view.GestureDetector pageGesture;
     private static final int[] MEDIA_CARDS = {R.id.cardPlayer, R.id.cardDownload, R.id.cardVideoDl, R.id.cardXhs};
 
-    /** 首页/媒体管理 胶囊页切换 */
-    private void switchPage(boolean media) {
-        if (mediaPage == media) return;
-        applyPageVisibility(media);
+    /** 三态页切换: 0=首页 1=媒体 2=设置(打开设置页) */
+    private void switchToPage(int p) {
+        if (pageIdx == p) return;
+        if (p == 2) {
+            pageIdx = 2;
+            if (bottomBar != null) bottomBar.setActive(2);
+            startActivity(new Intent(this, SettingsActivity.class));
+            return;
+        }
+        applyPageVisibility(p);
     }
 
     /** 无守卫的页面可见性应用(启动初始化也走这里) */
-    private void applyPageVisibility(boolean media) {
-        mediaPage = media;
-        if (bottomBar != null) bottomBar.setActive(media ? 1 : 0);
+    private void applyPageVisibility(int p) {
+        pageIdx = p;
+        boolean media = p == 1;
+        if (bottomBar != null) bottomBar.setActive(p);
         java.util.List<View> cards = new java.util.ArrayList<View>();
         collectCards((android.view.ViewGroup) findViewById(R.id.toolColumn), cards);
         for (View c : cards) {
@@ -116,10 +123,8 @@ public class HomeActivity extends Activity {
         }
         bottomBar = new CapsuleBottomBar(this, dark, new CapsuleBottomBar.OnItem() {
                 public void onItem(int idx) {
-                    if (idx == 1) switchPage(true);
-                    else if (idx == 2) startActivity(new Intent(HomeActivity.this, SettingsActivity.class));
-                    else if (idx == 3) showPlayChoice();
-                    else switchPage(false);
+                    if (idx == 3) showPlayChoice();
+                    else switchToPage(idx);
                 }
             });
         bottomBar.setTag("bottombar");
@@ -199,7 +204,8 @@ public class HomeActivity extends Activity {
                 if (e1.getX() < edge || e1.getX() > getResources().getDisplayMetrics().widthPixels - edge) return false;
                 float dx = e2.getX() - e1.getX(), dy = e2.getY() - e1.getY();
                 if (Math.abs(dx) > 150 && Math.abs(dx) > Math.abs(dy) * 1.5f) {
-                    switchPage(dx < 0);
+                    int target = dx < 0 ? Math.min(pageIdx + 1, 2) : Math.max(pageIdx - 1, 0);
+                    switchToPage(target);
                     return true;
                 }
                 return false;
@@ -237,7 +243,7 @@ public class HomeActivity extends Activity {
         applyTheme();
         applyImmersive();
 
-        applyPageVisibility(false); // 初始: 首页态, 隐藏媒体卡
+        applyPageVisibility(0); // 初始: 首页态, 隐藏媒体卡
 
         findViewById(R.id.themeToggle).setOnClickListener(new View.OnClickListener() {
             public void onClick(View v) {
