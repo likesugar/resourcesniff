@@ -110,7 +110,7 @@
 
                 <LinearLayout android:tag="card" android:id="@+id/cardChat"
                     android:layout_width="match_parent" android:layout_height="wrap_content"
-                    android:layout_marginTop="14dp"
+                    android:layout_marginTop="6dp"
                     android:background="@drawable/bg_card_md3" android:orientation="vertical"
                     android:padding="20dp">
                     <LinearLayout

@@ -49,7 +49,7 @@ public class SettingsPageView extends android.widget.FrameLayout {
         for (int i = 0; i < root.getChildCount(); i++) {
             View c = root.getChildAt(i);
             if (c instanceof android.widget.ScrollView) {
-                c.setPadding(c.getPaddingLeft(), c.getPaddingTop(), c.getPaddingRight(), (int) (64 * getResources().getDisplayMetrics().density));
+                c.setPadding(c.getPaddingLeft(), c.getPaddingTop(), c.getPaddingRight(), (int) (20 * getResources().getDisplayMetrics().density));
                 break;
             }
         }
