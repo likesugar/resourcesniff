@@ -166,20 +166,34 @@ public class SettingsPageView extends android.widget.FrameLayout {
         new Thread(new Runnable() { public void run() {
             String err = null;
             for (String u : urls) {
+                byte[] data = null;
+                // 每源重试 3 次, 支持断点续传
+                for (int attempt = 0; attempt < 3 && data == null; attempt++) {
+                    try {
+                        java.io.File part = new java.io.File(host.getFilesDir(), "ytdlp_custom/yt-dlp.part");
+                        long done = part.exists() ? part.length() : 0;
+                        java.net.HttpURLConnection c = (java.net.HttpURLConnection) new java.net.URL(u).openConnection();
+                        c.setConnectTimeout(15000); c.setReadTimeout(30000);
+                        c.setInstanceFollowRedirects(true);
+                        if (done > 0) c.setRequestProperty("Range", "bytes=" + done + "-");
+                        if (c.getResponseCode() / 100 != 2) { err = "HTTP " + c.getResponseCode(); part.delete(); continue; }
+                        java.io.InputStream in = c.getInputStream();
+                        java.io.FileOutputStream fo = new java.io.FileOutputStream(part, done > 0);
+                        byte[] buf = new byte[16384]; int n;
+                        while ((n = in.read(buf)) > 0) fo.write(buf, 0, n);
+                        in.close(); fo.close();
+                        data = new byte[(int) part.length()];
+                        java.io.FileInputStream fi = new java.io.FileInputStream(part);
+                        int p2 = 0; int rn;
+                        while ((rn = fi.read(data, p2, data.length - p2)) > 0) p2 += rn;
+                        fi.close();
+                        part.delete();
+                    } catch (Throwable t) { err = t.getMessage(); }
+                }
+                if (data == null) continue;
                 try {
-                    java.net.HttpURLConnection c = (java.net.HttpURLConnection) new java.net.URL(u).openConnection();
-                    c.setConnectTimeout(15000); c.setReadTimeout(30000);
-                    c.setInstanceFollowRedirects(true);
-                    if (c.getResponseCode() / 100 != 2) { err = "HTTP " + c.getResponseCode(); continue; }
-                    java.io.InputStream in = c.getInputStream();
-                    java.io.ByteArrayOutputStream bo = new java.io.ByteArrayOutputStream();
-                    byte[] buf = new byte[16384]; int n;
-                    while ((n = in.read(buf)) > 0) bo.write(buf, 0, n);
-                    in.close();
-                    byte[] data = bo.toByteArray();
                     // gzip 响应自动解压(部分代理强制压缩)
-                    String enc = c.getContentEncoding();
-                    if ((enc != null && enc.contains("gzip")) || (data.length > 2 && data[0] == 31 && data[1] == -117)) {
+                    if (data.length > 2 && data[0] == 31 && data[1] == -117) {
                         try {
                             java.io.ByteArrayInputStream bi = new java.io.ByteArrayInputStream(data);
                             java.util.zip.GZIPInputStream gi = new java.util.zip.GZIPInputStream(bi);
