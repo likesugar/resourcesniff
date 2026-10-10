@@ -131,8 +131,10 @@ public class HomeActivity extends Activity {
         }
         bottomBar = new CapsuleBottomBar(this, dark, new CapsuleBottomBar.OnItem() {
                 public void onItem(int idx) {
-                    if (idx == 3) showPlayChoice();
-                    else switchToPage(idx);
+                    if (idx == 3) {
+                        showPlayChoice();
+                        if (bottomBar != null) bottomBar.setActive(Math.min(pageIdx, 2)); // 播放器不是页面, 滑块归位
+                    } else switchToPage(idx);
                 }
             });
         bottomBar.setTag("bottombar");
@@ -314,6 +316,9 @@ public class HomeActivity extends Activity {
 
     @Override
     protected void onResume() {
+        super.onResume();
+        if (pageIdx == 2) applyPageVisibility(0); // 从设置页返回, 归位首页态
+
         super.onResume();
         calTick.post(calTickRun);
         updateMedStatus();

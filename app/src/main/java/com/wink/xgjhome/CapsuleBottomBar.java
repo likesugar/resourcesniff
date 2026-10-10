@@ -61,7 +61,6 @@ public class CapsuleBottomBar extends FrameLayout {
         pg.setColors(new int[]{dark ? 0xFF1677FF : 0xFF1677FF, dark ? 0xFF4C9AFF : 0xFF4C9AFF});
         pg.setCornerRadius(dp(15));
         pill.setBackground(pg);
-        pill.setElevation(dp(4));
         LayoutParams plp = new LayoutParams(itemW - dp(6), dp(30), Gravity.CENTER_VERTICAL | Gravity.START);
         plp.leftMargin = dp(3);
         capsule.addView(pill, plp);
