@@ -79,24 +79,6 @@ public class SettingsActivity extends Activity {
         setContentView(R.layout.activity_settings);
 
         boolean d = getSharedPreferences("settings", MODE_PRIVATE).getBoolean("dark", false);
-        CapsuleBottomBar bar = new CapsuleBottomBar(this, d, new CapsuleBottomBar.OnItem() {
-            public void onItem(int idx) {
-                if (idx == 0) {
-                    finish();
-                    overridePendingTransition(R.anim.slide_in_left, R.anim.slide_out_right);
-                } else if (idx == 2) {
-                    finish();
-                    overridePendingTransition(R.anim.slide_in_left, R.anim.slide_out_right);
-                    startActivity(new Intent(SettingsActivity.this, HomeActivity.class).putExtra("goto_play", true));
-                }
-            }
-        });
-        bar.setActive(1);
-        FrameLayout content = (FrameLayout) findViewById(android.R.id.content);
-        FrameLayout.LayoutParams blp = new FrameLayout.LayoutParams(
-                ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT,
-                Gravity.BOTTOM | Gravity.CENTER_HORIZONTAL);
-        content.addView(bar, blp);
 
         dark = getSharedPreferences("settings", MODE_PRIVATE).getBoolean("dark", false);
         platList = (LinearLayout) findViewById(R.id.platList);
