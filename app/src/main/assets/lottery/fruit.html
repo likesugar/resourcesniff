@@ -125,7 +125,6 @@ var SYM = {
 // 外圈 16 格（顺时针），与真实水果机布局近似
 var RING = ['apple','bell','bar','bell','apple','star','apple','luck','luck','bell','star',
             'apple','star','seven','seven','apple'];
-Object.keys(ODDS).forEach(function(k){ if (SYM[k]) SYM[k].odds = ODDS[k]; });
 var DIFF_W = { easy:{bar:1,seven:2,star:4,bell:4,apple:6,luck:2}, normal:{bar:2,seven:2,star:4,bell:4,apple:4,luck:1}, hard:{bar:1,seven:1,star:2,bell:3,apple:6,luck:1} };
 var XTAG = {'bar':'X30','seven':'X12','star':'X6','bell':'X6','apple':'X3'};
 // 5 个押注位（底排）：符号 + 赔率
@@ -135,6 +134,7 @@ var BETS = [2, 8];
 
 var ODDS_DEF = {apple:3, bell:6, star:6, seven:12, bar:30};
 var ODDS = (function(){ try { var o = JSON.parse(localStorage.fm_odds); if (o && o.bar) return o; } catch(e){} return ODDS_DEF; })();
+Object.keys(ODDS).forEach(function(k){ if (SYM[k]) SYM[k].odds = ODDS[k]; });
 var DIFF = localStorage.fm_diff || 'normal';
 var balance = parseInt(localStorage.getItem('fm_bal') || '500', 10);
 if (!isFinite(balance) || balance < 0) balance = 500;
