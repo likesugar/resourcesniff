@@ -10,17 +10,30 @@ import android.widget.FrameLayout;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 
-/** SmoothBottomBar 风格底部迷你胶囊导航（2项：首页/播放） */
+/**
+ * 底部胶囊导航（全新重写）
+ * 四项：首页 / 媒体 / 设置 / 播放器
+ * - 点按任意项切换
+ * - 胶囊上横向滑动切换（始终向手指方向走，循环）
+ * - 滑块平滑跟随
+ */
 public class CapsuleBottomBar extends FrameLayout {
 
     public interface OnItem { void onItem(int index); }
 
+    private static final int ITEM_COUNT = 4;
+    private static final String[] LABELS = {"🏠 首页", "🎬 媒体", "⚙️ 设置", "📡 播放器"};
+
+    private final TextView[] items = new TextView[ITEM_COUNT];
     private final View pill;
-    private final TextView[] items = new TextView[4];
-    private final boolean dark;
     private final int itemW;
+    private final boolean dark;
+    private final OnItem cb;
     private int active = 0;
-    private OnItem cb;
+
+    // 滑动检测
+    private float downX, downY;
+    private boolean swiping;
 
     public CapsuleBottomBar(Context c, boolean darkMode, OnItem callback) {
         super(c);
@@ -33,66 +46,56 @@ public class CapsuleBottomBar extends FrameLayout {
         int activeTx = dark ? 0xFFB4C5FF : 0xFF315CDE;
         int inactiveTx = dark ? 0xFF8A94A6 : 0xFF7C8694;
 
-        FrameLayout capsule = new FrameLayout(c);
+        // 外层胶囊体
+        LinearLayout capsule = new LinearLayout(c);
+        capsule.setOrientation(LinearLayout.HORIZONTAL);
         GradientDrawable bg = new GradientDrawable();
-        bg.setCornerRadius(dp(17));
+        bg.setCornerRadius(dp(16));
         bg.setColor(barBg);
         capsule.setBackground(bg);
         capsule.setElevation(dp(8));
-        LayoutParams clp = new LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT,
-                Gravity.BOTTOM | Gravity.CENTER_HORIZONTAL);
-        clp.bottomMargin = dp(12);
-        addView(capsule, clp);
+        addView(capsule, new LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT,
+                Gravity.BOTTOM | Gravity.CENTER_HORIZONTAL));
 
+        // 滑块（选中底衬）
         pill = new View(c);
         GradientDrawable pg = new GradientDrawable();
         pg.setCornerRadius(dp(14));
         pg.setColor(pillBg);
         pill.setBackground(pg);
-        FrameLayout.LayoutParams plp = new FrameLayout.LayoutParams(itemW, dp(26),
-                Gravity.BOTTOM | Gravity.START);
-        plp.leftMargin = dp(3); plp.bottomMargin = dp(3);
+        LayoutParams plp = new LayoutParams(itemW, dp(26), Gravity.BOTTOM | Gravity.START);
+        plp.leftMargin = dp(3);
+        plp.bottomMargin = dp(3);
         capsule.addView(pill, plp);
 
+        // 四个标签
         LinearLayout row = new LinearLayout(c);
         row.setOrientation(LinearLayout.HORIZONTAL);
-        capsule.addView(row, new FrameLayout.LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT));
-        String[] labels = {"🏠 首页", "🎬 媒体", "⚙️ 设置", "📡 播放器"};
-        for (int i = 0; i < 4; i++) {
+        capsule.addView(row, new LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT));
+        for (int i = 0; i < ITEM_COUNT; i++) {
             final int idx = i;
             TextView t = new TextView(c);
-            t.setText(labels[i]);
+            t.setText(LABELS[i]);
             t.setTextSize(11);
             t.setGravity(Gravity.CENTER);
             t.setTextColor(i == 0 ? activeTx : inactiveTx);
-            row.addView(t, new LinearLayout.LayoutParams(itemW, dp(26)));
-            items[i] = t;
+            t.setClickable(true);
             t.setOnClickListener(new OnClickListener() {
                 public void onClick(View v) { select(idx, true); }
             });
+            row.addView(t, new LinearLayout.LayoutParams(itemW, dp(26)));
+            items[i] = t;
         }
     }
 
-    @Override
-    public boolean dispatchTouchEvent(android.view.MotionEvent ev) {
-        if (ev.getAction() == android.view.MotionEvent.ACTION_DOWN) { downX = ev.getX(); swiped = false; }
-        else if (ev.getAction() == android.view.MotionEvent.ACTION_MOVE) {
-            float dx = ev.getX() - downX;
-            if (!swiped && Math.abs(dx) > dp(50)) {
-                swiped = true;
-                int target = dx < 0 ? Math.min(active + 1, 1) : Math.max(active - 1, 0);
-                select(target, true);
-            }
-        }
-        return super.dispatchTouchEvent(ev);
-    }
-    private float downX; private boolean swiped;
-
-    /** 外部同步选中态(不触发回调) */
-    public void setActive(int idx) { if (idx != active) select(idx, false); }
-
+    /** 点击/滑动选中 */
     public void select(int idx, boolean fire) {
-        if (idx == active) { pill.setTranslationX(idx * itemW); if (fire && cb != null) cb.onItem(idx); return; }
+        if (idx < 0 || idx >= ITEM_COUNT) return;
+        if (idx == active) {
+            pill.setTranslationX(idx * itemW);
+            if (fire && cb != null) cb.onItem(idx);
+            return;
+        }
         int old = active;
         active = idx;
         int activeTx = dark ? 0xFFB4C5FF : 0xFF315CDE;
@@ -107,6 +110,37 @@ public class CapsuleBottomBar extends FrameLayout {
         });
         va.start();
         if (fire && cb != null) cb.onItem(idx);
+    }
+
+    /** 外部同步选中态（不触发回调） */
+    public void setActive(int idx) {
+        if (idx != active) select(idx, false);
+        else pill.setTranslationX(idx * itemW);
+    }
+
+    /** 胶囊上横向滑动：一次滑动走一步，方向循环 */
+    @Override
+    public boolean dispatchTouchEvent(android.view.MotionEvent ev) {
+        switch (ev.getActionMasked()) {
+            case android.view.MotionEvent.ACTION_DOWN:
+                downX = ev.getX();
+                downY = ev.getY();
+                swiping = false;
+                break;
+            case android.view.MotionEvent.ACTION_MOVE: {
+                float dx = ev.getX() - downX;
+                float dy = ev.getY() - downY;
+                if (!swiping && Math.abs(dx) > dp(40) && Math.abs(dx) > Math.abs(dy)) {
+                    swiping = true;
+                    int target;
+                    if (dx < 0) target = (active + 1) % ITEM_COUNT;          // 左滑下一个
+                    else target = (active - 1 + ITEM_COUNT) % ITEM_COUNT;    // 右滑上一个
+                    select(target, true);
+                }
+                break;
+            }
+        }
+        return super.dispatchTouchEvent(ev);
     }
 
     private int dp(int v) { return Math.round(v * getResources().getDisplayMetrics().density); }
