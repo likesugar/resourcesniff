@@ -16,7 +16,7 @@ public class CapsuleBottomBar extends FrameLayout {
     public interface OnItem { void onItem(int index); }
 
     private final View pill;
-    private final TextView[] items = new TextView[3];
+    private final TextView[] items = new TextView[4];
     private final boolean dark;
     private final int itemW;
     private int active = 0;
@@ -57,8 +57,8 @@ public class CapsuleBottomBar extends FrameLayout {
         LinearLayout row = new LinearLayout(c);
         row.setOrientation(LinearLayout.HORIZONTAL);
         capsule.addView(row, new FrameLayout.LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT));
-        String[] labels = {"🏠 首页", "⚙️ 设置", "📡 播放器"};
-        for (int i = 0; i < 3; i++) {
+        String[] labels = {"🏠 首页", "🎬 媒体", "⚙️ 设置", "📡 播放器"};
+        for (int i = 0; i < 4; i++) {
             final int idx = i;
             TextView t = new TextView(c);
             t.setText(labels[i]);
@@ -78,7 +78,7 @@ public class CapsuleBottomBar extends FrameLayout {
         if (ev.getAction() == android.view.MotionEvent.ACTION_DOWN) { downX = ev.getX(); swiped = false; }
         else if (ev.getAction() == android.view.MotionEvent.ACTION_MOVE) {
             float dx = ev.getX() - downX;
-            if (!swiped && Math.abs(dx) > dp(50)) { swiped = true; select(dx < 0 ? (active == 2 ? 0 : active + 1) : (active == 0 ? 2 : active - 1), true); }
+            if (!swiped && Math.abs(dx) > dp(50)) { swiped = true; select(dx < 0 ? (active == 3 ? 0 : active + 1) : (active == 0 ? 3 : active - 1), true); }
         }
         return super.dispatchTouchEvent(ev);
     }
@@ -92,7 +92,7 @@ public class CapsuleBottomBar extends FrameLayout {
         int inactiveTx = dark ? 0xFF8A94A6 : 0xFF7C8694;
         items[old].setTextColor(inactiveTx);
         items[active].setTextColor(activeTx);
-        ValueAnimator va = ValueAnimator.ofFloat(active > old ? 0 : itemW, active * itemW);
+        ValueAnimator va = ValueAnimator.ofFloat(old * itemW, active * itemW);
         va.setDuration(240);
         va.setInterpolator(new OvershootInterpolator(0.7f));
         va.addUpdateListener(new ValueAnimator.AnimatorUpdateListener() {

@@ -100,7 +100,6 @@ public class HomeActivity extends Activity {
     private void switchPage(boolean media) {
         if (mediaPage == media) return;
         mediaPage = media;
-        refreshPillBar();
         java.util.List<View> cards = new java.util.ArrayList<View>();
         collectCards((android.view.ViewGroup) findViewById(R.id.toolColumn), cards);
         for (View c : cards) {
@@ -118,17 +117,6 @@ public class HomeActivity extends Activity {
         }
     }
 
-    private void refreshPillBar() {
-        TextView home = findViewById(R.id.pillHome);
-        TextView media = findViewById(R.id.pillMedia);
-        boolean dark = getSharedPreferences("settings", MODE_PRIVATE).getBoolean("dark", false);
-        int idleBg = dark ? 0xFF1A1A1A : 0xFFFFFFFF;
-        home.setBackgroundResource(mediaPage ? R.drawable.bg_pill_idle : R.drawable.bg_pill_active);
-        media.setBackgroundResource(mediaPage ? R.drawable.bg_pill_active : R.drawable.bg_pill_idle);
-        home.setTextColor(mediaPage ? (dark ? 0xFF9AA3AE : 0xFF8A94A6) : 0xFFFFFFFF);
-        media.setTextColor(mediaPage ? 0xFFFFFFFF : (dark ? 0xFF9AA3AE : 0xFF8A94A6));
-    }
-
     private void applyTheme() {
         boolean dark = getSharedPreferences("settings", MODE_PRIVATE).getBoolean("dark", false);
         findViewById(R.id.toolRoot).setBackgroundColor(dark ? 0xFF000000 : 0xFFEEF4FF);
@@ -136,14 +124,15 @@ public class HomeActivity extends Activity {
         ((android.view.ViewGroup) findViewById(R.id.toolRoot)).addView(
             new CapsuleBottomBar(this, dark, new CapsuleBottomBar.OnItem() {
                 public void onItem(int idx) {
-                    if (idx == 1) startActivity(new Intent(HomeActivity.this, SettingsActivity.class));
-                    else if (idx == 2) showPlayChoice();
+                    if (idx == 1) switchPage(true);
+                    else if (idx == 2) startActivity(new Intent(HomeActivity.this, SettingsActivity.class));
+                    else if (idx == 3) showPlayChoice();
+                    else switchPage(false);
                 }
             }));
         findViewById(R.id.toolColumn).setBackgroundColor(dark ? 0xFF000000 : 0xFFEEF4FF);
         ((TextView) findViewById(R.id.themeToggle)).setText(dark ? "☀️" : "🌙");
         applyTraversal((android.view.ViewGroup) findViewById(R.id.toolColumn), dark);
-        if (findViewById(R.id.pillHome) != null) refreshPillBar();
     }
 
     private void applyTraversal(android.view.ViewGroup vg, boolean dark) {
@@ -229,14 +218,8 @@ public class HomeActivity extends Activity {
         applyTheme();
         applyImmersive();
 
-        findViewById(R.id.pillHome).setOnClickListener(new View.OnClickListener() {
-            public void onClick(View v) { switchPage(false); }
-        });
-        findViewById(R.id.pillMedia).setOnClickListener(new View.OnClickListener() {
-            public void onClick(View v) { switchPage(true); }
-        });
-        mediaPage = true; // 强制走一次切换, 初始隐藏媒体卡
-        findViewById(R.id.pillHome).performClick();
+        mediaPage = true; // 初始隐藏媒体卡
+        switchPage(true);
 
         findViewById(R.id.themeToggle).setOnClickListener(new View.OnClickListener() {
             public void onClick(View v) {
