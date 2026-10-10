@@ -153,7 +153,19 @@ public class HomeActivity extends Activity {
         pageSettings.setVisibility(View.GONE);
         pageHost.addView(pageSettings, new FrameLayout.LayoutParams(
                 FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT));
-        toolColumn.addView(pageHost, homeIdx, new android.view.ViewGroup.LayoutParams(
+        // 来回滑动提示 ↔（置于页面容器上方）
+        android.widget.LinearLayout hintRow = new android.widget.LinearLayout(this);
+        hintRow.setOrientation(android.widget.LinearLayout.HORIZONTAL);
+        hintRow.setGravity(android.view.Gravity.CENTER);
+        TextView hint = new TextView(this);
+        hint.setText("←↔→  左右滑动切换");
+        hint.setTextSize(11);
+        hint.setTextColor(0xFF8A94A6);
+        hint.setPadding(0, (int)(4 * getResources().getDisplayMetrics().density), 0, (int)(2 * getResources().getDisplayMetrics().density));
+        hintRow.addView(hint);
+        toolColumn.addView(hintRow, homeIdx, new android.view.ViewGroup.LayoutParams(
+                android.view.ViewGroup.LayoutParams.MATCH_PARENT, android.view.ViewGroup.LayoutParams.WRAP_CONTENT));
+        toolColumn.addView(pageHost, homeIdx + 1, new android.view.ViewGroup.LayoutParams(
                 android.view.ViewGroup.LayoutParams.MATCH_PARENT, android.view.ViewGroup.LayoutParams.MATCH_PARENT));
     }
 
