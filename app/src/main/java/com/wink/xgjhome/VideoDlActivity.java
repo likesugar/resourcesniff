@@ -357,7 +357,7 @@ public class VideoDlActivity extends Activity {
                             boolean ytNoCookie = yt && si < 2;
                             if (st[2].equals("1") && !ytNoCookie) meta.addOption("--cookies", cookies().getAbsolutePath());
                             if (yt) {
-                                String pc = si == 0 ? "android_vr" : si == 1 ? "android_vr" : si == 2 ? "web_safari" : "tv";
+                                String pc = si == 0 ? "android" : si == 1 ? "android" : si == 2 ? "web_safari" : "tv";
                                 if (qjsf != null && qjsf.exists()) meta.addOption("--js-runtimes", "quickjs:" + qjsf.getAbsolutePath());
                                 meta.addOption("--extractor-args", "youtube:player_client=" + pc + (ytNoCookie ? "" : "+cookies"));
                             }
@@ -406,7 +406,7 @@ public class VideoDlActivity extends Activity {
                             java.io.File qjsf2 = new java.io.File(getFilesDir(), "ytdlp/qjs");
                             if (st[2].equals("1") && !ytNoCookie2) req.addOption("--cookies", cookies().getAbsolutePath());
                             if (yt2) {
-                                String pc = si == 0 ? "android_vr" : si == 1 ? "android_vr" : si == 2 ? "web_safari" : "tv";
+                                String pc = si == 0 ? "android" : si == 1 ? "android" : si == 2 ? "web_safari" : "tv";
                                 if (qjsf2 != null && qjsf2.exists()) req.addOption("--js-runtimes", "quickjs:" + qjsf2.getAbsolutePath());
                                 req.addOption("--extractor-args", "youtube:player_client=" + pc + (ytNoCookie2 ? "" : "+cookies"));
                             }
@@ -458,7 +458,7 @@ public class VideoDlActivity extends Activity {
                             ra.addOption("--add-headers", "Referer: " + ref);
                             if (st[2].equals("1") && !ytNoCookie2) ra.addOption("--cookies", cookies().getAbsolutePath());
                             if (yt2) {
-                                String pc = si == 0 ? "android_vr" : si == 1 ? "android_vr" : si == 2 ? "web_safari" : "tv";
+                                String pc = si == 0 ? "android" : si == 1 ? "android" : si == 2 ? "web_safari" : "tv";
                                 if (qjsf2 != null && qjsf2.exists()) ra.addOption("--js-runtimes", "quickjs:" + qjsf2.getAbsolutePath());
                                 ra.addOption("--extractor-args", "youtube:player_client=" + pc + (ytNoCookie2 ? "" : "+cookies"));
                             }
