@@ -96,6 +96,14 @@ public class HomeActivity extends Activity {
         pageIdx = p;
         boolean media = p == 1;
         if (bottomBar != null) bottomBar.setActive(p);
+        // 页面切换过渡：淡入 + 轻微上滑
+        try {
+            View col = findViewById(R.id.toolColumn);
+            col.setAlpha(0f);
+            col.setTranslationY(26f);
+            col.animate().alpha(1f).translationY(0f).setDuration(230).setInterpolator(
+                    new android.view.animation.DecelerateInterpolator(1.4f)).start();
+        } catch (Throwable ignored) { }
         java.util.List<View> cards = new java.util.ArrayList<View>();
         collectCards((android.view.ViewGroup) findViewById(R.id.toolColumn), cards);
         for (View c : cards) {
