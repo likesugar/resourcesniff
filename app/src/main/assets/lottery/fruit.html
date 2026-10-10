@@ -73,6 +73,7 @@
 </style>
 </head>
 <body>
+<button onclick="app.close()" style="margin:6px 0 0 10px;padding:7px 20px;background:#241636;color:#ffd75e;border:2px solid #d8a520;border-radius:16px;font-size:14px;font-weight:bold">← 返回</button>
 <div id="machine">
   <div id="head">
     <div class="lucky">LUCKY</div>
@@ -92,7 +93,24 @@
       <div class="kbtn kBig" id="btnBig">8-12<br>大</div>
       <button id="go">GO</button>
     </div>
-    <div id="bets"></div>
+    <div id="helpBox" style="display:flex;align-items:flex-start;margin:8px 4px 0;background:#221733;border:1px solid #5b3a8c;border-radius:12px;padding:10px">
+  <button onclick="toggleFcfg()" style="flex-shrink:0;padding:6px 14px;background:#315CDE;color:#fff;border:none;border-radius:14px;font-size:12px;font-weight:bold">⚙ 自定义</button>
+  <div style="color:#fff;font-size:12px;line-height:1.7;margin-left:10px">
+    押注位点按加注，按 GO 开奖；开出对应水果按倍数赔付，LUCK 全部押注×2 返还。难度与倍数可在「自定义」里调。
+  </div>
+</div>
+<div id="fcfg" style="display:none;margin:8px 4px 0;background:#1c1230;border:1px solid #5b3a8c;border-radius:12px;padding:10px">
+  <div style="color:#ffd75e;font-size:12px;font-weight:bold;margin-bottom:6px">难度(影响开出分布)</div>
+  <div style="display:flex;gap:6px;margin-bottom:8px">
+    <button onclick="setDiff('easy')" style="flex:1;padding:7px 0;background:#1FA855;color:#fff;border:none;border-radius:10px;font-size:12px">😊 容易</button>
+    <button onclick="setDiff('normal')" style="flex:1;padding:7px 0;background:#315CDE;color:#fff;border:none;border-radius:10px;font-size:12px">🎲 普通</button>
+    <button onclick="setDiff('hard')" style="flex:1;padding:7px 0;background:#e67e22;color:#fff;border:none;border-radius:10px;font-size:12px">😈 困难</button>
+  </div>
+  <div style="color:#ffd75e;font-size:12px;font-weight:bold;margin-bottom:6px">倍数</div>
+  <div id="oddsRow" style="display:flex;gap:6px;flex-wrap:wrap"></div>
+  <button onclick="saveOdds()" style="margin-top:8px;width:100%;padding:9px 0;background:#1FA855;color:#fff;border:none;border-radius:14px;font-size:13px;font-weight:bold">保存倍数</button>
+</div>
+<div id="bets"></div>
   </div>
 </div>
 <script>
@@ -108,12 +126,17 @@ var SYM = {
 // 外圈 16 格（顺时针），与真实水果机布局近似
 var RING = ['apple','bell','bar','bell','apple','star','apple','luck','luck','bell','star',
             'apple','star','seven','seven','apple'];
+Object.keys(ODDS).forEach(function(k){ if (SYM[k]) SYM[k].odds = ODDS[k]; });
+var DIFF_W = { easy:{bar:1,seven:2,star:4,bell:4,apple:6,luck:2}, normal:{bar:2,seven:2,star:4,bell:4,apple:4,luck:1}, hard:{bar:1,seven:1,star:2,bell:3,apple:6,luck:1} };
 var XTAG = {'bar':'X30','seven':'X12','star':'X6','bell':'X6','apple':'X3'};
 // 5 个押注位（底排）：符号 + 赔率
 var BET_SLOTS = ['bar','seven','star','bell','apple'];
 var slot = 0;   // 当前押注档: 0=小(2) 1=大(8)
 var BETS = [2, 8];
 
+var ODDS_DEF = {apple:3, bell:6, star:6, seven:12, bar:30};
+var ODDS = (function(){ try { var o = JSON.parse(localStorage.fm_odds); if (o && o.bar) return o; } catch(e){} return ODDS_DEF; })();
+var DIFF = localStorage.fm_diff || 'normal';
 var balance = parseInt(localStorage.getItem('fm_bal') || '500', 10);
 if (!isFinite(balance) || balance < 0) balance = 500;
 var bets = {}; BET_SLOTS.forEach(function(k){ bets[k] = 0; });
@@ -200,7 +223,7 @@ document.getElementById('go').onclick = function() {
   document.getElementById('go').disabled = true;
   balance -= total; save(); refresh();
   // 加权随机：LUCK 权重低（视为随机高赔）
-  var weights = RING.map(function(k) { return k === 'luck' ? 1 : (k === 'bar' ? 2 : 4); });
+  var W = DIFF_W[DIFF] || DIFF_W.normal; var weights = RING.map(function(k) { return W[k] || 4; });
   var sum = weights.reduce(function(a, b) { return a + b; }, 0);
   var pick = Math.floor(Math.random() * sum), land = 0;
   for (var i = 0; i < sum && pick >= 0; i++) { pick -= weights[i]; land = i; }
@@ -235,6 +258,28 @@ function settle(idx) {
   spinning = false;
   document.getElementById('go').disabled = false;
 }
+
+function toggleFcfg() { var f = document.getElementById('fcfg'); f.style.display = f.style.display === 'none' ? 'block' : 'none'; if (f.style.display === 'block') renderOddsRow(); }
+function renderOddsRow() {
+  var row = document.getElementById('oddsRow'); row.innerHTML = '';
+  BET_SLOTS.forEach(function(k) {
+    var d = document.createElement('div');
+    d.style.textAlign = 'center';
+    d.innerHTML = '<div style="color:#fff;font-size:11px;margin-bottom:2px">' + SYM[k].name + '</div>' +
+      '<input id="od_' + k + '" type="number" inputmode="numeric" value="' + ODDS[k] + '" min="1" max="999" ' +
+      'style="width:52px;background:#0c0e12;color:#eee;border:none;border-radius:8px;padding:6px;text-align:center;font-size:13px">';
+    row.appendChild(d);
+  });
+}
+function saveOdds() {
+  BET_SLOTS.forEach(function(k) {
+    var v = parseInt(document.getElementById('od_' + k).value, 10);
+    if (v >= 1 && v <= 999) { ODDS[k] = v; if (SYM[k]) SYM[k].odds = v; }
+  });
+  localStorage.fm_odds = JSON.stringify(ODDS);
+  toast('倍数已保存');
+}
+function setDiff(d) { DIFF = d; localStorage.fm_diff = d; toast('难度已切换：' + (d === 'easy' ? '容易' : d === 'hard' ? '困难' : '普通')); }
 
 document.getElementById('ledBal').textContent = pad(balance);
 refresh();
