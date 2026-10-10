@@ -158,7 +158,8 @@ public class SettingsPageView extends android.widget.FrameLayout {
     private void startYtdlpUpdate() {
         final String[] urls = {
             "https://gh-proxy.com/https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp",
-            "https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp"
+            "https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp",
+            "https://gh-proxy.com/https://github.com/yt-dlp/yt-dlp-nightly-builds/releases/latest/download/yt-dlp"
         };
         ytdlpStatus.setTextColor(0xFFE5A50A);
         ytdlpStatus.setText("正在下载最新版 yt-dlp…");
@@ -176,8 +177,25 @@ public class SettingsPageView extends android.widget.FrameLayout {
                     while ((n = in.read(buf)) > 0) bo.write(buf, 0, n);
                     in.close();
                     byte[] data = bo.toByteArray();
-                    // 校验 zipapp: ZIP 头 + 含 yt_dlp/version.py
-                    if (data.length < 100000 || data[0] != '#' || data[1] != '!') { err = "文件格式不对"; continue; }
+                    // gzip 响应自动解压(部分代理强制压缩)
+                    String enc = c.getContentEncoding();
+                    if ((enc != null && enc.contains("gzip")) || (data.length > 2 && data[0] == 31 && data[1] == -117)) {
+                        try {
+                            java.io.ByteArrayInputStream bi = new java.io.ByteArrayInputStream(data);
+                            java.util.zip.GZIPInputStream gi = new java.util.zip.GZIPInputStream(bi);
+                            java.io.ByteArrayOutputStream bo2 = new java.io.ByteArrayOutputStream();
+                            byte[] gb = new byte[16384]; int gn;
+                            while ((gn = gi.read(gb)) > 0) bo2.write(gb, 0, gn);
+                            gi.close();
+                            data = bo2.toByteArray();
+                        } catch (Throwable ignored) { }
+                    }
+                    // 校验 zipapp: #! 开头 + 含 yt_dlp/version.py
+                    if (data.length < 100000 || data[0] != '#' || data[1] != '!') {
+                        StringBuilder hexb = new StringBuilder();
+                        for (int hi = 0; hi < Math.min(8, data.length); hi++) hexb.append(String.format("%02x", data[hi]));
+                        err = "内容异常 len=" + data.length + " head=" + hexb; continue;
+                    }
                     java.util.zip.ZipInputStream zs = new java.util.zip.ZipInputStream(new java.io.ByteArrayInputStream(data));
                     java.util.zip.ZipEntry ze; boolean ok = false; String ver = "";
                     while ((ze = zs.getNextEntry()) != null) {
