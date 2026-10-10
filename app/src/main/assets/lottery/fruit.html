@@ -161,7 +161,13 @@ RING.forEach(function(k, i) {
 var center = document.createElement('div');
 center.id = 'center';
 center.style.gridArea = '2 / 2 / 5 / 5';
-center.innerHTML = '<div><div id="logo">✦ 幸运水果机 ✦</div><div id="msg">点押注位下注，按 GO 开奖</div></div>';
+center.style.overflow = 'hidden';
+center.style.display = 'flex';
+center.style.flexDirection = 'column';
+center.style.alignItems = 'center';
+center.style.justifyContent = 'center';
+center.style.padding = '6px';
+center.innerHTML = '<div id="logo" style="font-size:20px;letter-spacing:2px;white-space:nowrap">✦ 幸运水果机 ✦</div><div id="msg" style="font-size:12px;color:#ffd75e;margin-top:8px;text-align:center;line-height:1.5">点押注位下注<br>按 GO 开奖</div>';
 board.appendChild(center);
 
 var betsBox = document.getElementById('bets');
