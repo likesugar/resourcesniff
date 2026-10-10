@@ -353,10 +353,12 @@ public class VideoDlActivity extends Activity {
                             meta.addOption("-4");
                             meta.addOption("--add-headers", "Referer: " + ref);
                             boolean yt = tk.url.contains("youtube.com") || tk.url.contains("youtu.be");
+                            java.io.File qjsf = new java.io.File(getFilesDir(), "ytdlp/qjs");
                             boolean ytNoCookie = yt && si < 2;
                             if (st[2].equals("1") && !ytNoCookie) meta.addOption("--cookies", cookies().getAbsolutePath());
                             if (yt) {
                                 String pc = si == 0 ? "android_vr" : si == 1 ? "android_vr" : si == 2 ? "web_safari" : "tv";
+                                if (qjsf != null && qjsf.exists()) meta.addOption("--js-runtimes", "quickjs:" + qjsf.getAbsolutePath());
                                 meta.addOption("--extractor-args", "youtube:player_client=" + pc + (ytNoCookie ? "" : "+cookies"));
                             }
                             com.yausername.youtubedl_android.YoutubeDLResponse mr =
@@ -401,9 +403,11 @@ public class VideoDlActivity extends Activity {
                         req.addOption("--add-headers", "Referer: " + ref);
                         boolean yt2 = tk.url.contains("youtube.com") || tk.url.contains("youtu.be");
                             boolean ytNoCookie2 = yt2 && si < 2;
+                            java.io.File qjsf2 = new java.io.File(getFilesDir(), "ytdlp/qjs");
                             if (st[2].equals("1") && !ytNoCookie2) req.addOption("--cookies", cookies().getAbsolutePath());
                             if (yt2) {
                                 String pc = si == 0 ? "android_vr" : si == 1 ? "android_vr" : si == 2 ? "web_safari" : "tv";
+                                if (qjsf2 != null && qjsf2.exists()) req.addOption("--js-runtimes", "quickjs:" + qjsf2.getAbsolutePath());
                                 req.addOption("--extractor-args", "youtube:player_client=" + pc + (ytNoCookie2 ? "" : "+cookies"));
                             }
 
@@ -455,6 +459,7 @@ public class VideoDlActivity extends Activity {
                             if (st[2].equals("1") && !ytNoCookie2) ra.addOption("--cookies", cookies().getAbsolutePath());
                             if (yt2) {
                                 String pc = si == 0 ? "android_vr" : si == 1 ? "android_vr" : si == 2 ? "web_safari" : "tv";
+                                if (qjsf2 != null && qjsf2.exists()) ra.addOption("--js-runtimes", "quickjs:" + qjsf2.getAbsolutePath());
                                 ra.addOption("--extractor-args", "youtube:player_client=" + pc + (ytNoCookie2 ? "" : "+cookies"));
                             }
                             ra.addOption("-o", out.getAbsolutePath());
@@ -571,6 +576,19 @@ public class VideoDlActivity extends Activity {
                             in2.close(); out2.close();
                             target.setExecutable(true);
                         }
+                    }
+                } catch (Throwable ignored) {}
+                // EJS 运行时: quickjs 放 yt-dlp 同目录(EJS wiki 支持同目录发现)
+                try {
+                    java.io.File qsrc = new java.io.File(getApplicationInfo().nativeLibraryDir, "libqjs.so");
+                    java.io.File qdst = new java.io.File(getFilesDir(), "ytdlp/qjs");
+                    if (qsrc.exists() && (!qdst.exists() || qdst.length() != qsrc.length())) {
+                        java.io.FileInputStream qi = new java.io.FileInputStream(qsrc);
+                        java.io.FileOutputStream qo = new java.io.FileOutputStream(qdst);
+                        byte[] qb = new byte[8192]; int qn;
+                        while ((qn = qi.read(qb)) > 0) qo.write(qb, 0, qn);
+                        qi.close(); qo.close();
+                        qdst.setExecutable(true);
                     }
                 } catch (Throwable ignored) {}
             }
