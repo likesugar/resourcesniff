@@ -95,6 +95,7 @@ public class SniffActivity extends Activity {
         try { LiveProxy.start(); } catch (Throwable ignored) {}   // 本地中转必须常驻，FC2/B站记录才能播/录/下
         DlManager.init(this);
         setContentView(R.layout.activity_sniff);
+        AdBlocker.load(this);
 
 
         webView = findViewById(R.id.webview);
@@ -112,7 +113,7 @@ public class SniffActivity extends Activity {
             @Override
             public void onClick(View v) {
                 toggleAutoRefresh();
-            }
+    }
         });
 
         WebSettings ws = webView.getSettings();
@@ -203,6 +204,11 @@ public class SniffActivity extends Activity {
 
             @Override
             public WebResourceResponse shouldInterceptRequest(WebView view, WebResourceRequest request) {
+                try {
+                    if (AdBlocker.shouldBlock(request.getUrl().toString()))
+                        return new WebResourceResponse("text/plain", "utf-8",
+                                new java.io.ByteArrayInputStream(new byte[0]));
+                } catch (Throwable ignored) {}
                 try { maybeRecordGeneric(request.getUrl().toString(), request.getMethod()); } catch (Throwable ignored) {}
                 try {
                     if (!"GET".equalsIgnoreCase(request.getMethod())) return null;
