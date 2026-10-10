@@ -82,6 +82,11 @@ public class HomeActivity extends Activity {
     /** 首页/媒体管理 胶囊页切换 */
     private void switchPage(boolean media) {
         if (mediaPage == media) return;
+        applyPageVisibility(media);
+    }
+
+    /** 无守卫的页面可见性应用(启动初始化也走这里) */
+    private void applyPageVisibility(boolean media) {
         mediaPage = media;
         if (bottomBar != null) bottomBar.setActive(media ? 1 : 0);
         java.util.List<View> cards = new java.util.ArrayList<View>();
@@ -223,8 +228,7 @@ public class HomeActivity extends Activity {
         applyTheme();
         applyImmersive();
 
-        mediaPage = true; // 初始隐藏媒体卡
-        switchPage(true);
+        applyPageVisibility(false); // 初始: 首页态, 隐藏媒体卡
 
         findViewById(R.id.themeToggle).setOnClickListener(new View.OnClickListener() {
             public void onClick(View v) {
