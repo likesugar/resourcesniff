@@ -46,18 +46,17 @@ public class CapsuleBottomBar extends FrameLayout {
         int activeTx = dark ? 0xFFB4C5FF : 0xFF315CDE;
         int inactiveTx = dark ? 0xFF8A94A6 : 0xFF7C8694;
 
-        // 外层胶囊体
-        LinearLayout capsule = new LinearLayout(c);
-        capsule.setOrientation(LinearLayout.HORIZONTAL);
+        // 外层胶囊体（FrameLayout 叠层: pill 在下, 标签行在上）
+        FrameLayout capsule = new FrameLayout(c);
         GradientDrawable bg = new GradientDrawable();
-        bg.setCornerRadius(dp(16));
+        bg.setCornerRadius(dp(17));
         bg.setColor(barBg);
         capsule.setBackground(bg);
         capsule.setElevation(dp(8));
         addView(capsule, new LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT,
                 Gravity.BOTTOM | Gravity.CENTER_HORIZONTAL));
 
-        // 滑块（选中底衬）
+        // 滑块（选中底衬, 底部左起, 随选中平移）
         pill = new View(c);
         GradientDrawable pg = new GradientDrawable();
         pg.setCornerRadius(dp(14));
@@ -71,7 +70,7 @@ public class CapsuleBottomBar extends FrameLayout {
         // 四个标签
         LinearLayout row = new LinearLayout(c);
         row.setOrientation(LinearLayout.HORIZONTAL);
-        capsule.addView(row, new LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT));
+        capsule.addView(row, new FrameLayout.LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT));
         for (int i = 0; i < ITEM_COUNT; i++) {
             final int idx = i;
             TextView t = new TextView(c);
