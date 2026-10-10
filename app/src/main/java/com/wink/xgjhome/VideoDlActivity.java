@@ -555,6 +555,21 @@ public class VideoDlActivity extends Activity {
                 System.setProperty("java.net.preferIPv4Stack", "true");
                 com.yausername.youtubedl_android.YoutubeDL.getInstance().init(getApplicationContext());
                 inited = true;
+                // 自定义 yt-dlp 覆盖引擎内置版(设置页更新后)
+                try {
+                    java.io.File cust = new java.io.File(getFilesDir(), "ytdlp_custom/yt-dlp");
+                    if (cust.exists() && cust.length() > 100000) {
+                        java.io.File target = new java.io.File(getFilesDir(), "ytdlp/yt-dlp");
+                        if (target.exists() && target.lastModified() < cust.lastModified()) {
+                            java.io.FileInputStream in2 = new java.io.FileInputStream(cust);
+                            java.io.FileOutputStream out2 = new java.io.FileOutputStream(target);
+                            byte[] b2 = new byte[8192]; int n2;
+                            while ((n2 = in2.read(b2)) > 0) out2.write(b2, 0, n2);
+                            in2.close(); out2.close();
+                            target.setExecutable(true);
+                        }
+                    }
+                } catch (Throwable ignored) {}
             }
         }
     }

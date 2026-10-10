@@ -96,6 +96,126 @@ public class SettingsPageView extends android.widget.FrameLayout {
             public void onClick(View v) { clearAll(); }
         });
         applyTheme();
+        buildYtdlpCard();
+    }
+
+    // ---------- yt-dlp 引擎更新 ----------
+    private TextView ytdlpStatus;
+
+    private void buildYtdlpCard() {
+        try {
+            View cardOled = findViewById(R.id.cardOled);
+            android.view.ViewGroup parent = (android.view.ViewGroup) cardOled.getParent();
+            LinearLayout card = new LinearLayout(host);
+            card.setOrientation(LinearLayout.VERTICAL);
+            card.setBackgroundResource(host.getSharedPreferences("settings", android.content.Context.MODE_PRIVATE).getBoolean("dark", false)
+                    ? (host.getSharedPreferences("settings", android.content.Context.MODE_PRIVATE).getBoolean("oled", true) ? R.drawable.bg_card_oled : R.drawable.bg_card_md3_dark) : R.drawable.bg_card_md3);
+            int pad = dp(16);
+            card.setPadding(pad, pad, pad, pad);
+            LinearLayout.LayoutParams clp = new LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+            clp.topMargin = dp(14);
+            TextView title = new TextView(host);
+            title.setText("yt-dlp 引擎更新");
+            title.setTextSize(18); title.setTypeface(Typeface.DEFAULT_BOLD);
+            title.setTextColor(0xFF1F2329);
+            card.addView(title);
+            TextView sub = new TextView(host);
+            sub.setText("视频下载引擎。YouTube 等网站改版后更新引擎可修复解析失败。");
+            sub.setTextSize(13); sub.setTextColor(0xFF8A94A6);
+            sub.setPadding(0, dp(4), 0, dp(8));
+            card.addView(sub);
+            ytdlpStatus = new TextView(host);
+            ytdlpStatus.setTextSize(13);
+            ytdlpStatus.setTextColor(0xFF0E9F6E);
+            ytdlpStatus.setText(currentYtdlpLabel());
+            card.addView(ytdlpStatus);
+            TextView btn = new TextView(host);
+            btn.setText("更新到最新版");
+            btn.setTextSize(14); btn.setTypeface(Typeface.DEFAULT_BOLD);
+            btn.setTextColor(0xFFFFFFFF);
+            GradientDrawable g = new GradientDrawable();
+            g.setCornerRadius(dp(18)); g.setColor(0xFF315CDE);
+            btn.setBackground(g);
+            btn.setGravity(Gravity.CENTER);
+            btn.setPadding(0, dp(10), 0, dp(10));
+            LinearLayout.LayoutParams blp = new LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+            blp.topMargin = dp(10);
+            btn.setOnClickListener(new View.OnClickListener() {
+                public void onClick(View v) { startYtdlpUpdate(); }
+            });
+            card.addView(btn, blp);
+            parent.addView(card, Math.max(0, parent.indexOfChild(cardOled)), clp);
+        } catch (Throwable ignored) { }
+    }
+
+    private String currentYtdlpLabel() {
+        String v = host.getSharedPreferences("settings", android.content.Context.MODE_PRIVATE).getString("ytdlp_custom_ver", "");
+        return v.isEmpty() ? "当前: 内置 2026.08.19" : "当前: " + v + "（自定义版）";
+    }
+
+    private void startYtdlpUpdate() {
+        final String[] urls = {
+            "https://gh-proxy.com/https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp",
+            "https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp"
+        };
+        ytdlpStatus.setTextColor(0xFFE5A50A);
+        ytdlpStatus.setText("正在下载最新版 yt-dlp…");
+        new Thread(new Runnable() { public void run() {
+            String err = null;
+            for (String u : urls) {
+                try {
+                    java.net.HttpURLConnection c = (java.net.HttpURLConnection) new java.net.URL(u).openConnection();
+                    c.setConnectTimeout(15000); c.setReadTimeout(30000);
+                    c.setInstanceFollowRedirects(true);
+                    if (c.getResponseCode() / 100 != 2) { err = "HTTP " + c.getResponseCode(); continue; }
+                    java.io.InputStream in = c.getInputStream();
+                    java.io.ByteArrayOutputStream bo = new java.io.ByteArrayOutputStream();
+                    byte[] buf = new byte[16384]; int n;
+                    while ((n = in.read(buf)) > 0) bo.write(buf, 0, n);
+                    in.close();
+                    byte[] data = bo.toByteArray();
+                    // 校验 zipapp: ZIP 头 + 含 yt_dlp/version.py
+                    if (data.length < 100000 || data[0] != '#' || data[1] != '!') { err = "文件格式不对"; continue; }
+                    java.util.zip.ZipInputStream zs = new java.util.zip.ZipInputStream(new java.io.ByteArrayInputStream(data));
+                    java.util.zip.ZipEntry ze; boolean ok = false; String ver = "";
+                    while ((ze = zs.getNextEntry()) != null) {
+                        if (ze.getName().equals("yt_dlp/version.py")) {
+                            ok = true;
+                            java.util.Scanner sc = new java.util.Scanner(zs).useDelimiter("\\A");
+                            String src = sc.hasNext() ? sc.next() : "";
+                            java.util.regex.Matcher m = java.util.regex.Pattern.compile("[0-9]{4}\\.[0-9]{2}\\.[0-9]{2}").matcher(src);
+                            if (m.find()) ver = m.group();
+                            break;
+                        }
+                    }
+                    zs.close();
+                    if (!ok) { err = "不是 yt-dlp 包"; continue; }
+                    java.io.File dir = new java.io.File(host.getFilesDir(), "ytdlp_custom");
+                    dir.mkdirs();
+                    java.io.FileOutputStream fo = new java.io.FileOutputStream(new java.io.File(dir, "yt-dlp"));
+                    fo.write(data); fo.close();
+                    host.getSharedPreferences("settings", android.content.Context.MODE_PRIVATE)
+                            .edit().putString("ytdlp_custom_ver", ver + " · " + new java.text.SimpleDateFormat("MM-dd HH:mm", java.util.Locale.CHINA).format(new java.util.Date())).apply();
+                    host.runOnUiThread(new Runnable() { public void run() {
+                        ytdlpStatus.setTextColor(0xFF0E9F6E);
+                        ytdlpStatus.setText(currentYtdlpLabel());
+                    }});
+                    toastOnUi("✅ yt-dlp 已更新到 " + ver + "，下次下载生效");
+                    return;
+                } catch (Throwable t) { err = t.getMessage(); }
+            }
+            final String fe = err;
+            host.runOnUiThread(new Runnable() { public void run() {
+                ytdlpStatus.setTextColor(0xFFE5A50A);
+                ytdlpStatus.setText("更新失败: " + fe + "（需网络可达 GitHub）");
+            }});
+        }}, "ytdlp-update").start();
+    }
+
+    private void toastOnUi(String m) {
+        host.runOnUiThread(new Runnable() { public void run() { Toast.makeText(host, m, Toast.LENGTH_LONG).show(); }});
     }
 
     // ---------- 平台列表 ----------
