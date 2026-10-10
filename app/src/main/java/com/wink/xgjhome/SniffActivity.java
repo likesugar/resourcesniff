@@ -186,7 +186,16 @@ public class SniffActivity extends Activity {
             }
         }, "AndroidPlayer");
 
-        webView.setWebChromeClient(new WebChromeClient());
+        webView.getSettings().setSupportMultipleWindows(true);
+        webView.getSettings().setJavaScriptCanOpenWindowsAutomatically(false);
+        webView.setWebChromeClient(new WebChromeClient() {
+            @Override
+            public boolean onCreateWindow(WebView view, boolean isDialog, boolean isUserGesture, android.os.Message resultMsg) {
+                // 吞掉所有新窗口/弹窗广告(点播放触发的 popunder)
+                android.util.Log.w("Sniff", "POP-SWALLOW gesture=" + isUserGesture);
+                return true;
+            }
+        });
         webView.setWebViewClient(new WebViewClient() {
             @Override
             public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest request) {
@@ -489,6 +498,8 @@ public class SniffActivity extends Activity {
 
             @Override
             public void onPageStarted(WebView view, String url, android.graphics.Bitmap favicon) {
+                // 保险丝: window.open 一律返回 null, 防止 JS 弹窗劫持
+                view.evaluateJavascript("try{window.open=function(){return null};}catch(e){}", null);
                 // 诊断模式：stripchat 等抓不到的站，全量请求落 网页诊断.txt
                 diagActive = url != null && (url.contains("stripchat") || url.contains("zh.stripchat"));
                 if (diagActive) dumpDiag("PAGE: " + url);
