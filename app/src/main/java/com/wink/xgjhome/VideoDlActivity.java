@@ -352,15 +352,7 @@ public class VideoDlActivity extends Activity {
                             meta.addOption("--user-agent", st[0]);
                             meta.addOption("-4");
                             meta.addOption("--add-headers", "Referer: " + ref);
-                            boolean yt = tk.url.contains("youtube.com") || tk.url.contains("youtu.be");
-                            java.io.File qjsf = new java.io.File(getFilesDir(), "ytdlp/qjs");
-                            boolean ytNoCookie = yt && si < 2;
-                            if (st[2].equals("1") && !ytNoCookie) meta.addOption("--cookies", cookies().getAbsolutePath());
-                            if (yt) {
-                                String pc = si == 0 ? "android" : si == 1 ? "android" : si == 2 ? "web_safari" : "tv";
-                                if (qjsf != null && qjsf.exists()) meta.addOption("--js-runtimes", "quickjs:" + qjsf.getAbsolutePath());
-                                meta.addOption("--extractor-args", "youtube:player_client=" + pc + (ytNoCookie ? "" : "+cookies"));
-                            }
+                            if (st[2].equals("1")) meta.addOption("--cookies", cookies().getAbsolutePath());
                             com.yausername.youtubedl_android.YoutubeDLResponse mr =
                                     com.yausername.youtubedl_android.YoutubeDL.getInstance().execute(meta, null);
                             String[] ls = mr.getOut().trim().split("\n");
@@ -401,15 +393,7 @@ public class VideoDlActivity extends Activity {
                         req.addOption("--user-agent", st[0]);
                         req.addOption("-4");
                         req.addOption("--add-headers", "Referer: " + ref);
-                        boolean yt2 = tk.url.contains("youtube.com") || tk.url.contains("youtu.be");
-                            boolean ytNoCookie2 = yt2 && si < 2;
-                            java.io.File qjsf2 = new java.io.File(getFilesDir(), "ytdlp/qjs");
-                            if (st[2].equals("1") && !ytNoCookie2) req.addOption("--cookies", cookies().getAbsolutePath());
-                            if (yt2) {
-                                String pc = si == 0 ? "android" : si == 1 ? "android" : si == 2 ? "web_safari" : "tv";
-                                if (qjsf2 != null && qjsf2.exists()) req.addOption("--js-runtimes", "quickjs:" + qjsf2.getAbsolutePath());
-                                req.addOption("--extractor-args", "youtube:player_client=" + pc + (ytNoCookie2 ? "" : "+cookies"));
-                            }
+                            if (st[2].equals("1")) req.addOption("--cookies", cookies().getAbsolutePath());
 
                     if (tk.gen != myGen) return;
                         req.addOption("-o", out.getAbsolutePath());
@@ -456,12 +440,7 @@ public class VideoDlActivity extends Activity {
                             ra.addOption("--user-agent", st[0]);
                             ra.addOption("-4");
                             ra.addOption("--add-headers", "Referer: " + ref);
-                            if (st[2].equals("1") && !ytNoCookie2) ra.addOption("--cookies", cookies().getAbsolutePath());
-                            if (yt2) {
-                                String pc = si == 0 ? "android" : si == 1 ? "android" : si == 2 ? "web_safari" : "tv";
-                                if (qjsf2 != null && qjsf2.exists()) ra.addOption("--js-runtimes", "quickjs:" + qjsf2.getAbsolutePath());
-                                ra.addOption("--extractor-args", "youtube:player_client=" + pc + (ytNoCookie2 ? "" : "+cookies"));
-                            }
+                            if (st[2].equals("1")) ra.addOption("--cookies", cookies().getAbsolutePath());
                             ra.addOption("-o", out.getAbsolutePath());
                             ra.addOption("--restrict-filenames");
                             ra.addOption("--no-playlist"); ra.addOption("--no-mtime");
@@ -591,31 +570,6 @@ public class VideoDlActivity extends Activity {
                         qdst.setExecutable(true);
                     }
                 } catch (Throwable ignored) {}
-                // QJS 自检: 能否真正执行(结果记入 网页诊断.txt)
-                try {
-                    java.io.File qjsf0 = new java.io.File(getFilesDir(), "ytdlp/qjs");
-                    String probe = "SKIP";
-                    if (qjsf0.exists()) {
-                        Process p = new ProcessBuilder(qjsf0.getAbsolutePath(), "-e", "console.log(40+2)").redirectErrorStream(true).start();
-                        java.io.ByteArrayOutputStream bo = new java.io.ByteArrayOutputStream();
-                        java.io.InputStream pi = p.getInputStream();
-                        byte[] pb = new byte[1024]; int pn;
-                        while ((pn = pi.read(pb)) > 0) bo.write(pb, 0, pn);
-                        p.waitFor();
-                        probe = "exit=" + p.exitValue() + " out=" + bo.toString().trim();
-                    }
-                    java.io.File dir0 = getExternalFilesDir(null) != null ? getExternalFilesDir(null).getParentFile() : getFilesDir();
-                    java.io.FileWriter fw0 = new java.io.FileWriter(new java.io.File(dir0, "网页诊断.txt"), true);
-                    fw0.write("\n==== QJS self-test " + new java.util.Date() + " ====" + probe + "\n");
-                    fw0.close();
-                } catch (Throwable t0) {
-                    try {
-                        java.io.File dir0 = getExternalFilesDir(null) != null ? getExternalFilesDir(null).getParentFile() : getFilesDir();
-                        java.io.FileWriter fw0 = new java.io.FileWriter(new java.io.File(dir0, "网页诊断.txt"), true);
-                        fw0.write("\n==== QJS self-test EXC ====" + t0 + "\n");
-                        fw0.close();
-                    } catch (Throwable ignored) {}
-                }
             }
         }
     }
