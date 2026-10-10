@@ -356,6 +356,7 @@ public class HomeActivity extends Activity {
     protected void onResume() {
         super.onResume();
         if (bottomBar != null) bottomBar.setActive(pageIdx); // 滑块对齐当前页(设置非驻留页)
+        if (pageIdx == 2 && pageSettings != null) pageSettings.refresh(); // 平台账号登录返回, 刷新登录态
         calTick.post(calTickRun);
         updateMedStatus();
         try { MedPlanActivity.checkAndNotifyDue(this); } catch (Throwable ignored) {}

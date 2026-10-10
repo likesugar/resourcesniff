@@ -351,8 +351,13 @@ public class VideoDlActivity extends Activity {
                             if (si == 0) meta.addOption("--verbose");
                             meta.addOption("--user-agent", st[0]);
                             meta.addOption("--add-headers", "Referer: " + ref);
-                            if (st[2].equals("1")) meta.addOption("--cookies", cookies().getAbsolutePath());
-                            if (tk.url.contains("youtube.com") || tk.url.contains("youtu.be")) meta.addOption("--extractor-args", "youtube:player_client=" + (si % 2 == 0 ? "android_vr" : "web_embedded"));
+                            boolean yt = tk.url.contains("youtube.com") || tk.url.contains("youtu.be");
+                            boolean ytNoCookie = yt && si < 2;
+                            if (st[2].equals("1") && !ytNoCookie) meta.addOption("--cookies", cookies().getAbsolutePath());
+                            if (yt) {
+                                String pc = si == 0 ? "android_vr" : si == 1 ? "tv" : si == 2 ? "android_vr" : "web_embedded";
+                                meta.addOption("--extractor-args", "youtube:player_client=" + pc + (ytNoCookie ? "" : "+cookies"));
+                            }
                             com.yausername.youtubedl_android.YoutubeDLResponse mr =
                                     com.yausername.youtubedl_android.YoutubeDL.getInstance().execute(meta, null);
                             String[] ls = mr.getOut().trim().split("\n");
@@ -392,8 +397,13 @@ public class VideoDlActivity extends Activity {
                         req.addOption("--no-update");
                         req.addOption("--user-agent", st[0]);
                         req.addOption("--add-headers", "Referer: " + ref);
-                        if (st[2].equals("1")) req.addOption("--cookies", cookies().getAbsolutePath());
-                            if (tk.url.contains("youtube.com") || tk.url.contains("youtu.be")) req.addOption("--extractor-args", "youtube:player_client=" + (si % 2 == 0 ? "android_vr" : "web_embedded"));
+                        boolean yt2 = tk.url.contains("youtube.com") || tk.url.contains("youtu.be");
+                            boolean ytNoCookie2 = yt2 && si < 2;
+                            if (st[2].equals("1") && !ytNoCookie2) req.addOption("--cookies", cookies().getAbsolutePath());
+                            if (yt2) {
+                                String pc = si == 0 ? "android_vr" : si == 1 ? "tv" : si == 2 ? "android_vr" : "web_embedded";
+                                req.addOption("--extractor-args", "youtube:player_client=" + pc + (ytNoCookie2 ? "" : "+cookies"));
+                            }
 
                     if (tk.gen != myGen) return;
                         req.addOption("-o", out.getAbsolutePath());
@@ -439,8 +449,11 @@ public class VideoDlActivity extends Activity {
                             ra.addOption("--no-update");
                             ra.addOption("--user-agent", st[0]);
                             ra.addOption("--add-headers", "Referer: " + ref);
-                            if (st[2].equals("1")) ra.addOption("--cookies", cookies().getAbsolutePath());
-                            if (tk.url.contains("youtube.com") || tk.url.contains("youtu.be")) ra.addOption("--extractor-args", "youtube:player_client=" + (si % 2 == 0 ? "android_vr" : "web_embedded"));
+                            if (st[2].equals("1") && !ytNoCookie2) ra.addOption("--cookies", cookies().getAbsolutePath());
+                            if (yt2) {
+                                String pc = si == 0 ? "android_vr" : si == 1 ? "tv" : si == 2 ? "android_vr" : "web_embedded";
+                                ra.addOption("--extractor-args", "youtube:player_client=" + pc + (ytNoCookie2 ? "" : "+cookies"));
+                            }
                             ra.addOption("-o", out.getAbsolutePath());
                             ra.addOption("--restrict-filenames");
                             ra.addOption("--no-playlist"); ra.addOption("--no-mtime");
