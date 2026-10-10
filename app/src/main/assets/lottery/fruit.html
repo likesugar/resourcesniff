@@ -105,6 +105,7 @@
     <button onclick="setDiff('normal')" style="flex:1;padding:7px 0;background:#315CDE;color:#fff;border:none;border-radius:10px;font-size:12px">🎲 普通</button>
     <button onclick="setDiff('hard')" style="flex:1;padding:7px 0;background:#e67e22;color:#fff;border:none;border-radius:10px;font-size:12px">😈 困难</button>
   </div>
+  <div id="diffInfo" style="color:#fff;font-size:11px;line-height:1.6;margin-bottom:8px"></div>
   <div style="color:#ffd75e;font-size:12px;font-weight:bold;margin-bottom:6px">倍数</div>
   <div id="oddsRow" style="display:flex;gap:6px;flex-wrap:wrap"></div>
   <button onclick="saveOdds()" style="margin-top:8px;width:100%;padding:9px 0;background:#1FA855;color:#fff;border:none;border-radius:14px;font-size:13px;font-weight:bold">保存倍数</button>
@@ -125,7 +126,20 @@ var SYM = {
 // 外圈 16 格（顺时针），与真实水果机布局近似
 var RING = ['apple','bell','bar','bell','apple','star','apple','luck','luck','bell','star',
             'apple','star','seven','seven','apple'];
-var DIFF_W = { easy:{bar:1,seven:2,star:4,bell:4,apple:6,luck:2}, normal:{bar:2,seven:2,star:4,bell:4,apple:4,luck:1}, hard:{bar:1,seven:1,star:2,bell:3,apple:6,luck:1} };
+var RTP = { easy:1.02, normal:0.90, hard:0.78 }; // 含 LUCK 补偿后: 约 107%/95%/83% // 期望回报率: 容易略赚/普通微亏/困难重亏
+function buildWeights() {
+  var base = 0; BET_SLOTS.forEach(function(k){ base += 1/ODDS[k]; });
+  var K = (RTP[DIFF] || 0.98) / base; // 按倍数和缩放, 保证整局回报≈RTP
+  var w = {};
+  BET_SLOTS.forEach(function(k) {
+    var cnt = 0; RING.forEach(function(x){ if (x === k) cnt++; });
+    var per = Math.max(0.15, 16 * K / (ODDS[k] * Math.max(1, cnt)));
+    RING.forEach(function(x){ if (x === k) w[x] = per; });
+  });
+  var lw = DIFF === 'easy' ? 0.5 : 0.2;
+  RING.forEach(function(x){ if (x === 'luck') w[x] = lw; });
+  return w;
+}
 var XTAG = {'bar':'X30','seven':'X12','star':'X6','bell':'X6','apple':'X3'};
 // 5 个押注位（底排）：符号 + 赔率
 var BET_SLOTS = ['bar','seven','star','bell','apple'];
@@ -228,7 +242,7 @@ document.getElementById('go').onclick = function() {
   document.getElementById('go').disabled = true;
   balance -= total; save(); refresh();
   // 加权随机：LUCK 权重低（视为随机高赔）
-  var W = DIFF_W[DIFF] || DIFF_W.normal; var weights = RING.map(function(k) { return W[k] || 4; });
+  var W = buildWeights(); var weights = RING.map(function(k) { return W[k] || 0.2; });
   var sum = weights.reduce(function(a, b) { return a + b; }, 0);
   var pick = Math.floor(Math.random() * sum), land = 0;
   for (var i = 0; i < sum && pick >= 0; i++) { pick -= weights[i]; land = i; }
@@ -264,7 +278,7 @@ function settle(idx) {
   document.getElementById('go').disabled = false;
 }
 
-function toggleFcfg() { var f = document.getElementById('fcfg'); f.style.display = f.style.display === 'none' ? 'block' : 'none'; if (f.style.display === 'block') renderOddsRow(); }
+function toggleFcfg() { var f = document.getElementById('fcfg'); f.style.display = f.style.display === 'none' ? 'block' : 'none'; if (f.style.display === 'block') { renderOddsRow(); renderDiffInfo(); } }
 function renderOddsRow() {
   var row = document.getElementById('oddsRow'); row.innerHTML = '';
   BET_SLOTS.forEach(function(k) {
@@ -295,7 +309,17 @@ function saveOdds() {
   });
   toast('倍数已保存');
 }
-function setDiff(d) { DIFF = d; localStorage.fm_diff = d; toast('难度已切换：' + (d === 'easy' ? '容易' : d === 'hard' ? '困难' : '普通')); }
+function setDiff(d) { DIFF = d; localStorage.fm_diff = d; renderDiffInfo(); toast('难度已切换：' + (d === 'easy' ? '容易' : d === 'hard' ? '困难' : '普通')); }
+function renderDiffInfo() {
+  var W = buildWeights(); var tot = 0;
+  RING.forEach(function(x){ tot += W[x]; });
+  var parts = {};
+  RING.forEach(function(x){ parts[x] = (parts[x] || 0) + W[x]; });
+  var line = '当前分布：';
+  BET_SLOTS.forEach(function(k){ line += SYM[k].name + ' ' + Math.round(parts[k] / tot * 100) + '%  '; });
+  line += '🍀 ' + Math.round((parts.luck || 0) / tot * 100) + '%  · 回报 ' + Math.round((RTP[DIFF] || 0.98) * 100) + '%';
+  document.getElementById('diffInfo').textContent = line;
+}
 
 document.getElementById('ledBal').textContent = pad(balance);
 refresh();
