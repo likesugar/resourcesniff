@@ -193,6 +193,12 @@ public class SniffActivity extends Activity {
                 Uri u = request.getUrl();
                 String scheme = u.getScheme() == null ? "" : u.getScheme().toLowerCase();
                 if ("http".equals(scheme) || "https".equals(scheme)) {
+                    // 直链媒体: 不在 WebView 里打开(会黑页/跳走), 直接进播放器
+                    String mediaUrl = u.toString();
+                    if (MEDIA.matcher(mediaUrl).find()) {
+                        playUrl(mediaUrl);
+                        return true;
+                    }
                     // host 无点号说明是相对路径被浏览器补全的假链接（如 webcast_room/），忽略
                     String h = u.getHost() == null ? "" : u.getHost();
                     return !h.contains(".");
