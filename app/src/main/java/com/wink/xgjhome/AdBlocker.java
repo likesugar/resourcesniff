@@ -16,7 +16,7 @@ public class AdBlocker {
     private static final ArrayList<String> genericRules = new ArrayList<>();
     private static final ArrayList<String> genericAllow = new ArrayList<>();
     private static final String[] BOOT_BLOCK = {
-        "/api/v1/direct/", "wheelroot.com", "go.marzaent.com", "smartpop",
+        "/api/v1/direct/", "go.marzaent.com", "smartpop",
         "propellerads", "propellerclick", "adcash", "zroiw2.com", "pu-wew" };
     private static volatile boolean loaded = false;
     private static int blocked = 0;
