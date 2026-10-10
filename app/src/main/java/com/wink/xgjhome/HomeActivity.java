@@ -79,20 +79,19 @@ public class HomeActivity extends Activity {
     private android.view.GestureDetector pageGesture;
     private static final int[] MEDIA_CARDS = {R.id.cardPlayer, R.id.cardDownload, R.id.cardVideoDl, R.id.cardXhs};
 
-    /** 三态页切换: 0=首页 1=媒体 2=设置(打开设置页) */
+    /** 三态导航: 0=首页 1=媒体 2=设置(打开设置页,不驻留状态) */
     private void switchToPage(int p) {
-        if (pageIdx == p) return;
         if (p == 2) {
-            pageIdx = 2;
             if (bottomBar != null) bottomBar.setActive(2);
             startActivity(new Intent(this, SettingsActivity.class));
             return;
         }
-        applyPageVisibility(p);
+        if (pageIdx == p) return;
+        applyPage(p);
     }
 
     /** 无守卫的页面可见性应用(启动初始化也走这里) */
-    private void applyPageVisibility(int p) {
+    private void applyPage(int p) {
         pageIdx = p;
         boolean media = p == 1;
         if (bottomBar != null) bottomBar.setActive(p);
@@ -133,7 +132,7 @@ public class HomeActivity extends Activity {
                 public void onItem(int idx) {
                     if (idx == 3) {
                         showPlayChoice();
-                        if (bottomBar != null) bottomBar.setActive(Math.min(pageIdx, 2)); // 播放器不是页面, 滑块归位
+                        if (bottomBar != null) bottomBar.setActive(pageIdx); // 播放器不是页面, 滑块归位
                     } else switchToPage(idx);
                 }
             });
@@ -214,7 +213,6 @@ public class HomeActivity extends Activity {
                 if (e1.getX() < edge || e1.getX() > getResources().getDisplayMetrics().widthPixels - edge) return false;
                 float dx = e2.getX() - e1.getX(), dy = e2.getY() - e1.getY();
                 if (Math.abs(dx) > 150 && Math.abs(dx) > Math.abs(dy) * 1.5f) {
-                    // 真循环: 0首页→1媒体→2设置→0首页
                     int target = dx < 0 ? (pageIdx + 1) % 3 : (pageIdx + 2) % 3;
                     switchToPage(target);
                     return true;
@@ -254,7 +252,7 @@ public class HomeActivity extends Activity {
         applyTheme();
         applyImmersive();
 
-        applyPageVisibility(0); // 初始: 首页态, 隐藏媒体卡
+        applyPage(0); // 初始: 首页态, 隐藏媒体卡
 
         findViewById(R.id.themeToggle).setOnClickListener(new View.OnClickListener() {
             public void onClick(View v) {
@@ -317,9 +315,7 @@ public class HomeActivity extends Activity {
     @Override
     protected void onResume() {
         super.onResume();
-        if (pageIdx == 2) applyPageVisibility(0); // 从设置页返回, 归位首页态
-
-        super.onResume();
+        if (bottomBar != null) bottomBar.setActive(pageIdx); // 滑块对齐当前页(设置非驻留页)
         calTick.post(calTickRun);
         updateMedStatus();
         try { MedPlanActivity.checkAndNotifyDue(this); } catch (Throwable ignored) {}

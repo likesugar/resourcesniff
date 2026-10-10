@@ -91,7 +91,7 @@ public class SettingsActivity extends Activity {
                 }
             }
         });
-        bar.select(1, false);
+        bar.setActive(1);
         FrameLayout content = (FrameLayout) findViewById(android.R.id.content);
         FrameLayout.LayoutParams blp = new FrameLayout.LayoutParams(
                 ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT,
