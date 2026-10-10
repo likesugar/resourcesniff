@@ -178,7 +178,13 @@ public class HomeActivity extends Activity {
 
     @Override
     public boolean dispatchTouchEvent(android.view.MotionEvent ev) {
-        if (pageGesture != null) pageGesture.onTouchEvent(ev);
+        if (pageGesture != null && bottomBar != null) {
+            int[] loc = new int[2];
+            bottomBar.getLocationOnScreen(loc);
+            boolean onBar = ev.getRawY() >= loc[1] - dp2(8);
+            if (!onBar) pageGesture.onTouchEvent(ev);
+            else pageGesture.onTouchEvent(android.view.MotionEvent.obtain(ev.getDownTime(), ev.getEventTime(), android.view.MotionEvent.ACTION_CANCEL, ev.getX(), ev.getY(), 0));
+        }
         return super.dispatchTouchEvent(ev);
     }
 

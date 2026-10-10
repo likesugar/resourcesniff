@@ -78,7 +78,11 @@ public class CapsuleBottomBar extends FrameLayout {
         if (ev.getAction() == android.view.MotionEvent.ACTION_DOWN) { downX = ev.getX(); swiped = false; }
         else if (ev.getAction() == android.view.MotionEvent.ACTION_MOVE) {
             float dx = ev.getX() - downX;
-            if (!swiped && Math.abs(dx) > dp(50)) { swiped = true; select(dx < 0 ? (active == 3 ? 0 : active + 1) : (active == 0 ? 3 : active - 1), true); }
+            if (!swiped && Math.abs(dx) > dp(50)) {
+                swiped = true;
+                int target = dx < 0 ? Math.min(active + 1, 1) : Math.max(active - 1, 0);
+                select(target, true);
+            }
         }
         return super.dispatchTouchEvent(ev);
     }
