@@ -30,9 +30,6 @@ public class CapsuleBottomBar extends FrameLayout {
     private int active = 0;
 
     // 滑动检测
-    private float downX, downY;
-    private boolean swiping;
-
     public CapsuleBottomBar(Context c, boolean darkMode, OnItem callback) {
         super(c);
         dark = darkMode;
@@ -112,28 +109,6 @@ public class CapsuleBottomBar extends FrameLayout {
         if (fire && cb != null) cb.onItem(idx);
     }
 
-    @Override
-    public boolean dispatchTouchEvent(android.view.MotionEvent ev) {
-        switch (ev.getActionMasked()) {
-            case android.view.MotionEvent.ACTION_DOWN:
-                downX = ev.getX();
-                downY = ev.getY();
-                swiping = false;
-                break;
-            case android.view.MotionEvent.ACTION_MOVE: {
-                float dx = ev.getX() - downX;
-                float dy = ev.getY() - downY;
-                if (!swiping && Math.abs(dx) > dp(40) && Math.abs(dx) > Math.abs(dy)) {
-                    swiping = true;
-                    // 滑动循环：首页↔媒体↔设置（播放器仅点按）
-                    int target = dx < 0 ? (active + 1) % 3 : (active - 1 + 3) % 3;
-                    if (target != active) select(target, true);
-                }
-                break;
-            }
-        }
-        return super.dispatchTouchEvent(ev);
-    }
 
     private int dp(int v) { return Math.round(v * getResources().getDisplayMetrics().density); }
 }
