@@ -49,7 +49,7 @@ public class SettingsPageView extends android.widget.FrameLayout {
         for (int i = 0; i < root.getChildCount(); i++) {
             View c = root.getChildAt(i);
             if (c instanceof android.widget.ScrollView) {
-                c.setPadding(c.getPaddingLeft(), c.getPaddingTop(), c.getPaddingRight(), (int) (96 * getResources().getDisplayMetrics().density));
+                c.setPadding(c.getPaddingLeft(), c.getPaddingTop(), c.getPaddingRight(), (int) (64 * getResources().getDisplayMetrics().density));
                 break;
             }
         }
@@ -333,20 +333,6 @@ public class SettingsPageView extends android.widget.FrameLayout {
         TextView tvO = (TextView) findViewById(R.id.tvOled);
         if (tvO != null) tvO.setText(oled ? "开" : "关");
         buildPlatList();
-        // 诊断: card2 子项状态
-        try {
-            android.view.ViewGroup c2 = (android.view.ViewGroup) findViewById(R.id.card2);
-            StringBuilder sb = new StringBuilder("DBG dark=").append(dark)
-                .append(" kids=").append(c2.getChildCount());
-            for (int i = 0; i < c2.getChildCount(); i++) {
-                View k = c2.getChildAt(i);
-                sb.append(" [").append(k.getClass().getSimpleName())
-                  .append(" vis=").append(k.getVisibility())
-                  .append(" h=").append(k.getHeight())
-                  .append(" alpha=").append(k.getAlpha()).append("]");
-            }
-            Toast.makeText(host, sb, Toast.LENGTH_LONG).show();
-        } catch (Throwable ignored) { }
     }
 
     private int dp(int v) { return (int) (v * getResources().getDisplayMetrics().density); }
