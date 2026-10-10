@@ -591,6 +591,31 @@ public class VideoDlActivity extends Activity {
                         qdst.setExecutable(true);
                     }
                 } catch (Throwable ignored) {}
+                // QJS 自检: 能否真正执行(结果记入 网页诊断.txt)
+                try {
+                    java.io.File qjsf0 = new java.io.File(getFilesDir(), "ytdlp/qjs");
+                    String probe = "SKIP";
+                    if (qjsf0.exists()) {
+                        Process p = new ProcessBuilder(qjsf0.getAbsolutePath(), "-e", "console.log(40+2)").redirectErrorStream(true).start();
+                        java.io.ByteArrayOutputStream bo = new java.io.ByteArrayOutputStream();
+                        java.io.InputStream pi = p.getInputStream();
+                        byte[] pb = new byte[1024]; int pn;
+                        while ((pn = pi.read(pb)) > 0) bo.write(pb, 0, pn);
+                        p.waitFor();
+                        probe = "exit=" + p.exitValue() + " out=" + bo.toString().trim();
+                    }
+                    java.io.File dir0 = getExternalFilesDir(null) != null ? getExternalFilesDir(null).getParentFile() : getFilesDir();
+                    java.io.FileWriter fw0 = new java.io.FileWriter(new java.io.File(dir0, "网页诊断.txt"), true);
+                    fw0.write("\n==== QJS self-test " + new java.util.Date() + " ====" + probe + "\n");
+                    fw0.close();
+                } catch (Throwable t0) {
+                    try {
+                        java.io.File dir0 = getExternalFilesDir(null) != null ? getExternalFilesDir(null).getParentFile() : getFilesDir();
+                        java.io.FileWriter fw0 = new java.io.FileWriter(new java.io.File(dir0, "网页诊断.txt"), true);
+                        fw0.write("\n==== QJS self-test EXC ====" + t0 + "\n");
+                        fw0.close();
+                    } catch (Throwable ignored) {}
+                }
             }
         }
     }
