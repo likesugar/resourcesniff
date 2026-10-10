@@ -352,6 +352,7 @@ public class VideoDlActivity extends Activity {
                             meta.addOption("--user-agent", st[0]);
                             meta.addOption("--add-headers", "Referer: " + ref);
                             if (st[2].equals("1")) meta.addOption("--cookies", cookies().getAbsolutePath());
+                            if (tk.url.contains("youtube.com") || tk.url.contains("youtu.be")) meta.addOption("--extractor-args", "youtube:player_client=" + (si % 2 == 0 ? "android_vr" : "web_embedded"));
                             com.yausername.youtubedl_android.YoutubeDLResponse mr =
                                     com.yausername.youtubedl_android.YoutubeDL.getInstance().execute(meta, null);
                             String[] ls = mr.getOut().trim().split("\n");
@@ -392,6 +393,7 @@ public class VideoDlActivity extends Activity {
                         req.addOption("--user-agent", st[0]);
                         req.addOption("--add-headers", "Referer: " + ref);
                         if (st[2].equals("1")) req.addOption("--cookies", cookies().getAbsolutePath());
+                            if (tk.url.contains("youtube.com") || tk.url.contains("youtu.be")) req.addOption("--extractor-args", "youtube:player_client=" + (si % 2 == 0 ? "android_vr" : "web_embedded"));
 
                     if (tk.gen != myGen) return;
                         req.addOption("-o", out.getAbsolutePath());
@@ -438,6 +440,7 @@ public class VideoDlActivity extends Activity {
                             ra.addOption("--user-agent", st[0]);
                             ra.addOption("--add-headers", "Referer: " + ref);
                             if (st[2].equals("1")) ra.addOption("--cookies", cookies().getAbsolutePath());
+                            if (tk.url.contains("youtube.com") || tk.url.contains("youtu.be")) ra.addOption("--extractor-args", "youtube:player_client=" + (si % 2 == 0 ? "android_vr" : "web_embedded"));
                             ra.addOption("-o", out.getAbsolutePath());
                             ra.addOption("--restrict-filenames");
                             ra.addOption("--no-playlist"); ra.addOption("--no-mtime");
