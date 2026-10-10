@@ -194,6 +194,9 @@ public class HomeActivity extends Activity {
         pageGesture = new android.view.GestureDetector(this, new android.view.GestureDetector.SimpleOnGestureListener() {
             public boolean onFling(android.view.MotionEvent e1, android.view.MotionEvent e2, float vx, float vy) {
                 if (e1 == null || e2 == null) return false;
+                // 豁免系统边缘返回手势(左右边缘起手的横滑不切页)
+                int edge = (int) (getResources().getDisplayMetrics().widthPixels * 0.08f);
+                if (e1.getX() < edge || e1.getX() > getResources().getDisplayMetrics().widthPixels - edge) return false;
                 float dx = e2.getX() - e1.getX(), dy = e2.getY() - e1.getY();
                 if (Math.abs(dx) > 150 && Math.abs(dx) > Math.abs(dy) * 1.5f) {
                     switchPage(dx < 0);
