@@ -350,6 +350,7 @@ public class VideoDlActivity extends Activity {
                             meta.addOption("--no-update");
                             if (si == 0) meta.addOption("--verbose");
                             meta.addOption("--user-agent", st[0]);
+                            meta.addOption("-4");
                             meta.addOption("--add-headers", "Referer: " + ref);
                             boolean yt = tk.url.contains("youtube.com") || tk.url.contains("youtu.be");
                             boolean ytNoCookie = yt && si < 2;
@@ -396,6 +397,7 @@ public class VideoDlActivity extends Activity {
                         }
                         req.addOption("--no-update");
                         req.addOption("--user-agent", st[0]);
+                        req.addOption("-4");
                         req.addOption("--add-headers", "Referer: " + ref);
                         boolean yt2 = tk.url.contains("youtube.com") || tk.url.contains("youtu.be");
                             boolean ytNoCookie2 = yt2 && si < 2;
@@ -448,6 +450,7 @@ public class VideoDlActivity extends Activity {
                             ra.addOption("-f", "ba[ext=m4a]/ba/b");
                             ra.addOption("--no-update");
                             ra.addOption("--user-agent", st[0]);
+                            ra.addOption("-4");
                             ra.addOption("--add-headers", "Referer: " + ref);
                             if (st[2].equals("1") && !ytNoCookie2) ra.addOption("--cookies", cookies().getAbsolutePath());
                             if (yt2) {
