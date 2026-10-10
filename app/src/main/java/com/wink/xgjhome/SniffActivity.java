@@ -195,6 +195,11 @@ public class SniffActivity extends Activity {
                 if ("http".equals(scheme) || "https".equals(scheme)) {
                     // 直链媒体: 不在 WebView 里打开(会黑页/跳走), 直接进播放器
                     String mediaUrl = u.toString();
+                    // 点击跳转的广告链直接拦掉(弹窗广告: wheelroot/marzaent 等)
+                    if (AdBlocker.shouldBlock(mediaUrl)) {
+                        android.util.Log.w("Sniff", "NAV-BLOCK " + mediaUrl);
+                        return true;
+                    }
                     if (MEDIA.matcher(mediaUrl).find()) {
                         playUrl(mediaUrl);
                         return true;

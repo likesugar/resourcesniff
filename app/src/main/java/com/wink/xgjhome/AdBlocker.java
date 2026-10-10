@@ -15,6 +15,9 @@ public class AdBlocker {
     private static final HashMap<String, ArrayList<String[]>> domainAllow = new HashMap<>();
     private static final ArrayList<String> genericRules = new ArrayList<>();
     private static final ArrayList<String> genericAllow = new ArrayList<>();
+    private static final String[] BOOT_BLOCK = {
+        "/api/v1/direct/", "wheelroot.com", "go.marzaent.com", "smartpop",
+        "propellerads", "propellerclick", "adcash", "zroiw2.com", "pu-wew" };
     private static volatile boolean loaded = false;
     private static int blocked = 0;
 
@@ -84,6 +87,7 @@ public class AdBlocker {
                 }
                 br.close();
             } catch (Throwable ignored) { }
+            for (String b : BOOT_BLOCK) applyCustom(b);
             synchronized (customRules) {
                 String saved = c.getSharedPreferences("settings", android.content.Context.MODE_PRIVATE)
                         .getString("adblock_custom", "");
