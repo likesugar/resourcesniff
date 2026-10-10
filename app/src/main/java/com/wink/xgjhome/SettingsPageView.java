@@ -165,6 +165,7 @@ public class SettingsPageView extends android.widget.FrameLayout {
         ytdlpStatus.setText("正在下载最新版 yt-dlp…");
         new Thread(new Runnable() { public void run() {
             String err = null;
+            new java.io.File(host.getFilesDir(), "ytdlp_custom").mkdirs();
             for (String u : urls) {
                 byte[] data = null;
                 // 每源重试 3 次, 支持断点续传
