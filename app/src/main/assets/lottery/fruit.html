@@ -24,7 +24,7 @@
   #arch { height:14px; background:repeating-linear-gradient(90deg,#ffe082 0 6px,#2a1a10 6px 14px);
           border-radius:0 0 8px 8px; }
   /* 转盘区 */
-  #board { flex:none; width:100%; aspect-ratio:1/1; margin:4px 14px; border:3px solid #d8a520; border-radius:10px;
+  #board { flex:none; width:calc(100% - 8px); aspect-ratio:1/1; margin:4px auto; border:3px solid #d8a520; border-radius:10px;
            background:radial-gradient(circle at 50% 50%, #4a1a6e 0%, #2a0e42 70%);
            display:grid; grid-template-columns:repeat(5,1fr); grid-template-rows:repeat(5,1fr); gap:4px; padding:6px; }
   .cell { border-radius:8px; display:flex; flex-direction:column; align-items:center; justify-content:center;
@@ -282,6 +282,17 @@ function saveOdds() {
     if (v >= 1 && v <= 999) { ODDS[k] = v; if (SYM[k]) SYM[k].odds = v; }
   });
   localStorage.fm_odds = JSON.stringify(ODDS);
+  // 同步刷新押注位与台面角标
+  BET_SLOTS.forEach(function(k, i) {
+    var od = betAmt[k].querySelector('.odds');
+    if (od) od.textContent = '×' + ODDS[k];
+  });
+  cells.forEach(function(c, i) {
+    var k = RING[i];
+    if (!XTAG[k]) return;
+    var x = c.querySelector('.x');
+    if (x) x.textContent = XTAG[k] = (k === 'bar' ? 'X' + ODDS.bar : k === 'seven' ? 'X' + ODDS.seven : k === 'star' ? 'X' + ODDS.star : k === 'bell' ? 'X' + ODDS.bell : 'X' + ODDS.apple);
+  });
   toast('倍数已保存');
 }
 function setDiff(d) { DIFF = d; localStorage.fm_diff = d; toast('难度已切换：' + (d === 'easy' ? '容易' : d === 'hard' ? '困难' : '普通')); }
