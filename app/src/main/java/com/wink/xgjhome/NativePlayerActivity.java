@@ -153,7 +153,12 @@ public class NativePlayerActivity extends Activity {
 
     Map<String, String> douyinHeaders() {
         Map<String, String> hdrs = null;
-        if (url != null && (url.contains("douyincdn") || url.contains("douyin"))) {
+        String extRef = getIntent() == null ? null : getIntent().getStringExtra("referer");
+        if (extRef != null && !extRef.isEmpty()) {
+            hdrs = new HashMap<String, String>();
+            hdrs.put("Referer", extRef);
+            hdrs.put("User-Agent", "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36");
+        } else if (url != null && (url.contains("douyincdn") || url.contains("douyin"))) {
             hdrs = new HashMap<String, String>();
             hdrs.put("Referer", "https://live.douyin.com/");
             hdrs.put("User-Agent", "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36");

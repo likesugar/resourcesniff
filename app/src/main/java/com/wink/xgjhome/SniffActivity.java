@@ -195,9 +195,44 @@ public class SniffActivity extends Activity {
                 if ("http".equals(scheme) || "https".equals(scheme)) {
                     // 直链媒体: 不在 WebView 里打开(会黑页/跳走), 直接进播放器
                     String mediaUrl = u.toString();
-                    // 点击跳转的广告链直接拦掉(弹窗广告: wheelroot/marzaent 等)
+                    // 命中广告特征的跳转链(如 wheelroot /api/v1/direct): 后台跟随302甄别
+                    // 真媒体→带Referer进播放器; 真广告→丢弃不跳
                     if (AdBlocker.shouldBlock(mediaUrl)) {
-                        android.util.Log.w("Sniff", "NAV-BLOCK " + mediaUrl);
+                        android.util.Log.w("Sniff", "NAV-PROBE " + mediaUrl);
+                        final String mu = mediaUrl;
+                        WebView wv = webView;
+                        final String ref = (wv == null || wv.getUrl() == null) ? "" : wv.getUrl();
+                        new Thread(new Runnable() { public void run() {
+                            try {
+                                String cu = mu;
+                                for (int i = 0; i < 5; i++) {
+                                    java.net.HttpURLConnection c = (java.net.HttpURLConnection) new java.net.URL(cu).openConnection();
+                                    c.setInstanceFollowRedirects(false);
+                                    c.setRequestMethod("GET");
+                                    c.setRequestProperty("User-Agent", "Mozilla/5.0 (Linux; Android 13) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36");
+                                    if (!ref.isEmpty()) c.setRequestProperty("Referer", ref);
+                                    c.setConnectTimeout(8000); c.setReadTimeout(8000);
+                                    int code = c.getResponseCode();
+                                    String loc = c.getHeaderField("Location");
+                                    String ct = c.getHeaderField("Content-Type");
+                                    c.disconnect();
+                                    if (ct != null && (ct.startsWith("video/") || ct.startsWith("audio/") || ct.contains("mpegurl") || ct.contains("octet-stream"))) {
+                                        final String fu = cu; runOnUiThread(new Runnable() { public void run() { pendingRef = ref; playUrl(fu); } });
+                                        return;
+                                    }
+                                    if ((code == 301 || code == 302 || code == 303 || code == 307 || code == 308) && loc != null) {
+                                        cu = new java.net.URL(new java.net.URL(cu), loc).toString();
+                                        if (MEDIA.matcher(cu).find()) {
+                                            final String fu2 = cu; runOnUiThread(new Runnable() { public void run() { pendingRef = ref; playUrl(fu2); } });
+                                            return;
+                                        }
+                                        continue;
+                                    }
+                                    break;
+                                }
+                                // 最终不是媒体 → 广告, 丢弃
+                            } catch (Throwable ignored) { }
+                        } }).start();
                         return true;
                     }
                     if (MEDIA.matcher(mediaUrl).find()) {
@@ -1458,6 +1493,9 @@ public class SniffActivity extends Activity {
 
     private volatile String playerUrl = null;
 
+    /** 探测甄别出的 referer, 随 playUrl 透传给播放器 */
+    static volatile String pendingRef = "";
+
     /** 内置 jessibuca 播放器：player.html 通过 AndroidPlayer 桥取地址 */
     void playUrl(String url) {
         // FC2 中转流：按 http 链接直接唤起浏览器播放
@@ -1479,6 +1517,8 @@ public class SniffActivity extends Activity {
             i.putExtra("url", url);
             i.putExtra("title", "资源嗅探");
             i.putExtra("kernel", url.contains("douyin") ? "web" : "native");
+            if (pendingRef != null && !pendingRef.isEmpty()) i.putExtra("referer", pendingRef);
+            pendingRef = "";
             startActivity(i);
         } catch (Exception e) {
             Toast.makeText(this, "打不开: " + e.getMessage(), Toast.LENGTH_SHORT).show();
