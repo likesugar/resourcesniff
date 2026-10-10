@@ -212,7 +212,8 @@ public class HomeActivity extends Activity {
                 if (e1.getX() < edge || e1.getX() > getResources().getDisplayMetrics().widthPixels - edge) return false;
                 float dx = e2.getX() - e1.getX(), dy = e2.getY() - e1.getY();
                 if (Math.abs(dx) > 150 && Math.abs(dx) > Math.abs(dy) * 1.5f) {
-                    int target = dx < 0 ? Math.min(pageIdx + 1, 2) : Math.max(pageIdx - 1, 0);
+                    // 真循环: 0首页→1媒体→2设置→0首页
+                    int target = dx < 0 ? (pageIdx + 1) % 3 : (pageIdx + 2) % 3;
                     switchToPage(target);
                     return true;
                 }
