@@ -2,6 +2,7 @@ package com.wink.xgjhome;
 
 import android.annotation.SuppressLint;
 import android.app.Activity;
+import android.app.AlertDialog;
 import android.content.Context;
 import android.content.ClipData;
 import android.content.Intent;
@@ -114,6 +115,11 @@ public class SniffActivity extends Activity {
             public void onClick(View v) {
                 toggleAutoRefresh();
     }
+        });
+
+        btnRefresh.setOnLongClickListener(new View.OnLongClickListener() {
+            @Override
+            public boolean onLongClick(View v) { showAdblockMgr(); return true; }
         });
 
         WebSettings ws = webView.getSettings();
@@ -847,6 +853,57 @@ public class SniffActivity extends Activity {
             try { addRecord(url, forceTitle != null ? forceTitle : (page == null ? "" : page)); }
             catch (Throwable t) { dumpDiag("SC ADD ERR: " + t); }
         }});
+    }
+
+
+    private android.app.AlertDialog adblockDlg;
+
+    /** 自定义广告屏蔽管理: 添加域名/关键词 + 列表删除 */
+    private void showAdblockMgr() {
+        android.widget.LinearLayout box = new android.widget.LinearLayout(this);
+        box.setOrientation(android.widget.LinearLayout.VERTICAL);
+        int pad = (int) (14 * getResources().getDisplayMetrics().density);
+        box.setPadding(pad, pad, pad, pad);
+        final android.widget.EditText et = new android.widget.EditText(this);
+        et.setHint("输入域名(如 ad.example.com)或关键词");
+        et.setSingleLine(true);
+        box.addView(et);
+        android.widget.Button add = new android.widget.Button(this);
+        add.setText("＋ 添加屏蔽");
+        add.setOnClickListener(new View.OnClickListener() {
+            public void onClick(View v) {
+                String t = et.getText().toString().trim();
+                if (t.isEmpty()) return;
+                AdBlocker.addCustomRule(SniffActivity.this, t);
+                Toast.makeText(SniffActivity.this, "已添加屏蔽: " + t + "，立即生效", Toast.LENGTH_SHORT).show();
+                et.setText("");
+            }
+        });
+        box.addView(add, new android.view.ViewGroup.LayoutParams(-1, -2));
+        java.util.List<String> customs = AdBlocker.getCustomRules();
+        if (!customs.isEmpty()) {
+            TextView lbl = new TextView(this);
+            lbl.setText("已添加 " + customs.size() + " 条（点按删除）:");
+            lbl.setPadding(0, (int) (10 * getResources().getDisplayMetrics().density), 0, 0);
+            box.addView(lbl);
+            for (final String k : customs) {
+                TextView tv = new TextView(this);
+                tv.setText("✕  " + k);
+                tv.setTextColor(0xFFE5A50A);
+                tv.setPadding(0, (int) (6 * getResources().getDisplayMetrics().density), 0, 0);
+                tv.setOnClickListener(new View.OnClickListener() {
+                    public void onClick(View v) {
+                        AdBlocker.removeCustomRule(SniffActivity.this, k);
+                        Toast.makeText(SniffActivity.this, "已删除: " + k, Toast.LENGTH_SHORT).show();
+                        if (adblockDlg != null) adblockDlg.dismiss();
+                        showAdblockMgr();
+                    }
+                });
+                box.addView(tv);
+            }
+        }
+        adblockDlg = new AlertDialog.Builder(this).setTitle("广告屏蔽管理").setView(box).create();
+        adblockDlg.show();
     }
 
     /** 对应 DK shouldInterceptRequest 的抖音判定段 */

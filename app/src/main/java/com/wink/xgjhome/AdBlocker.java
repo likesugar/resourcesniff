@@ -18,6 +18,49 @@ public class AdBlocker {
     private static volatile boolean loaded = false;
     private static int blocked = 0;
 
+    private static final java.util.LinkedHashSet<String> customRules = new java.util.LinkedHashSet<>();
+
+    /** 自定义屏蔽: 域名(含点)→整域拦截; 其它→URL关键词拦截。立即生效并持久化 */
+    public static void addCustomRule(Context c, String input) {
+        String k = input == null ? "" : input.trim().toLowerCase();
+        if (k.isEmpty()) return;
+        synchronized (customRules) {
+            customRules.add(k);
+            persist(c);
+            applyCustom(k);
+        }
+    }
+
+    public static void removeCustomRule(Context c, String k) {
+        synchronized (customRules) {
+            customRules.remove(k);
+            persist(c);
+        }
+        loaded = false;
+        load(c);
+    }
+
+    public static java.util.List<String> getCustomRules() {
+        synchronized (customRules) { return new ArrayList<String>(customRules); }
+    }
+
+    private static void persist(Context c) {
+        StringBuilder sb = new StringBuilder();
+        for (String k : customRules) { if (sb.length() > 0) sb.append('\u0001'); sb.append(k); }
+        c.getSharedPreferences("settings", android.content.Context.MODE_PRIVATE)
+                .edit().putString("adblock_custom", sb.toString()).apply();
+    }
+
+    private static void applyCustom(String k) {
+        if (k.indexOf('.') >= 0 && !k.contains(" ")) {
+            ArrayList<String[]> l = domainRules.get(k);
+            if (l == null) { l = new ArrayList<String[]>(); domainRules.put(k, l); }
+            l.add(new String[]{k, ""});
+        } else {
+            genericRules.add(k);
+        }
+    }
+
     /** 首次调用异步加载规则包 */
     public static void load(Context c) {
         if (loaded) return;
@@ -41,6 +84,11 @@ public class AdBlocker {
                 }
                 br.close();
             } catch (Throwable ignored) { }
+            synchronized (customRules) {
+                String saved = c.getSharedPreferences("settings", android.content.Context.MODE_PRIVATE)
+                        .getString("adblock_custom", "");
+                for (String k : saved.split("\u0001")) if (!k.isEmpty()) { customRules.add(k); applyCustom(k); }
+            }
         }}, "adblock-load").start();
     }
 
