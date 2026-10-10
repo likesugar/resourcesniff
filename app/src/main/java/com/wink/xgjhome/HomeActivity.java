@@ -2,6 +2,8 @@ package com.wink.xgjhome;
 
 import android.app.Activity;
 import android.content.ClipboardManager;
+import android.widget.FrameLayout;
+import android.widget.ScrollView;
 import android.widget.Toast;
 import android.content.DialogInterface;
 import android.content.Intent;
@@ -75,41 +77,84 @@ public class HomeActivity extends Activity {
     private float dp2(float v) { return v * getResources().getDisplayMetrics().density; }
 
     private int pageIdx = 0; // 0=首页 1=媒体 2=设置
+    private FrameLayout pageHost;
+    private SettingsPageView pageSettings;
+    private boolean pagesBuilt = false;
     private CapsuleBottomBar bottomBar;
     private android.view.GestureDetector pageGesture;
     private static final int[] MEDIA_CARDS = {R.id.cardPlayer, R.id.cardDownload, R.id.cardVideoDl, R.id.cardXhs};
 
-    /** 三态导航: 0=首页 1=媒体 2=设置(打开设置页,不驻留状态) */
+    /** 三态导航: 0=首页 1=媒体 2=设置(内嵌页) */
     private void switchToPage(int p) {
-        if (p == 2) {
-            if (bottomBar != null) bottomBar.setActive(2);
-            startActivity(new Intent(this, SettingsActivity.class));
-            return;
-        }
         if (pageIdx == p) return;
         applyPage(p);
     }
 
-    /** 无守卫的页面可见性应用(启动初始化也走这里) */
+    /** 无守卫的页面应用：0=首页 1=媒体 2=设置（设置已内嵌为本页） */
     private void applyPage(int p) {
+        if (!pagesBuilt) buildPages();
         pageIdx = p;
-        boolean media = p == 1;
         if (bottomBar != null) bottomBar.setActive(p);
+        if (p == 2 && pageSettings != null) pageSettings.refresh();
+        pageHost.getChildAt(0).setVisibility(p == 0 ? View.VISIBLE : View.GONE);
+        pageHost.getChildAt(1).setVisibility(p == 1 ? View.VISIBLE : View.GONE);
+        pageHost.getChildAt(2).setVisibility(p == 2 ? View.VISIBLE : View.GONE);
         // 页面切换过渡：淡入 + 轻微上滑
         try {
-            View col = findViewById(R.id.toolColumn);
+            View col = pageHost;
             col.setAlpha(0f);
             col.setTranslationY(26f);
             col.animate().alpha(1f).translationY(0f).setDuration(230).setInterpolator(
                     new android.view.animation.DecelerateInterpolator(1.4f)).start();
         } catch (Throwable ignored) { }
-        java.util.List<View> cards = new java.util.ArrayList<View>();
-        collectCards((android.view.ViewGroup) findViewById(R.id.toolColumn), cards);
-        for (View c : cards) {
-            boolean isMedia = false;
-            for (int id : MEDIA_CARDS) if (c.getId() == id) { isMedia = true; break; }
-            c.setVisibility(isMedia == media ? View.VISIBLE : View.GONE);
+    }
+
+    /** 把单列卡片流拆成 首页/媒体 两个子页 + 内嵌设置页，装入统一页容器 */
+    private void buildPages() {
+        pagesBuilt = true;
+        android.view.ViewGroup toolColumn = (android.view.ViewGroup) findViewById(R.id.toolColumn);
+        ScrollView homeScroll = null;
+        for (int i = 0; i < toolColumn.getChildCount(); i++) {
+            View c = toolColumn.getChildAt(i);
+            if (c instanceof ScrollView) { homeScroll = (ScrollView) c; break; }
         }
+        LinearLayout cardsBox = (LinearLayout) homeScroll.getChildAt(0);
+        // 媒体页
+        ScrollView mediaScroll = new ScrollView(this);
+        mediaScroll.setFillViewport(true);
+        mediaScroll.setVerticalScrollBarEnabled(false);
+        LinearLayout mediaBox = new LinearLayout(this);
+        mediaBox.setOrientation(LinearLayout.VERTICAL);
+        float den = getResources().getDisplayMetrics().density;
+        mediaBox.setPadding((int) (18 * den), (int) (20 * den), (int) (18 * den), (int) (150 * den));
+        boolean first = true;
+        for (int id : MEDIA_CARDS) {
+            View card = findViewById(id);
+            int idx = -1;
+            for (int i = 0; i < cardsBox.getChildCount(); i++) if (cardsBox.getChildAt(i) == card) { idx = i; break; }
+            if (idx < 0) continue;
+            cardsBox.removeView(card);
+            LinearLayout.LayoutParams lp = (LinearLayout.LayoutParams) card.getLayoutParams();
+            if (first) { lp.topMargin = 0; first = false; }
+            card.setLayoutParams(lp);
+            mediaBox.addView(card);
+        }
+        mediaScroll.addView(mediaBox, new FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.WRAP_CONTENT));
+        // 页容器
+        pageHost = new FrameLayout(this);
+        int homeIdx = toolColumn.indexOfChild(homeScroll);
+        toolColumn.removeView(homeScroll);
+        pageHost.addView(homeScroll, new FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT));
+        pageHost.addView(mediaScroll, new FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT));
+        pageSettings = new SettingsPageView(this);
+        pageSettings.setVisibility(View.GONE);
+        pageHost.addView(pageSettings, new FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT));
+        toolColumn.addView(pageHost, homeIdx, new android.view.ViewGroup.LayoutParams(
+                android.view.ViewGroup.LayoutParams.MATCH_PARENT, android.view.ViewGroup.LayoutParams.MATCH_PARENT));
     }
 
     private void collectCards(android.view.ViewGroup vg, java.util.List<View> out) {
