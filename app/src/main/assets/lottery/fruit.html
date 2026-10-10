@@ -108,23 +108,28 @@ var SYM = {
 // 外圈 16 格（顺时针），与真实水果机布局近似
 var RING = ['apple','bell','bar','bell','apple','star','apple','luck','luck','bell','star',
             'apple','star','seven','seven','apple'];
-var XTAG = {'bar':'X30','bell':'X2','star':'X2','apple':'X2','seven':'X2'};
+var XTAG = {'bar':'X30','seven':'X12','star':'X6','bell':'X6','apple':'X3'};
 // 5 个押注位（底排）：符号 + 赔率
 var BET_SLOTS = ['bar','seven','star','bell','apple'];
-var slot = 2;   // 当前押注档: 0=小(2) 1=大(8)
+var slot = 0;   // 当前押注档: 0=小(2) 1=大(8)
 var BETS = [2, 8];
 
 var balance = parseInt(localStorage.getItem('fm_bal') || '500', 10);
+if (!isFinite(balance) || balance < 0) balance = 500;
 var bets = {}; BET_SLOTS.forEach(function(k){ bets[k] = 0; });
 var spinning = false;
 
 // ---------- 渲染 ----------
 var board = document.getElementById('board');
 var cells = [];
+// 顺时针边界位置(1-based 网格坐标): 顶行→右列→底行→左列
+var POS = [[1,1],[1,2],[1,3],[1,4],[1,5],[2,5],[3,5],[4,5],[5,5],[5,4],[5,3],[5,2],[5,1],[4,1],[3,1],[2,1]];
 RING.forEach(function(k, i) {
   var s = SYM[k];
   var d = document.createElement('div');
   d.className = 'cell ' + s.cls;
+  d.style.gridRow = POS[i][0];
+  d.style.gridColumn = POS[i][1];
   d.innerHTML = '<span>' + (k === 'bar' ? '<span style="font-weight:900;font-size:15px">BAR</span>' : s.emoji) + '</span>' +
                 (XTAG[k] ? '<span class="x">' + XTAG[k] + '</span>' : '');
   board.appendChild(d);
@@ -133,6 +138,7 @@ RING.forEach(function(k, i) {
 // 中心 logo + 信息
 var center = document.createElement('div');
 center.id = 'center';
+center.style.gridArea = '2 / 2 / 5 / 5';
 center.innerHTML = '<div><div id="logo">✦ 幸运水果机 ✦</div><div id="msg">点押注位下注，按 GO 开奖</div></div>';
 board.appendChild(center);
 
@@ -149,7 +155,7 @@ BET_SLOTS.forEach(function(k) {
   betAmt[k] = d;
 });
 
-function pad(n) { n = Math.max(0, Math.round(n)); var s = String(n); while (s.length < 4) s = '0' + s; return s; }
+function pad(n) { if (!isFinite(n)) n = 0; n = Math.max(0, Math.round(n)); var s = String(n); while (s.length < 4) s = '0' + s; return s; }
 function refresh() {
   document.getElementById('ledBal').textContent = pad(balance);
   document.getElementById('ledWin').textContent = pad(0);
@@ -157,7 +163,7 @@ function refresh() {
   BET_SLOTS.forEach(function(k) { betAmt[k].classList.toggle('sel', bets[k] > 0); });
 }
 function toast(m) { document.getElementById('msg').textContent = m; }
-function save() { localStorage.setItem('fm_bal', String(balance)); }
+function save() { if (isFinite(balance)) localStorage.setItem('fm_bal', String(balance)); }
 
 // ---------- 押注 ----------
 function placeBet(k) {
