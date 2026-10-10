@@ -71,35 +71,19 @@ public class HomeActivity extends Activity {
 
     private float swX, swY; private boolean swDone;
 
-    @Override
-    public boolean dispatchTouchEvent(android.view.MotionEvent ev) {
-        switch (ev.getActionMasked()) {
-            case android.view.MotionEvent.ACTION_DOWN:
-                swX = ev.getX(); swY = ev.getY(); swDone = false; break;
-            case android.view.MotionEvent.ACTION_MOVE: {
-                if (!swDone) {
-                    float dx = ev.getX() - swX, dy = ev.getY() - swY;
-                    if (Math.abs(dx) > Math.abs(dy) * 1.4f && Math.abs(dx) > dp2(80)) {
-                        swDone = true;
-                        startActivity(new Intent(this, SettingsActivity.class));
-                        overridePendingTransition(R.anim.slide_in_right, R.anim.slide_out_left);
-                    }
-                }
-                break;
-            }
-        }
-        return super.dispatchTouchEvent(ev);
-    }
 
     private float dp2(float v) { return v * getResources().getDisplayMetrics().density; }
 
     private boolean mediaPage = false;
+    private CapsuleBottomBar bottomBar;
+    private android.view.GestureDetector pageGesture;
     private static final int[] MEDIA_CARDS = {R.id.cardPlayer, R.id.cardDownload, R.id.cardVideoDl, R.id.cardXhs};
 
     /** 首页/媒体管理 胶囊页切换 */
     private void switchPage(boolean media) {
         if (mediaPage == media) return;
         mediaPage = media;
+        if (bottomBar != null) bottomBar.setActive(media ? 1 : 0);
         java.util.List<View> cards = new java.util.ArrayList<View>();
         collectCards((android.view.ViewGroup) findViewById(R.id.toolColumn), cards);
         for (View c : cards) {
@@ -121,15 +105,20 @@ public class HomeActivity extends Activity {
         boolean dark = getSharedPreferences("settings", MODE_PRIVATE).getBoolean("dark", false);
         findViewById(R.id.toolRoot).setBackgroundColor(dark ? 0xFF000000 : 0xFFEEF4FF);
         // 底部胶囊导航（SmoothBottomBar 风格）
-        ((android.view.ViewGroup) findViewById(R.id.toolRoot)).addView(
-            new CapsuleBottomBar(this, dark, new CapsuleBottomBar.OnItem() {
+        android.view.ViewGroup root = (android.view.ViewGroup) findViewById(R.id.toolRoot);
+        for (int i = root.getChildCount() - 1; i >= 0; i--) {
+            if (root.getChildAt(i) instanceof CapsuleBottomBar) root.removeViewAt(i);
+        }
+        bottomBar = new CapsuleBottomBar(this, dark, new CapsuleBottomBar.OnItem() {
                 public void onItem(int idx) {
                     if (idx == 1) switchPage(true);
                     else if (idx == 2) startActivity(new Intent(HomeActivity.this, SettingsActivity.class));
                     else if (idx == 3) showPlayChoice();
                     else switchPage(false);
                 }
-            }));
+            });
+        bottomBar.setTag("bottombar");
+        root.addView(bottomBar);
         findViewById(R.id.toolColumn).setBackgroundColor(dark ? 0xFF000000 : 0xFFEEF4FF);
         ((TextView) findViewById(R.id.themeToggle)).setText(dark ? "☀️" : "🌙");
         applyTraversal((android.view.ViewGroup) findViewById(R.id.toolColumn), dark);
@@ -183,9 +172,25 @@ public class HomeActivity extends Activity {
     }
 
     @Override
+    public boolean dispatchTouchEvent(android.view.MotionEvent ev) {
+        if (pageGesture != null) pageGesture.onTouchEvent(ev);
+        return super.dispatchTouchEvent(ev);
+    }
+
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         RecManager.init(getApplicationContext());
+        pageGesture = new android.view.GestureDetector(this, new android.view.GestureDetector.SimpleOnGestureListener() {
+            public boolean onFling(android.view.MotionEvent e1, android.view.MotionEvent e2, float vx, float vy) {
+                if (e1 == null || e2 == null) return false;
+                float dx = e2.getX() - e1.getX(), dy = e2.getY() - e1.getY();
+                if (Math.abs(dx) > 150 && Math.abs(dx) > Math.abs(dy) * 1.5f) {
+                    switchPage(dx < 0);
+                    return true;
+                }
+                return false;
+            }
+        });
         Thread.setDefaultUncaughtExceptionHandler(new Thread.UncaughtExceptionHandler() {
             @Override
             public void uncaughtException(Thread t, Throwable e) {

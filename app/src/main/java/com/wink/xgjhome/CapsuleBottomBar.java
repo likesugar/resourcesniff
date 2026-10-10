@@ -84,6 +84,9 @@ public class CapsuleBottomBar extends FrameLayout {
     }
     private float downX; private boolean swiped;
 
+    /** 外部同步选中态(不触发回调) */
+    public void setActive(int idx) { if (idx != active) select(idx, false); }
+
     public void select(int idx, boolean fire) {
         if (idx == active) { pill.setTranslationX(idx * itemW); if (fire && cb != null) cb.onItem(idx); return; }
         int old = active;
