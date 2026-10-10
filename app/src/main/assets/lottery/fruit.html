@@ -7,7 +7,7 @@
 <style>
   * { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; user-select:none; }
   html,body { width:100%; height:100%; overflow:hidden; background:#0d0618; font-family:sans-serif; }
-  #machine { position:absolute; inset:0; display:flex; flex-direction:column; padding:6px 10px; }
+  #machine { position:absolute; inset:0; display:flex; flex-direction:column; padding:6px 10px; overflow-y:auto; }
   /* 顶部机头 */
   #head { background:linear-gradient(#3a2a52,#241636); border:3px solid #d8a520; border-radius:14px 14px 0 0;
           padding:8px 10px 6px; text-align:center; position:relative; }
@@ -24,7 +24,7 @@
   #arch { height:14px; background:repeating-linear-gradient(90deg,#ffe082 0 6px,#2a1a10 6px 14px);
           border-radius:0 0 8px 8px; }
   /* 转盘区 */
-  #board { flex:1; margin:4px 14px; border:3px solid #d8a520; border-radius:10px;
+  #board { flex:none; width:100%; aspect-ratio:1/1; margin:4px 14px; border:3px solid #d8a520; border-radius:10px;
            background:radial-gradient(circle at 50% 50%, #4a1a6e 0%, #2a0e42 70%);
            display:grid; grid-template-columns:repeat(5,1fr); grid-template-rows:repeat(5,1fr); gap:4px; padding:6px; }
   .cell { border-radius:8px; display:flex; flex-direction:column; align-items:center; justify-content:center;
@@ -73,14 +73,13 @@
 </style>
 </head>
 <body>
-<button onclick="app.close()" style="margin:6px 0 0 10px;padding:7px 20px;background:#241636;color:#ffd75e;border:2px solid #d8a520;border-radius:16px;font-size:14px;font-weight:bold">← 返回</button>
+<button id="appBackTop" onclick="app.close()" style="margin:6px 0 0 10px;padding:7px 20px;background:#241636;color:#ffd75e;border:2px solid #d8a520;border-radius:16px;font-size:14px;font-weight:bold">← 返回</button>
 <div id="machine">
   <div id="head">
     <div class="lucky">LUCKY</div>
     <div id="counters">
       <span class="clabel">可用余额:</span><div class="led" id="ledBal">0</div>
       <span class="clabel">当前赢取:</span><div class="led" id="ledWin">0</div>
-      <button id="btnBack">返回</button>
     </div>
   </div>
   <div id="arch"></div>
@@ -212,7 +211,7 @@ document.getElementById('btnClear').onclick = function() {
 };
 document.getElementById('btnSmall').onclick = function() { slot = 0; toast('押注档：2'); };
 document.getElementById('btnBig').onclick = function() { slot = 1; toast('押注档：8'); };
-document.getElementById('btnBack').onclick = function() { if (window.JNI) JNI.back(); else history.back(); };
+document.getElementById('appBackTop') && (document.getElementById('appBackTop').onclick = function() { if (window.app) app.close(); });
 
 // ---------- 开奖 ----------
 document.getElementById('go').onclick = function() {

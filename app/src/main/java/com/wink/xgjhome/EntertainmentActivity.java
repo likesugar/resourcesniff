@@ -52,6 +52,7 @@ public class EntertainmentActivity extends Activity {
             public void onClick(View v) {
                 fruit = !fruit;
                 modeBtn.setText(fruit ? "🎡 娱乐" : "🎰 水果机");
+                modeBtn.setVisibility(fruit ? View.GONE : View.VISIBLE); // 水果机里不显示切换按钮
                 web.loadUrl("file:///android_asset/lottery/" + (fruit ? "fruit.html" : "ent.html"));
             }
         });
