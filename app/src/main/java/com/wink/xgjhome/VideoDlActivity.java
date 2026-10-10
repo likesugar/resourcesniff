@@ -352,10 +352,10 @@ public class VideoDlActivity extends Activity {
                             meta.addOption("--user-agent", st[0]);
                             meta.addOption("--add-headers", "Referer: " + ref);
                             boolean yt = tk.url.contains("youtube.com") || tk.url.contains("youtu.be");
-                            boolean ytNoCookie = yt && si == 2;
+                            boolean ytNoCookie = yt && si < 2;
                             if (st[2].equals("1") && !ytNoCookie) meta.addOption("--cookies", cookies().getAbsolutePath());
                             if (yt) {
-                                String pc = si == 0 ? "tv" : si == 1 ? "web_safari" : si == 2 ? "android_vr" : "web_embedded";
+                                String pc = si == 0 ? "android_vr" : si == 1 ? "android_vr" : si == 2 ? "web_safari" : "tv";
                                 meta.addOption("--extractor-args", "youtube:player_client=" + pc + (ytNoCookie ? "" : "+cookies"));
                             }
                             com.yausername.youtubedl_android.YoutubeDLResponse mr =
@@ -398,10 +398,10 @@ public class VideoDlActivity extends Activity {
                         req.addOption("--user-agent", st[0]);
                         req.addOption("--add-headers", "Referer: " + ref);
                         boolean yt2 = tk.url.contains("youtube.com") || tk.url.contains("youtu.be");
-                            boolean ytNoCookie2 = yt2 && si == 2;
+                            boolean ytNoCookie2 = yt2 && si < 2;
                             if (st[2].equals("1") && !ytNoCookie2) req.addOption("--cookies", cookies().getAbsolutePath());
                             if (yt2) {
-                                String pc = si == 0 ? "tv" : si == 1 ? "web_safari" : si == 2 ? "android_vr" : "web_embedded";
+                                String pc = si == 0 ? "android_vr" : si == 1 ? "android_vr" : si == 2 ? "web_safari" : "tv";
                                 req.addOption("--extractor-args", "youtube:player_client=" + pc + (ytNoCookie2 ? "" : "+cookies"));
                             }
 
@@ -451,7 +451,7 @@ public class VideoDlActivity extends Activity {
                             ra.addOption("--add-headers", "Referer: " + ref);
                             if (st[2].equals("1") && !ytNoCookie2) ra.addOption("--cookies", cookies().getAbsolutePath());
                             if (yt2) {
-                                String pc = si == 0 ? "tv" : si == 1 ? "web_safari" : si == 2 ? "android_vr" : "web_embedded";
+                                String pc = si == 0 ? "android_vr" : si == 1 ? "android_vr" : si == 2 ? "web_safari" : "tv";
                                 ra.addOption("--extractor-args", "youtube:player_client=" + pc + (ytNoCookie2 ? "" : "+cookies"));
                             }
                             ra.addOption("-o", out.getAbsolutePath());
