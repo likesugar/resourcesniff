@@ -126,18 +126,19 @@ var SYM = {
 // 外圈 16 格（顺时针），与真实水果机布局近似
 var RING = ['apple','bell','bar','bell','apple','star','apple','luck','luck','bell','star',
             'apple','star','seven','seven','apple'];
-var RTP = { easy:1.02, normal:0.90, hard:0.78 }; // 含 LUCK 补偿后: 约 107%/95%/83% // 期望回报率: 容易略赚/普通微亏/困难重亏
+var RTP = { easy:1.00, normal:0.92, hard:0.82 }; // LUCK 为空格: 单押/全压期望都=RTP // 期望回报率: 容易略赚/普通微亏/困难重亏
 function buildWeights() {
-  var base = 0; BET_SLOTS.forEach(function(k){ base += 1/ODDS[k]; });
-  var K = (RTP[DIFF] || 0.98) / base; // 按倍数和缩放, 保证整局回报≈RTP
-  var w = {};
+  // p(符号) = K/odds, K=RTP → 单押任一符号期望都是 -RTP, 全压同亏; LUCK 吃剩余概率
+  var K = RTP[DIFF] || 0.90;
+  var w = {}, used = 0;
   BET_SLOTS.forEach(function(k) {
     var cnt = 0; RING.forEach(function(x){ if (x === k) cnt++; });
-    var per = Math.max(0.15, 16 * K / (ODDS[k] * Math.max(1, cnt)));
-    RING.forEach(function(x){ if (x === k) w[x] = per; });
+    var p = Math.min(0.6, K / ODDS[k]);
+    used += p;
+    RING.forEach(function(x){ if (x === k) w[x] = p * 16 / Math.max(1, cnt); });
   });
-  var lw = DIFF === 'easy' ? 0.5 : 0.2;
-  RING.forEach(function(x){ if (x === 'luck') w[x] = lw; });
+  var pLuck = Math.max(0.05, 1 - used);
+  RING.forEach(function(x){ if (x === 'luck') w[x] = pLuck * 16 / 2; });
   return w;
 }
 var XTAG = {'bar':'X30','seven':'X12','star':'X6','bell':'X6','apple':'X3'};
@@ -262,9 +263,9 @@ function settle(idx) {
   var k = RING[idx];
   var s = SYM[k];
   var win = bets[k] * s.odds;
-  if (k === 'luck') { // LUCK: 押注位全返 2 倍
-    win = BET_SLOTS.reduce(function(a, x) { return a + bets[x] * 2; }, 0);
-    toast('🍀 LUCK！全部押注 ×2 返还，赢 ' + win);
+  if (k === 'luck') { // LUCK: 空格, 不赔付
+    win = 0;
+    toast('🍀 LUCK！未押中');
   } else if (win > 0) {
     toast('🎉 开出 ' + s.name + ' ×' + s.odds + '，赢 ' + win + '！');
   } else {
